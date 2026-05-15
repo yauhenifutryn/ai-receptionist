@@ -84,7 +84,7 @@ VERTICAL-SPECIFIC (filled post-lock):
 
 ## 2. Framework Decision
 
-**Selected Framework:** **ElevenLabs ConvAI** (Conversational AI, formerly "Agents Platform") as voice runtime + agent orchestration. **Anthropic Claude Sonnet 4.6** (EU residency tier) as the agent's reasoning LLM.
+**Selected Framework:** **ElevenLabs ConvAI** (Conversational AI, formerly "Agents Platform") as voice runtime + agent orchestration. **Backend LLM work (scraper consolidation, ontology bootstrap, consent classifier, language detector) runs on Google Gemini** (3.1 Pro Preview for quality-sensitive tasks, 3.1 Flash-Lite for high-volume cheap tasks). **Agent in-call reasoning LLM is TBD Day 9** — depends on which LLMs ConvAI exposes as selectable; primary candidate is Anthropic Sonnet 4.6 EU for Polish naturalness, fallback Gemini 3.1 Flash Live Preview if ConvAI supports it as a custom-LLM endpoint.
 
 **Version:** `@elevenlabs/elevenlabs-js` ^2.x (Node), `@elevenlabs/react` ^1.0 (browser widget). Pin exact in `package.json` on Day 8.
 
@@ -117,8 +117,9 @@ VERTICAL-SPECIFIC (filled post-lock):
 ### Installation
 
 ```bash
-pnpm add @elevenlabs/elevenlabs-js zod @anthropic-ai/sdk
+pnpm add @elevenlabs/elevenlabs-js zod @google/genai
 pnpm add @elevenlabs/react   # apps/web only
+# Anthropic SDK (@anthropic-ai/sdk) added later if/when ConvAI exposes Sonnet 4.6 as the selectable agent LLM and we want to call it directly outside ConvAI.
 ```
 
 ### Core Imports
@@ -201,7 +202,7 @@ export async function provisionAgent(args: {
 4. **Tool argument hallucination.** Agent can invent argument values. Counter-mitigation: tight Zod-validated schemas on the webhook side, agent system prompt instructs explicit "use the values the caller said, do not invent."
 5. **Language switching mid-call**: setting `language: "pl"` is a _default_. Auto-detect must be implemented as either (a) ConvAI's language detect feature if available, or (b) a server-tool the agent calls on first turn that returns the detected language and triggers a voice swap. Verify Day 9.
 6. **Knowledge-base size cap per agent**: confirm in docs Day 8. If we exceed, split into multiple KB documents and rely on retrieval ordering.
-7. **Anthropic Claude in ConvAI**: confirm Sonnet 4.6 is a selectable LLM in ConvAI on Day 8 — if not yet available, fall back to GPT-4o EU residency or Anthropic via custom-LLM bring-your-own-endpoint (ConvAI supports a custom LLM URL).
+7. **Agent-runtime LLM selection in ConvAI**: Day-9 verify. Check which LLMs ConvAI exposes natively (Anthropic Sonnet 4.6, OpenAI GPT-4o, xAI, etc.) and whether Gemini is selectable. If our preferred model isn't native, ConvAI supports a custom-LLM URL — we can proxy any provider through that, including Gemini Live or Anthropic EU. Latency and EU residency are the constraints, not provider preference.
 
 ### Recommended Project Structure
 
@@ -210,7 +211,7 @@ ai_receptionist/
 ├── apps/
 │   ├── backend/
 │   │   ├── orchestration/       # provisionAgent, updateAgentKnowledge, getTranscript
-│   │   ├── scraper/             # Firecrawl → Claude consolidation
+│   │   ├── scraper/             # Firecrawl → Gemini 3.1 Pro consolidation
 │   │   ├── tools/               # check_availability + create_booking webhook handlers
 │   │   ├── post-call/           # webhook receiver, consent-gated transcript persistence
 │   │   ├── consent/             # universal consent script + classifier
@@ -240,10 +241,21 @@ ai_receptionist/
 
 **Model Configuration:**
 
-- Agent LLM: `claude-sonnet-4-6` via ConvAI, `temperature: 0.3` (we want consistency on prices / hours; some warmth but not creative), `maxTokens: 400` per turn (sub-3s latency budget). System prompt is short (<800 tokens) and instructs deference to retrieved KB. No few-shot in the system prompt — examples live in the ontology where retrieval can chunk them.
-- Consent classifier (post-first-turn): Claude Haiku 4.5 (fastest EU), `temperature: 0`, structured output (Pydantic-equivalent: Zod) returning `{ consent: "yes" | "no" | "ambiguous", confidence: number }`. Ambiguous defaults to `false`.
-- Scraper consolidation: Claude Sonnet 4.6, `temperature: 0`, structured Zod-validated output, hard prompt rule: "If a price is not in the source text, output `unknown`. Do not infer prices from related services."
-- Language detector: built-in ConvAI feature if available (verify Day 8); else GPT-4o-mini 1-shot on first transcribed user turn.
+Updated 2026-05-15: switched to **Gemini-first stack**. User has paid Google AI credits and wants the best models for quality-sensitive tasks. The `LLMClient` abstraction in `apps/backend/lib/llm.ts` (lands W2.1) makes per-task swapping a one-line config edit.
+
+| Job                                         | Model                                       | Tier         | Why                                                                                                                                                                                             |
+| ------------------------------------------- | ------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scraper consolidation                       | `gemini-3.1-pro-preview`                    | Paid         | Best quality on Google AI Studio. 1M-token context handles a full clinic-site dump in one call. ~$0.12 per onboarding (30K input + 5K output). Preview model — has tighter rate limits than GA. |
+| Ontology bootstrapping (post-vertical-lock) | `gemini-3.1-pro-preview`                    | Paid         | Same — quality matters for cross-tenant IP. Runs rarely (one batch when vertical locks).                                                                                                        |
+| Consent classifier                          | `gemini-3.1-flash-lite`                     | Free / cheap | Newest cheap model. ~$0.0001 per classification. Hundreds of free calls/day available; trivially affordable on paid.                                                                            |
+| Language detector                           | `gemini-3.1-flash-lite`                     | Free / cheap | Trivial task, lowest latency, lowest cost.                                                                                                                                                      |
+| Agent in-call LLM (live conversation)       | TBD Day 9 — verify ConvAI's selectable LLMs | —            | Likely Anthropic Sonnet 4.6 (best Polish naturalness) OR Gemini 3.1 Flash Live Preview if ConvAI supports it as a custom-LLM endpoint. Fallback: GPT-4o EU.                                     |
+
+Common parameters: `temperature: 0` for all structured-output tasks; consent + language detector return strict Zod-validated JSON via Gemini's `responseSchema` mode. Agent LLM `temperature: 0.3` once selected.
+
+Hard rule baked into the scraper consolidation prompt: "If a price is not in the source text, output `unknown`. Do not infer prices from related services."
+
+Fallback ordering when 3.1 Pro Preview rate-limited: `gemini-2.5-pro` → `gemini-3-flash-preview`. Implemented in the `LLMClient` retry chain.
 
 **Core Pattern (Conversational RAG with Server Tools):**
 
@@ -289,19 +301,27 @@ const ConsentResult = z.object({
 });
 
 export async function classifyConsent(transcribedUserTurn: string) {
-  const raw = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 100,
-    temperature: 0,
-    system: "Classify the caller's response to the consent question. Output JSON only.",
-    messages: [
-      {
-        role: "user",
-        content: `Question asked: <consent script>\nCaller said: ${transcribedUserTurn}\nOutput JSON: {"consent":"yes"|"no"|"ambiguous","confidence":0..1}`,
+  // Uses Gemini's strict structured-output (responseSchema) — fewer parse failures than text-then-parse.
+  const result = await gemini.models.generateContent({
+    model: "gemini-3.1-flash-lite",
+    contents: `Question asked: <consent script>\nCaller said: ${transcribedUserTurn}`,
+    config: {
+      systemInstruction:
+        "Classify the caller's response to the consent question. Output JSON only.",
+      temperature: 0,
+      maxOutputTokens: 100,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "object",
+        properties: {
+          consent: { type: "string", enum: ["yes", "no", "ambiguous"] },
+          confidence: { type: "number" },
+        },
+        required: ["consent", "confidence"],
       },
-    ],
+    },
   });
-  const parsed = ConsentResult.safeParse(JSON.parse(raw.content[0].text));
+  const parsed = ConsentResult.safeParse(JSON.parse(result.text));
   if (!parsed.success) return { consent: "ambiguous", confidence: 0 } as const;
   return parsed.data;
 }
@@ -331,9 +351,11 @@ Stream LLM responses where the caller can wait (scraper consolidation can stream
 ### Cost and Latency Budget
 
 - Voice runtime: $0.10-0.15/min (ElevenLabs Pro). 1,000 included min/mo at the 1,499 PLN tier; per-min refund offset 0.85 PLN.
-- LLM cost per call: Sonnet 4.6 ~$0.005/turn × 8 turns avg = $0.04/call. Negligible vs runtime.
+- Backend LLM cost per onboarding (Gemini 3.1 Pro Preview): ~30K input + 5K output tokens × $2/$12 per 1M = **~$0.12 per tenant scrape**. Negligible.
+- Backend LLM cost per call (Gemini 3.1 Flash-Lite for consent + language detection): ~50 input + 30 output tokens × $0.25/$1.50 per 1M = **~$0.0001 per call**. Negligible.
+- Agent in-call LLM cost: TBD pending Day-9 LLM selection. Anthropic Sonnet 4.6 reference: ~$0.005/turn × 8 turns avg = $0.04/call. Negligible vs voice runtime.
 - Latency budget per turn (target): ASR finalize ≤500ms + LLM first-token ≤700ms + KB retrieval (parallel) ≤300ms + TTS first-byte ≤400ms = ~1.5s perceived. p95 target 2.5s.
-- Caching: Anthropic prompt caching ON for the system prompt (saves 80%+ on tokens after first turn). Verify ConvAI exposes the cache control flag; if not, raise as an EL feature ask.
+- Caching: Gemini context caching available for repeated system prompts ($0.20/$0.40 per 1M cached tokens for Pro Preview, $0.025 for Flash-Lite). Anthropic prompt caching ON if/when we use Sonnet for the agent runtime (saves 80%+ on tokens after first turn). Verify ConvAI exposes whichever provider's cache flag we end up using.
 
 ---
 
@@ -341,19 +363,19 @@ Stream LLM responses where the caller can wait (scraper consolidation can stream
 
 ### Dimensions
 
-| Dimension                       | Rubric                                                                                                                                                                                     | Measurement                                                         | Priority |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | -------- |
-| Polish phrasing naturalness     | 1-5 Likert from native-PL owner on the first 20 turns of each pilot. Pass = avg ≥4.0; any 1 or 2 triggers a script tweak.                                                                  | Human (pilot owner)                                                 | Critical |
-| Consent flow correctness        | Pass/Fail per call. Pass = `consent_flag` matches the caller's intent on a labeled test set (20 transcripts: 10 "tak", 10 "nie", 0 ambiguous misroutes). Pass rate ≥95%.                   | Code (test fixtures)                                                | Critical |
-| Price hallucination rate        | Pass/Fail per query. Pass = answer is in source OR says "nie mam tej informacji, sprawdzę". Fail = invented number. Pass rate 100% (zero tolerance).                                       | LLM judge (Claude Sonnet 4.6 with rubric) + spot-check 10% by Jenya | Critical |
-| Escalation accuracy             | Per emergency keyword set (vertical-specific, currently empty): the agent must escalate within 2 turns when the keyword appears in caller speech. Pass rate ≥95% on a 20-keyword test set. | LLM judge + human spot-check                                        | Critical |
-| Multilingual auto-detect        | Pass rate ≥90% on a 30-call test set (10 PL, 10 EN, 10 RU).                                                                                                                                | Code (compare detected vs ground-truth label)                       | High     |
-| Booking accuracy                | Booking written to calendar matches the slot the agent quoted to caller, on a 20-booking test set. Pass rate 100% (zero tolerance for phantom bookings).                                   | Code (compare transcript-quoted slot vs DB row)                     | Critical |
-| Tool-call format compliance     | Server tool receives Zod-valid payload on every invocation. Failure → graceful fallback message; metric tracked.                                                                           | Code (Zod parse failures = denominator)                             | High     |
-| First-response latency (turn 1) | p50 ≤2.0s, p95 ≤3.5s from caller silence-end to agent first audio byte                                                                                                                     | Code (ElevenLabs trace events)                                      | High     |
-| Mid-call latency (turns 2+)     | p50 ≤1.5s, p95 ≤2.5s                                                                                                                                                                       | Code (ElevenLabs trace events)                                      | High     |
-| PII-in-logs leakage             | Zero occurrences in 1 week of Vercel + Supabase logs. Grep-test in CI on synthetic transcripts.                                                                                            | Code (regex sweep over log buckets)                                 | Critical |
-| Owner gut-check approval        | Pilot owner approves first 10 real calls. Blocking gate before pilot 1 goes live.                                                                                                          | Human (owner)                                                       | Critical |
+| Dimension                       | Rubric                                                                                                                                                                                     | Measurement                                                                | Priority |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | -------- |
+| Polish phrasing naturalness     | 1-5 Likert from native-PL owner on the first 20 turns of each pilot. Pass = avg ≥4.0; any 1 or 2 triggers a script tweak.                                                                  | Human (pilot owner)                                                        | Critical |
+| Consent flow correctness        | Pass/Fail per call. Pass = `consent_flag` matches the caller's intent on a labeled test set (20 transcripts: 10 "tak", 10 "nie", 0 ambiguous misroutes). Pass rate ≥95%.                   | Code (test fixtures)                                                       | Critical |
+| Price hallucination rate        | Pass/Fail per query. Pass = answer is in source OR says "nie mam tej informacji, sprawdzę". Fail = invented number. Pass rate 100% (zero tolerance).                                       | LLM judge (`gemini-3.1-pro-preview` with rubric) + spot-check 10% by Jenya | Critical |
+| Escalation accuracy             | Per emergency keyword set (vertical-specific, currently empty): the agent must escalate within 2 turns when the keyword appears in caller speech. Pass rate ≥95% on a 20-keyword test set. | LLM judge + human spot-check                                               | Critical |
+| Multilingual auto-detect        | Pass rate ≥90% on a 30-call test set (10 PL, 10 EN, 10 RU).                                                                                                                                | Code (compare detected vs ground-truth label)                              | High     |
+| Booking accuracy                | Booking written to calendar matches the slot the agent quoted to caller, on a 20-booking test set. Pass rate 100% (zero tolerance for phantom bookings).                                   | Code (compare transcript-quoted slot vs DB row)                            | Critical |
+| Tool-call format compliance     | Server tool receives Zod-valid payload on every invocation. Failure → graceful fallback message; metric tracked.                                                                           | Code (Zod parse failures = denominator)                                    | High     |
+| First-response latency (turn 1) | p50 ≤2.0s, p95 ≤3.5s from caller silence-end to agent first audio byte                                                                                                                     | Code (ElevenLabs trace events)                                             | High     |
+| Mid-call latency (turns 2+)     | p50 ≤1.5s, p95 ≤2.5s                                                                                                                                                                       | Code (ElevenLabs trace events)                                             | High     |
+| PII-in-logs leakage             | Zero occurrences in 1 week of Vercel + Supabase logs. Grep-test in CI on synthetic transcripts.                                                                                            | Code (regex sweep over log buckets)                                        | Critical |
+| Owner gut-check approval        | Pilot owner approves first 10 real calls. Blocking gate before pilot 1 goes live.                                                                                                          | Human (owner)                                                              | Critical |
 
 ### Eval Tooling
 
@@ -400,7 +422,7 @@ pnpm -F backend evals:nightly  # 50-query test set vs current fake-clinic agent,
 
 - 50-call seed set: hand-labeled by Jenya + pilot owner before Day 10.
 - Production sampling: smart filter (high tool-call latency, retrieval-low-confidence flag, owner-flagged) → human review weekly.
-- LLM judge: Claude Sonnet 4.6 with a rubric prompt per dimension. Judge prompts versioned in `apps/backend/evals/judges/` and re-calibrated against human labels every Monday in W2-W3.
+- LLM judge: `gemini-3.1-pro-preview` with a rubric prompt per dimension. Judge prompts versioned in `apps/backend/evals/judges/` and re-calibrated against human labels every Monday in W2-W3.
 
 ---
 
@@ -468,7 +490,7 @@ pnpm -F backend evals:nightly  # 50-query test set vs current fake-clinic agent,
 - [x] Domain context researched (Section 1b — STUB pending vertical lock 2026-05-18; structure populated, cross-vertical rows filled)
 - [x] Regulatory/compliance context identified (RODO Art. 6/13/14/32, EU AI Act limited-risk)
 - [x] Domain expert roles defined (pilot owner, Sebastian, vertical specialist TBD, Jenya)
-- [x] Framework selected with rationale (ElevenLabs ConvAI + Claude Sonnet 4.6)
+- [x] Framework selected with rationale (ElevenLabs ConvAI for voice runtime; Gemini 3.1 Pro Preview / Flash-Lite for backend LLM work; agent in-call LLM TBD Day 9)
 - [x] Alternatives considered and ruled out (Vapi, Synthflow, Retell, build-your-own, LangGraph)
 - [x] Framework quick reference written (install, imports, entry-point pattern, abstractions, pitfalls, project structure)
 - [x] AI systems best practices written (Zod, async, prompt discipline, context, cost+latency)

@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Receptionist — Project Snapshot 2026-05-14</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --bg-soft: #f5f5f4;
+    --text: #1c1917;
+    --text-muted: #57534e;
+    --text-dim: #78716c;
+    --border: #e7e5e4;
+    --border-strong: #d6d3d1;
+    --accent: #b45309;
+    --accent-bg: #fef3c7;
+    --warn: #b91c1c;
+    --warn-bg: #fef2f2;
+    --ok: #15803d;
+    --ok-bg: #f0fdf4;
+    --code-bg: #f5f5f4;
+    --code-text: #44403c;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  header.top {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  header.top .eyebrow {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  header.top h1 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin: 0 0 8px;
+    font-weight: 600;
+  }
+  header.top .sub {
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  h2 {
+    font-size: 19px;
+    margin: 40px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 16px;
+    margin: 24px 0 8px;
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 14px;
+    margin: 16px 0 6px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  p { margin: 0 0 12px; }
+  ul, ol { margin: 0 0 12px; padding-left: 24px; }
+  li { margin-bottom: 4px; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 14px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    border: 1px solid var(--border);
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--bg-soft);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  tr:last-child td { border-bottom: none; }
+  .callout {
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin: 16px 0;
+    border: 1px solid var(--border);
+    background: var(--bg-soft);
+  }
+  .callout.warn {
+    border-color: #fecaca;
+    background: var(--warn-bg);
+  }
+  .callout.warn strong { color: var(--warn); }
+  .callout.accent {
+    border-color: #fde68a;
+    background: var(--accent-bg);
+  }
+  .callout.accent strong { color: var(--accent); }
+  .callout.ok {
+    border-color: #bbf7d0;
+    background: var(--ok-bg);
+  }
+  .callout.ok strong { color: var(--ok); }
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--bg-soft);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    margin-right: 4px;
+  }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); border-color: #fecaca; }
+  .pill.ok { background: var(--ok-bg); color: var(--ok); border-color: #bbf7d0; }
+  .pill.accent { background: var(--accent-bg); color: var(--accent); border-color: #fde68a; }
+  nav.toc {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    padding: 14px 18px;
+    border-radius: 6px;
+    margin: 24px 0 40px;
+    font-size: 13px;
+  }
+  nav.toc strong {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  nav.toc ol {
+    margin: 0;
+    padding-left: 18px;
+    columns: 2;
+    column-gap: 24px;
+  }
+  nav.toc a { color: var(--text); }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .kvgrid {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 6px 16px;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  .kvgrid dt { color: var(--text-muted); }
+  .kvgrid dd { margin: 0; }
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li { padding-left: 24px; position: relative; margin-bottom: 6px; }
+  .checklist li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 3px;
+    background: white;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+  .small { font-size: 13px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">Project Snapshot — 2026-05-14</div>
+  <h1>AI Receptionist</h1>
+  <div class="sub">
+    Polish dental voice AI platform. 3-week sprint at START Warsaw.
+    <span class="pill accent">Day 7 / 21</span>
+    <span class="pill">Build Day 1</span>
+    <span class="pill warn">Vertical under review</span>
+  </div>
+</header>
+
+<div class="callout warn">
+  <strong>Live decision: vertical may pivot.</strong><br>
+  The current target is mid-market Polish private dental and aesthetic-medicine clinics. The team is actively evaluating whether to pivot to a vertical with steadier and more predictable demand (e.g., legal, real estate, professional services, beauty / wellness, veterinary). Everything below describes the project as currently shaped around dental. Architecture, stack, knowledge layering, and the Day 7-21 build sequence carry over to any voice-receptionist vertical with minimal change. Polish dental ontology and clinic-specific integrations (Booksy, Medfile, Estomed, Mediporta, Proassist) are the parts that would be replaced if vertical changes.
+</div>
+
+<nav class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#overview">Project overview</a></li>
+    <li><a href="#timeline">Sprint timeline</a></li>
+    <li><a href="#team">Team and split</a></li>
+    <li><a href="#stack">Stack defaults</a></li>
+    <li><a href="#knowledge">Knowledge architecture</a></li>
+    <li><a href="#setup">Account setup checklist</a></li>
+    <li><a href="#sequence">Day-by-day build sequence</a></li>
+    <li><a href="#access">Access provisioning</a></li>
+    <li><a href="#gate">Day 10 demo gate</a></li>
+    <li><a href="#handoff">Day 11 handoff</a></li>
+    <li><a href="#framework">GSD + superpowers</a></li>
+    <li><a href="#parallel">Parallel sessions</a></li>
+    <li><a href="#iterate">Iterate-until-success</a></li>
+    <li><a href="#repo">Repo layout</a></li>
+    <li><a href="#rules">Hard rules</a></li>
+    <li><a href="#open">Open status items</a></li>
+    <li><a href="#newchat">New-chat prompt</a></li>
+    <li><a href="#sources">Source docs in repo</a></li>
+  </ol>
+</nav>
+
+<section id="overview">
+<h2>1. Project overview</h2>
+<p>A vertical voice-AI platform for mid-market private dental and aesthetic-medicine clinics in Poland (1-4 chair practices, plus aesthetic clinics with meaningful after-hours and foreign-patient call volume). The agent answers inbound calls in conversational Polish (with English and Russian on demand), books appointments directly into the clinic's existing system (Booksy, Medfile, Estomed, Mediporta, Proassist, or Google Calendar as fallback), sends SMS confirmations with one-tap calendar add via a short URL, and escalates anything operationally complex to the human team with full context. Outbound conversational rebooking ships in v2. The clinic never sees ElevenLabs; we own the platform.</p>
+
+<p>Pricing: 1,499 / 2,499 / 3,999 PLN per month with 1,000 / 2,500 / 5,000 included minutes; 0.85 PLN per minute overage and refund offset. 60-day outcome guarantee at 2x monthly fee in recovered revenue. Per-clinic gross margin 56-89% at steady state.</p>
+
+<p>Demo Day at Rotunda Warsaw on 30 May 2026, 12:00-16:00. Intermediate forcing function: Inovo VC visit 18 May with Dawid Sugier.</p>
+</section>
+
+<section id="timeline">
+<h2>2. Sprint timeline</h2>
+<dl class="kvgrid">
+  <dt>Sprint window</dt><dd>8 May 2026 — 30 May 2026 (21 days)</dd>
+  <dt>Today</dt><dd>14 May 2026 (sprint Day 7, Build Day 1)</dd>
+  <dt>Days to Demo Day</dt><dd>16 days</dd>
+  <dt>Days to Inovo pitch</dt><dd>4 days (Wed 18 May, 17:00-21:00 with Dawid Sugier)</dd>
+  <dt>Pilot 1 live target</dt><dd>End of W2 (≈ 22 May)</dd>
+  <dt>Pilot 2 live target</dt><dd>End of W3 (≈ 29 May)</dd>
+  <dt>Demo Day</dt><dd>30 May, Rotunda Warsaw, 12:00-16:00</dd>
+</dl>
+<p class="small"><em>Day naming</em>: "Day N" in plan files refers to day N of the 21-day sprint window. Build days run in parallel; today is sprint Day 7 and Build Day 1 because nothing was coded before today. Tracking by absolute date avoids confusion.</p>
+</section>
+
+<section id="team">
+<h2>3. Team and split</h2>
+<table>
+  <thead>
+    <tr><th>Person</th><th>Lane</th><th>Owns</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Jenya</strong></td>
+      <td>Core product</td>
+      <td>ElevenLabs orchestration, per-clinic agent provisioning via API, scraper + KB pipeline, Polish dental ontology, consent flow, post-call webhook handling, live Demo Day technical execution.</td>
+    </tr>
+    <tr>
+      <td><strong>Rem</strong></td>
+      <td>Frontend + integrations</td>
+      <td>Onboarding wizard (Next.js + Tailwind + shadcn/ui, built directly with Claude Code), dashboard, Booksy / Medfile / Google Calendar / SMSAPI adapters, Vercel + Supabase setup, custom CRM integrations. Concrete scope locked Day 11 morning sync.</td>
+    </tr>
+    <tr>
+      <td><strong>Sebastian</strong></td>
+      <td>Commercial</td>
+      <td>Outreach list, cold calls + Instagram DMs, discovery meetings, pricing validation, pilot agreements, Inovo prep, Demo Day pitch lead. Lives in Notion, not in this repo.</td>
+    </tr>
+    <tr>
+      <td><strong>Patryk</strong></td>
+      <td>Program</td>
+      <td>Coordinator, unblocking, mentor intros (Pasha Rizali / Piotr Gerke / Jan Sikora).</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The split is parallelizable. The only hard sync point is <code>packages/contracts/*</code> — Rem scaffolds UI from mock data while Jenya finalizes schemas in parallel. PR review required only for changes touching <code>packages/contracts/*</code>; everywhere else, author self-merges after CI green.</p>
+</section>
+
+<section id="stack">
+<h2>4. Stack defaults</h2>
+<table>
+  <thead><tr><th>Layer</th><th>Choice</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Voice runtime</td><td>ElevenLabs Agents via API</td><td>Best Polish TTS, native multilingual, native RAG, native barge-in / turn-taking. Pro plan ($99) for production concurrency.</td></tr>
+    <tr><td>Telephony</td><td>Twilio EU via ElevenLabs native integration</td><td>One-line setup, EU regions.</td></tr>
+    <tr><td>Backend</td><td>Node.js + TypeScript + <code>@elevenlabs/elevenlabs-js</code></td><td>EU-deployable, single language across stack.</td></tr>
+    <tr><td>Frontend</td><td>Next.js + TypeScript + Tailwind + shadcn/ui</td><td>Built directly with Claude Code; no Lovable refactor step.</td></tr>
+    <tr><td>Database</td><td>Postgres on Supabase, Frankfurt (eu-central-1)</td><td>Auth, RLS, EU residency for RODO. Free tier covers sprint.</td></tr>
+    <tr><td>Hosting</td><td>Vercel, region <code>fra1</code> Frankfurt explicitly set</td><td>EU residency, GDPR DPA, free Hobby tier.</td></tr>
+    <tr><td>Backup hosting</td><td>Hetzner Falkenstein</td><td>Cheap German VPS fallback.</td></tr>
+    <tr><td>Scraping</td><td><strong>Firecrawl</strong> (managed, MCP server in env)</td><td>Handles JS-rendered SPAs; clean markdown out of the box; 500 free credits.</td></tr>
+    <tr><td>Browser demo widget</td><td><code>@elevenlabs/react</code> v1.0</td><td>Drop-in for "test in browser" in hours.</td></tr>
+    <tr><td>LLM (agent reasoning)</td><td>Claude Sonnet 4.6 via Anthropic EU</td><td>Polish benchmark W1 vs gpt-4o and Qwen2.5 / GLM; switch default if quality differs by &gt;5%.</td></tr>
+    <tr><td>Patient SMS</td><td>SMSAPI.pl with shared-brand sender ID</td><td>Polish operator coverage; per-clinic brand as +200 PLN/mo upgrade.</td></tr>
+    <tr><td>ICS generation</td><td><code>ics</code> npm package</td><td>RFC 5545 compliant.</td></tr>
+    <tr><td>ElevenLabs Agent Skills</td><td>Installed via <code>npx skills add elevenlabs/skills</code></td><td>Auto-loaded by Claude Code: <code>agents</code> and <code>setup-api-key</code> are directly relevant.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="knowledge">
+<h2>5. Knowledge architecture (3 layers)</h2>
+<p>The agent's RAG retriever pulls from all three layers at query time. Ordered by precedence; higher layer wins on conflicts.</p>
+
+<h3>Layer 1 — Polish dental ontology (our authored IP)</h3>
+<p>Path: <code>apps/backend/ontology/</code>. Version-controlled in git. Uploaded as agent KB documents.</p>
+<ul>
+  <li><code>services.md</code> — service taxonomy with Polish synonyms (~30 services).</li>
+  <li><code>triage.md</code> — escalation rules.</li>
+  <li><code>scripts.md</code> — default scripts (no-show recovery, recall, NFZ vs prywatne, hygiene reminder).</li>
+  <li><code>emergency-keywords.md</code> — pilne, ból nie do wytrzymania, spuchnięte, krwawi.</li>
+  <li><code>consent.md</code> — exact Polish + English wording for consent question at call start.</li>
+</ul>
+
+<h4>Indexing rules</h4>
+<ul>
+  <li>One service / one rule per H2 section.</li>
+  <li>Front-load Polish synonyms so embedding retrieval matches caller language.</li>
+  <li>Prices as explicit lines <code>Cena: 4500 PLN</code>; never as markdown tables (tables chunk badly).</li>
+  <li>Date-stamp prices: <code>Cennik aktualizowany: 2026-05-14</code>.</li>
+  <li>Section length 200-500 tokens.</li>
+  <li>Polish primary; EN and RU as parallel sections per service.</li>
+  <li>Include 1-2 example caller phrases per section.</li>
+</ul>
+
+<h3>Layer 2 — Per-clinic curated KB (Firecrawl-scraped, consolidated)</h3>
+<p>Path: <code>data/clinics/&lt;clinic_id&gt;/knowledge.md</code>.</p>
+<ol>
+  <li>Paste clinic URL into wizard.</li>
+  <li><code>firecrawl-map</code> lists all pages on the domain.</li>
+  <li><code>firecrawl-crawl</code> extracts markdown from each page (depth ~2-3, path filter excludes blog / legal).</li>
+  <li>Consolidation step (Claude Sonnet 4.6 with structured-output prompt): produces one <code>knowledge.md</code> in our shape (Klinika, Lekarze, Usługi i ceny, FAQ).</li>
+  <li>Upload to ElevenLabs as agent knowledge document.</li>
+</ol>
+
+<div class="callout warn">
+  <strong>Hard rule on consolidation prompt:</strong> "Do not invent prices. If a price is not in the source text, mark <code>unknown</code> and flag for clinic review during onboarding." Validate output before upload.
+</div>
+
+<h3>Layer 3 — Live website connector (ElevenLabs native, OPTIONAL complement)</h3>
+<p>ElevenLabs supports connecting a live URL as a knowledge source. They handle crawl + indexing internally.</p>
+<p><strong>Decision: complement, not main.</strong> Indexing quality is opaque; we can't see what was chunked or fix errors. The only value over Layer 2 is freshness when a clinic updates their site post-onboarding.</p>
+
+<h4>Verification plan (Day 8-9)</h4>
+<ol>
+  <li>Pick one real clinic with a typical Polish dental website.</li>
+  <li>Configure agent A = Layer 1 + Layer 2.</li>
+  <li>Configure agent B = Layer 1 + Layer 2 + Layer 3.</li>
+  <li>Ask both 20 test questions (prices, hours, services, staff, NFZ, location).</li>
+  <li>Compare answer accuracy, response latency, hallucination rate.</li>
+  <li>Decision rule: if B beats A on more than 70% of categories, ship Layer 3 as default. Otherwise opt-in per clinic.</li>
+</ol>
+
+<h4>Firecrawl vs ElevenLabs website connector — side by side</h4>
+<table>
+  <thead><tr><th>Aspect</th><th>EL connector (Layer 3)</th><th>Firecrawl + curated MD (Layer 2)</th></tr></thead>
+  <tbody>
+    <tr><td>Crawler</td><td>Theirs, opaque schedule</td><td>Ours, runs on-demand from backend</td></tr>
+    <tr><td>Chunking</td><td>Theirs, opaque rules</td><td>Predictable; matches our markdown headers</td></tr>
+    <tr><td>QA before upload</td><td>Not possible</td><td>Read and fix <code>knowledge.md</code> before upload</td></tr>
+    <tr><td>JS-rendered SPA</td><td>Unknown coverage</td><td>Firecrawl handles natively</td></tr>
+    <tr><td>Prices on <code>/cennik</code> separate page</td><td>Depends on crawler depth</td><td>Consolidation step picks up</td></tr>
+    <tr><td>Prices in images</td><td>Likely missed</td><td>Flagged <code>unknown</code> during onboarding</td></tr>
+    <tr><td>Freshness on site update</td><td>Auto re-crawl</td><td>Manual re-scrape</td></tr>
+    <tr><td>Version control</td><td>None</td><td>Curated <code>knowledge.md</code> in git</td></tr>
+    <tr><td>IP compounding across clinics</td><td>Per-clinic only</td><td>Consolidation prompt improves over time</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="setup">
+<h2>6. Account setup checklist (Day 7 morning)</h2>
+<p>Jenya's manual setup. Everything in subsequent sections gates on these.</p>
+
+<h3>6.1 GitHub (free)</h3>
+<ul class="checklist">
+  <li>Create private repo <code>ai-receptionist</code> (placeholder name).</li>
+  <li>Add Rem as collaborator with write access.</li>
+  <li>Branch protection on <code>main</code>: require PR review, require CI green, no force push.</li>
+  <li>CODEOWNERS: <code>packages/contracts/* @&lt;jenya&gt;</code>.</li>
+  <li>Push this directory: <code>git remote add origin &lt;url&gt; && git push -u origin main</code>.</li>
+</ul>
+
+<h3>6.2 Vercel (free Hobby)</h3>
+<ul class="checklist">
+  <li>Import GitHub repo as new project.</li>
+  <li>Set region <code>fra1</code> Frankfurt in <code>vercel.json</code>.</li>
+  <li>Rem does not need a Vercel seat; GitHub integration auto-deploys preview URLs per PR.</li>
+</ul>
+
+<h3>6.3 Supabase (free tier)</h3>
+<ul class="checklist">
+  <li>Region: <strong>Frankfurt (eu-central-1)</strong>. NOT the same naming as Vercel <code>fra1</code> — Supabase uses AWS region naming; both happen to be physically Frankfurt.</li>
+  <li>Free tier: 500MB DB, 1GB storage, 50K MAU. Plenty for 1-5 pilots.</li>
+  <li>Grab <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code> into <code>.env.local</code>.</li>
+  <li>Enable RLS by default on every table.</li>
+</ul>
+<p class="small"><em>Why Supabase</em>: Postgres + Auth + Row-Level Security + EU residency. Holds per-clinic config, service value matrix, booking metadata, consent log, optional transcript storage, dashboard auth. Multi-tenancy via RLS.</p>
+
+<h3>6.4 ElevenLabs</h3>
+<ul class="checklist">
+  <li><strong>Creator tier $22/mo for W1 dev</strong>, upgrade to <strong>Pro $99/mo</strong> when pilot 1 ships in W2. Saves $77 over W1.</li>
+  <li>Create business workspace under company name (not personal).</li>
+  <li>Workspace settings Day 1:
+    <ul>
+      <li>"Use conversation data for model improvement" → <strong>OFF</strong> (default is ON; RODO violation if left on).</li>
+      <li>Audio retention → 0 days.</li>
+      <li>Transcript retention → 0 days (per-call override when <code>consent_flag=true</code>).</li>
+    </ul>
+  </li>
+  <li>API key from <code>elevenlabs.io/app/developers/api-keys</code> → <code>ELEVENLABS_API_KEY</code> in <code>.env.local</code>.</li>
+  <li>Apply for ElevenLabs Grants program Day 1: 12 months free + 33M chars.</li>
+  <li>Install Agent Skills: <code>npx skills add elevenlabs/skills</code> (Claude Code, global scope). <span class="pill ok">Done</span></li>
+</ul>
+
+<h3>6.5 Firecrawl (free 500 credits)</h3>
+<ul class="checklist">
+  <li>Sign up at firecrawl.dev → <code>FIRECRAWL_API_KEY</code> in <code>.env.local</code>.</li>
+  <li>500 free credits ≈ 500 page scrapes ≈ 20-50 Polish clinics covered.</li>
+</ul>
+
+<h3>6.6 LLM provider keys</h3>
+<ul class="checklist">
+  <li>Anthropic API (Claude Sonnet 4.6, EU residency tier) → <code>ANTHROPIC_API_KEY</code>.</li>
+  <li>OpenAI API (gpt-4o for benchmark + Firecrawl extraction, EU residency tier) → <code>OPENAI_API_KEY</code>.</li>
+</ul>
+
+<h3>6.7 Twilio EU (deferred, Day 9-10)</h3>
+<ul class="checklist">
+  <li>Don't buy a number yet; browser test works first.</li>
+  <li>Plan: 1 Polish number ~$1/mo + $0.013/min inbound.</li>
+</ul>
+
+<h3>6.8 SMSAPI.pl (deferred, W2)</h3>
+<ul class="checklist">
+  <li>Register shared-brand sender ID Day 1 of W2 (2-7 day Polish operator approval).</li>
+</ul>
+</section>
+
+<section id="sequence">
+<h2>7. Day-by-day build sequence</h2>
+
+<h3>Day 7 (today, 2026-05-14)</h3>
+<p>Account setup (above) plus first code:</p>
+<ul>
+  <li><code>gsd-ai-integration-phase</code> → <code>docs/AI-SPEC.md</code> (~1h interactive).</li>
+  <li>Monorepo scaffolds: <code>apps/backend/</code>, <code>apps/web/</code>, <code>packages/contracts/</code>.</li>
+  <li>First contract drafts: <code>voice-agent-provider.ts</code>, <code>post-call-webhook.schema.ts</code>, <code>scraper.schema.ts</code>, <code>appointment-category.enum.ts</code>.</li>
+  <li>Polish dental ontology v0 stubs: 10 services first, full 30 by Day 8.</li>
+</ul>
+
+<h3>Day 8 — Scraper pipeline + ontology completion</h3>
+<ul>
+  <li>Scraper module in <code>apps/backend/scraper/</code>: Firecrawl-map + crawl → Claude consolidation → <code>knowledge.md</code> + structured JSON to Supabase.</li>
+  <li>Test on 2-3 real Warsaw clinic websites.</li>
+  <li>Ontology to ~30 services.</li>
+  <li>Supabase schema: <code>clinics</code>, <code>agents</code>, <code>service_value_matrix</code>, <code>consent_log</code>, <code>bookings</code>. RLS policies per clinic.</li>
+</ul>
+
+<h3>Day 9 — Orchestration + first agent</h3>
+<ul>
+  <li>ElevenLabs orchestration: <code>provisionAgent(clinicId)</code> via <code>POST /v1/convai/agents/create</code>.</li>
+  <li>Provision one fake clinic agent end-to-end.</li>
+  <li>Browser test page in <code>apps/web/test-agent/</code>.</li>
+  <li><strong>Knowledge architecture verification</strong>: Layer 1+2 vs Layer 1+2+3 on same fake clinic. Decide Layer 3 default.</li>
+</ul>
+
+<h3>Day 10 — Server tools + consent flow + post-call</h3>
+<ul>
+  <li>Server-tool webhooks: <code>check_availability</code> (stub), <code>create_booking</code> (writes to Supabase).</li>
+  <li>Consent flow: deterministic at-start, <code>consent_flag</code> defaults false on ambiguous.</li>
+  <li>Post-call webhook receiver: validates payload, writes booking, conditionally stores transcript only if <code>consent_flag === true</code>, computes <code>recovered_revenue</code> from <code>appointment_category</code> × service value matrix.</li>
+  <li><strong>End-of-day: internal demo green gate</strong> (see section 9).</li>
+</ul>
+
+<h3>Day 11 — Handoff to Rem + first real clinic</h3>
+<ul>
+  <li>All contract files locked. Tagged release on <code>dev</code>.</li>
+  <li>Morning: Jenya + Rem sync (60-90 min). Codebase tour, contract walkthrough, define Rem's W2 deliverables, his first feature branch.</li>
+  <li>Afternoon: first real Warsaw clinic Firecrawl'd → KB → agent provisioned. Sebastian gets live browser-demo URL.</li>
+</ul>
+
+<h3>Day 12-15 — W2: Pilot 1 + Inovo</h3>
+<ul>
+  <li>Pilot 1 customization with real clinic data.</li>
+  <li>Real Booksy connection or URL/token paste fallback.</li>
+  <li>SMS via SMSAPI + short URL + ICS landing.</li>
+  <li>Dashboard v1 with PLN metrics.</li>
+  <li>Multilingual auto-detect (first 2 sec audio → classify PL/EN/RU → switch agent).</li>
+  <li><strong>Day 12 (18 May) Inovo Visit 17:00-21:00</strong>: live browser demo with Dawid Sugier. Ask for 5 portfolio clinic intros.</li>
+  <li>2nd pilot LOI signed by end of W2.</li>
+</ul>
+
+<h3>Day 16-22 — W3: Pilot 2 + Demo Day</h3>
+<ul>
+  <li>2nd pilot live (different specialty or PMS).</li>
+  <li>Outcome metrics live with real recovered-PLN tracking.</li>
+  <li>Demo Day rehearsal Day 19-20.</li>
+  <li>Stretch: multilingual triple-call demo polished.</li>
+</ul>
+
+<h4>Day 22 — Demo Day, 30 May, Rotunda, 12:00-16:00</h4>
+<ol>
+  <li>Conversational inbound: live phone call on stage. Polish patient, unscripted booking.</li>
+  <li>Conversational outbound: rebook a no-show live.</li>
+  <li>Three languages, same number, three correct bookings: PL → EN → RU.</li>
+  <li>Dashboard slide: real PLN recovered from pilot 1.</li>
+  <li>LOI slide: signed pilot or LOI from named Warsaw clinic with owner quote.</li>
+</ol>
+</section>
+
+<section id="access">
+<h2>8. Access provisioning timeline</h2>
+<p>People get accesses at the moment they can actually use them.</p>
+<table>
+  <thead><tr><th>When</th><th>Access granted</th><th>Granted by</th></tr></thead>
+  <tbody>
+    <tr><td>Day 7</td><td>Jenya as owner: GitHub, Vercel, Supabase, ElevenLabs, Firecrawl, Anthropic, OpenAI</td><td>self</td></tr>
+    <tr><td>Day 7-8</td><td>Rem invited to private GitHub repo (write). Clones, reads docs, does not push yet.</td><td>Jenya</td></tr>
+    <tr><td>Day 10 (after demo green)</td><td>Rem added to Supabase (Developer role) + ElevenLabs workspace (member). Firecrawl key shared via secure channel.</td><td>Jenya</td></tr>
+    <tr><td>Day 11 morning</td><td>Jenya + Rem 60-90 min sync: contracts walkthrough, demo, define W2 scope, first feature branch.</td><td>both</td></tr>
+    <tr><td>Day 11 afternoon</td><td>Sebastian gets live browser-demo URL of the first real prospect clinic.</td><td>Jenya → Sebastian</td></tr>
+    <tr><td>Day 14-15</td><td>Sebastian gets read-only dashboard URL for pilot 1 (no admin access).</td><td>Jenya → Sebastian</td></tr>
+  </tbody>
+</table>
+
+<h4>Vercel access nuance</h4>
+<p>Hobby tier is single-user. Recommended for sprint: Rem does NOT need a Vercel seat. Vercel's GitHub integration auto-deploys preview URLs per PR branch. Production deploys gate on <code>dev</code> → <code>main</code> merges Jenya approves. Upgrade to Pro $20/mo only if Rem needs direct env-var management.</p>
+</section>
+
+<section id="gate">
+<h2>9. Day 10 "internal demo green" gate</h2>
+<p>All six checkpoints must pass before Rem onboards Day 11 and Sebastian gets the demo URL:</p>
+<ul class="checklist">
+  <li>Browser demo widget loads in under 3 seconds.</li>
+  <li>Agent answers naturally in Polish on ≥8/10 test queries (prices, hours, services, booking, NFZ, parking, multilingual switch, escalation, emergency keywords, vague intent).</li>
+  <li>Consent flow returns deterministic <code>consent_flag</code> on 10 test transcripts (5 "tak", 5 "nie", 0 wrong ambiguous defaults).</li>
+  <li>Booking appears in Supabase with correct <code>appointment_category</code> on ≥8/10 test bookings.</li>
+  <li>Post-call webhook fires and writes to Supabase within 5 seconds of call end.</li>
+  <li>No PII in Vercel logs (grep test passes).</li>
+</ul>
+<p>If any fail Day 10 EOD: push handoff to Day 11 EOD, bump Sebastian's discovery meetings by 1 day.</p>
+</section>
+
+<section id="handoff">
+<h2>10. Day 11 handoff sequence</h2>
+<table>
+  <thead><tr><th>Step</th><th>When</th><th>Who</th><th>What</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Day 10 EOD</td><td>Jenya</td><td>Internal demo green gate passes against fake clinic.</td></tr>
+    <tr><td>2</td><td>Day 11 09:30-11:00</td><td>Jenya + Rem</td><td>Codebase tour. Contract files walkthrough. Live demo. Define Rem's W2 deliverables: wizard, dashboard, SMS landing, Booksy adapter v1. First feature branch created.</td></tr>
+    <tr><td>3</td><td>Day 11 11:00-13:00</td><td>Jenya</td><td>First real Warsaw clinic from Sebastian's outreach → Firecrawl → consolidate → upload KB → provision agent → test in browser.</td></tr>
+    <tr><td>4</td><td>Day 11 14:00</td><td>Jenya → Sebastian</td><td>Hand off live browser-test URL of the prospect's own agent. Sebastian rehearses with the demo for 1 hour.</td></tr>
+    <tr><td>5</td><td>Day 12</td><td>Sebastian</td><td>Walks into first 1-2 discovery meetings with working demo of the prospect's own clinic on his laptop.</td></tr>
+    <tr><td>6</td><td>Day 12 onward</td><td>Rem</td><td>Opens first PR for wizard scaffold. Vercel auto-deploys preview URL. Self-merges after CI green (no contract files touched).</td></tr>
+  </tbody>
+</table>
+<p class="small"><em>Sebastian's prerequisite for Day 11 PM</em>: by Day 11 morning, deliver one real Polish clinic URL from his Warsaw outreach list. Ideally the clinic owner is the one he is meeting Tue/Wed, so the demo is of THEIR practice.</p>
+</section>
+
+<section id="framework">
+<h2>11. Framework usage (GSD + superpowers)</h2>
+
+<h3>Per phase (entering W1 / W2 / W3)</h3>
+<ul>
+  <li><code>gsd-discuss-phase</code> when unresolved decisions block planning (e.g., W2 entry to define Rem's concrete scope).</li>
+  <li><code>gsd-plan-phase</code> → <code>docs/plans/W&lt;N&gt;/PLAN.md</code> with verification gates.</li>
+  <li><code>gsd-execute-phase</code> runs the plan with wave-based parallelization.</li>
+  <li><code>gsd-secure-phase</code> Day 14-15 before pilot 1 goes live: verifies RODO + consent flow mitigations.</li>
+  <li><code>gsd-eval-review</code> after pilot 1 closes: retroactive audit of AI-SPEC eval coverage.</li>
+</ul>
+
+<h3>Per session</h3>
+<ul>
+  <li>Start: <code>gsd-resume-work</code> (or read <code>.continue-here.md</code>) → loads handoff state.</li>
+  <li>Disoriented mid-session: <code>gsd-progress</code>.</li>
+  <li>Ambiguous "next" / "continue": <code>gsd-do</code>.</li>
+  <li>End: <code>gsd-pause-work</code> → writes <code>HANDOFF.json</code> + <code>.continue-here.md</code> (gitignored).</li>
+</ul>
+
+<h3>Per task</h3>
+<ul>
+  <li>New feature: <code>superpowers:brainstorming</code> before any code.</li>
+  <li>Multi-step: <code>superpowers:writing-plans</code> → <code>docs/plans/</code>.</li>
+  <li>Implementation: <code>superpowers:test-driven-development</code>.</li>
+  <li>Stuck: <code>superpowers:systematic-debugging</code>.</li>
+  <li>Iterate-until-verified within a task: <code>superpowers:executing-plans</code>.</li>
+  <li>Before merging contract-file changes: <code>superpowers:requesting-code-review</code>.</li>
+</ul>
+
+<h3>One-time, Day 7</h3>
+<p><code>gsd-ai-integration-phase</code> → <code>docs/AI-SPEC.md</code>. Framework rationale, eval strategy, guardrails for the ElevenLabs agent.</p>
+</section>
+
+<section id="parallel">
+<h2>12. Parallel Claude Code sessions</h2>
+
+<h3>Pattern A — Multiple top-level sessions</h3>
+<p>Separate tmux panes, IDE windows, or machines. Each is its own conversation.</p>
+<p>Right for: Jenya works <code>apps/backend/</code> in session 1, Rem works <code>apps/web/</code> in session 2. Different files, different lanes. Day 8-9: spin up a second session in another tmux pane to author Polish dental ontology in parallel with your main backend session.</p>
+<p>Wrong for: two sessions both editing <code>packages/contracts/post-call-webhook.schema.ts</code> simultaneously. Always sequence work on shared files.</p>
+
+<h3>Pattern B — Subagents inside one session</h3>
+<p>One session dispatches subagents via the Agent tool. Use <code>superpowers:dispatching-parallel-agents</code>.</p>
+<p>Right for: knowledge architecture verification (dispatch 5 subagents, each tests one clinic site); ontology synonym sweep (one subagent per service category); pre-Inovo demo rehearsal (one subagent per planned demo question).</p>
+<p>Wrong for: subagent that needs context from another subagent (sequence them); critical-path implementation work (keep in main session).</p>
+</section>
+
+<section id="iterate">
+<h2>13. Iterate-until-success primitives</h2>
+<p>No <code>/goal</code> command exists in the installed environment as of 2026-05-14. Closest primitives:</p>
+<table>
+  <thead><tr><th>Primitive</th><th>When to use</th></tr></thead>
+  <tbody>
+    <tr><td><code>superpowers:executing-plans</code></td><td><strong>Default for our sprint.</strong> Drives a plan file to verified-green with checkpoints. Tight scope.</td></tr>
+    <tr><td><code>gsd-execute-phase</code></td><td>Phase-level execution with wave parallelization and goal-backward verification.</td></tr>
+    <tr><td><code>ralph-loop:ralph-loop</code></td><td>Ambitious "agent grinds for an hour" sessions. Token-hungry.</td></tr>
+    <tr><td><code>loop</code> skill</td><td>Polling or time-interval reruns (deploy waits, CI checks).</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="repo">
+<h2>14. Repo layout</h2>
+<pre><code>ai_receptionist/
+├── .gitignore
+├── CLAUDE.md                                   working agent brief (always read first)
+├── PROJECT.html                                this file
+├── PROJECT_LOG.md                              append-only decision history
+├── README.md                                   thin pointer
+├── apps/
+│   ├── backend/                                Jenya's lane: orchestration, scraper, ontology
+│   └── web/                                    Rem's lane: wizard, dashboard, SMS landing
+├── packages/
+│   └── contracts/                              PR-gated shared types
+├── docs/
+│   ├── AI-SPEC.md                              produced by gsd-ai-integration-phase (Day 7)
+│   ├── plans/
+│   │   ├── 2026-05-14-kickoff.md               team + collab decisions
+│   │   └── 2026-05-14-end-to-end-plan.md       active build plan
+│   └── research/
+│       ├── competitive_analysis.md
+│       ├── detailed_description.md             full kickoff doc
+│       └── statistics.md                       phone-vs-digital + lost-revenue research</code></pre>
+</section>
+
+<section id="rules">
+<h2>15. Hard rules for any code change</h2>
+<ul>
+  <li><strong>Never log patient PII in Vercel logs.</strong> Structured logging that strips PII before flushing.</li>
+  <li><strong>Audio recordings: never stored.</strong> Audio passes through ElevenLabs and is discarded.</li>
+  <li><strong>Transcripts: only stored if <code>consent_flag === true</code>.</strong> Consent flow runs deterministically at start of every call. Default false on ambiguous.</li>
+  <li><strong>EU regions everywhere.</strong> Vercel <code>fra1</code>, Supabase Frankfurt, Twilio EU media region, LLM in EU.</li>
+  <li><strong>ElevenLabs workspace setting</strong> "Use conversation data for model improvement" → OFF on Day 1.</li>
+  <li><strong>Polish phrasing is canonical</strong>, not literal translations.</li>
+  <li><strong>Voice runtime abstracted</strong> behind <code>VoiceAgentProvider</code> interface so we can swap ElevenLabs for Vapi or Synthflow in 4-6 weeks.</li>
+  <li><strong>Agent escalates, does not improvise</strong>, on anything operationally complex.</li>
+  <li><strong>Secrets in <code>.env.local</code></strong>, never committed.</li>
+  <li><strong>Speed &gt; architectural perfection.</strong> 16 days to Demo Day.</li>
+</ul>
+</section>
+
+<section id="open">
+<h2>16. Open status items</h2>
+<p>Need user confirmation before Day 8:</p>
+<ul class="checklist">
+  <li><strong>Vertical decision</strong>: confirm Polish dental, or pivot to alternative with steadier demand (legal / real estate / professional services / beauty / veterinary).</li>
+  <li>GitHub private repo + this directory pushed?</li>
+  <li>Vercel project (<code>fra1</code>) provisioned + connected to repo?</li>
+  <li>Supabase project (Frankfurt eu-central-1) provisioned + keys in <code>.env.local</code>?</li>
+  <li>ElevenLabs workspace on Creator tier + training-data opt-out OFF + audio retention 0 + API key in <code>.env.local</code>?</li>
+  <li>ElevenLabs Grants program application submitted?</li>
+  <li>Firecrawl account + API key in <code>.env.local</code>?</li>
+  <li>Anthropic + OpenAI API keys in <code>.env.local</code>?</li>
+  <li>Sebastian: Booksy partnerships email sent Day 1? Pilot 1 clinic identified? Real Polish clinic URL for Day 11 PM demo?</li>
+  <li>Patryk: mentors confirmed (Pasha Rizali, Piotr Gerke noted as Minerva not Asystent.ai, Jan Sikora)?</li>
+</ul>
+</section>
+
+<section id="newchat">
+<h2>17. New-chat prompt (paste-ready)</h2>
+<pre><code>Sprint Day 7 = Build Day 1 of the AI Receptionist sprint at START Warsaw.
+Today is 2026-05-14. 16 days to Demo Day at Rotunda (30 May).
+Inovo VC pitch in 4 days (18 May). I'm Jenya, building core solo today.
+Rem joins Day 10-11 once internal demo passes the green gate.
+Sebastian needs a working browser-demo URL by Day 11 PM for Tue/Wed
+discovery meetings.
+
+NOTE: vertical may still pivot from dental to a steadier-demand vertical;
+architecture is vertical-agnostic but ontology + PMS integrations would
+be replaced. Confirm vertical lock before any irreversible vertical-
+specific work.
+
+Working directory: /Users/jenyafutrin/workspace/claude_projects/ai_receptionist
+
+Read in this order before doing anything else:
+1. CLAUDE.md (operational brief)
+2. PROJECT.html (single-file project snapshot — view in browser if helpful)
+3. docs/plans/2026-05-14-end-to-end-plan.md (full plan)
+4. PROJECT_LOG.md (decision history)
+
+Account setup status (I'll fill in before you start):
+- GitHub private repo + dir pushed: [DONE / PENDING]
+- Vercel project on fra1: [DONE / PENDING]
+- Supabase Frankfurt (eu-central-1): [DONE / PENDING]
+- ElevenLabs Creator tier with training-data OFF + audio retention 0: [DONE / PENDING]
+- ElevenLabs Grants application: [SUBMITTED / NOT YET]
+- ElevenLabs Agent Skills installed: DONE
+- Firecrawl account + API key: [DONE / PENDING]
+- Anthropic + OpenAI API keys in .env.local: [DONE / PENDING]
+
+Sebastian's side:
+- Real Warsaw clinic URL for first Day 11 PM demo: [URL / NOT YET]
+- Booksy partnerships email sent: [DONE / PENDING]
+
+Vertical:
+- LOCKED on Polish dental + aesthetic / PIVOTED to: [SPECIFY]
+
+Once status is confirmed, run this exact sequence:
+
+1. gsd-ai-integration-phase → docs/AI-SPEC.md
+   (framework rationale, eval strategy, guardrails — interactive ~1h)
+
+2. gsd-plan-phase for W1 → docs/plans/W1/PLAN.md
+   with verification gates for the Day 10 internal-demo-green criteria
+
+3. gsd-execute-phase to run Wave 1 of W1 plan in parallel:
+   - Scraper module (Firecrawl + Claude consolidation)
+   - Polish dental ontology v1 in apps/backend/ontology/ (or pivoted-
+     vertical ontology if vertical changed)
+   - First contract drafts in packages/contracts/
+
+End of session: gsd-pause-work writes HANDOFF.json + .continue-here.md.
+
+If anything is unclear, default to: ask once, then make the reasonable
+call and continue. Don't over-deliberate. 16 days.</code></pre>
+</section>
+
+<section id="sources">
+<h2>18. Source docs in repo</h2>
+<dl class="kvgrid">
+  <dt><code>CLAUDE.md</code></dt><dd>Operational brief, always loaded at session start by Claude Code.</dd>
+  <dt><code>PROJECT_LOG.md</code></dt><dd>Append-only decision history.</dd>
+  <dt><code>PROJECT.html</code></dt><dd>This file. Single-page project snapshot.</dd>
+  <dt><code>docs/plans/2026-05-14-kickoff.md</code></dt><dd>Team and collaboration kickoff decisions.</dd>
+  <dt><code>docs/plans/2026-05-14-end-to-end-plan.md</code></dt><dd>Active build plan: setup, knowledge architecture, day-by-day, GSD usage, access timeline.</dd>
+  <dt><code>docs/research/detailed_description.md</code></dt><dd>Full strategy doc (77KB): pricing, RODO, defensibility, post-sprint roadmap.</dd>
+  <dt><code>docs/research/competitive_analysis.md</code></dt><dd>25 ranked competitors, threats, strategic implications.</dd>
+  <dt><code>docs/research/statistics.md</code></dt><dd>Phone-vs-digital booking + lost-revenue economics with source-quality annotations.</dd>
+</dl>
+</section>
+
+<footer>
+  <p><strong>Snapshot generated 2026-05-14.</strong> If you are reading this on a later date, treat the dates and counts as point-in-time. Authoritative current state lives in <code>CLAUDE.md</code> + <code>PROJECT_LOG.md</code> + <code>docs/plans/</code>.</p>
+  <p>Author: Claude (Anthropic Opus 4.7, 1M context) under Jenya Futryn's direction. Project lead: Jenya Futryn.</p>
+</footer>
+
+</div>
+</body>
+</html>

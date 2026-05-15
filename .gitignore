@@ -1,0 +1,64 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+*.local
+
+# Vercel
+.vercel/
+
+# Turbo
+.turbo/
+
+# Python (scraper)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Claude Code session continuity (per-developer, never shared)
+HANDOFF.json
+.continue-here.md
+.claude/sessions/
+
+# Project-internal decision history + informal team-comms drafts
+# (per CLAUDE.md "Repository privacy guardrails" — only the operational
+# CLAUDE.md itself is committed so Rem can read it; everything else stays local)
+PROJECT_LOG.md
+AGENTS.md
+vertical_pivot_brief.md
+docs/research/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/

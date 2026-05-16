@@ -1,12 +1,13 @@
--- 0000_init.sql — vertical-agnostic core schema for AI Receptionist.
--- Apply in Supabase Frankfurt (eu-central-1).
+-- 20260516120000_init.sql — vertical-agnostic core schema for AI Receptionist.
+-- Apply in Supabase Ireland (eu-west-1).
 -- Source of truth for shapes is packages/contracts/src/*.
+-- UUIDs use gen_random_uuid() from pgcrypto (preinstalled on modern Supabase)
+-- rather than uuid_generate_v4() from uuid-ossp (path-isolated).
 
 -- ============================================================
 -- Extensions
 -- ============================================================
 
-create extension if not exists "uuid-ossp";
 create extension if not exists "pgcrypto";
 
 -- ============================================================
@@ -54,7 +55,7 @@ end $$;
 
 -- tenants — one row per onboarded business.
 create table if not exists tenants (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   display_name text not null,
   owner_email text,
@@ -77,7 +78,7 @@ create index if not exists idx_tenant_members_user on tenant_members(user_id);
 
 -- agents — one row per provisioned voice agent (one per tenant for now).
 create table if not exists agents (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
   provider voice_provider not null default 'elevenlabs',
   provider_agent_id text not null, -- ElevenLabs agent id
@@ -93,7 +94,7 @@ create index if not exists idx_agents_tenant on agents(tenant_id);
 
 -- bookings — one row per (attempted) booking.
 create table if not exists bookings (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
   agent_id uuid references agents(id) on delete set null,
   conversation_id text not null,
@@ -118,7 +119,7 @@ create index if not exists idx_bookings_conversation on bookings(conversation_id
 
 -- consent_log — one row per call regardless of decision (audit trail).
 create table if not exists consent_log (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
   agent_id uuid references agents(id) on delete set null,
   conversation_id text not null,
@@ -134,7 +135,7 @@ create unique index if not exists uq_consent_log_conversation on consent_log(con
 
 -- transcripts — gated on consent_flag = true.
 create table if not exists transcripts (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
   conversation_id text not null,
   -- Full transcript JSON (matches PostCallTranscriptTurn[] in contracts).

@@ -84,7 +84,7 @@ VERTICAL-SPECIFIC (filled post-lock):
 
 ## 2. Framework Decision
 
-**Selected Framework:** **ElevenLabs ConvAI** (Conversational AI, formerly "Agents Platform") as voice runtime + agent orchestration. **Backend LLM work (scraper consolidation, ontology bootstrap, consent classifier, language detector) runs on Google Gemini** (3.1 Pro Preview for quality-sensitive tasks, 3.1 Flash-Lite for high-volume cheap tasks). **Agent in-call reasoning LLM is TBD Day 9** — depends on which LLMs ConvAI exposes as selectable; primary candidate is Anthropic Sonnet 4.6 EU for Polish naturalness, fallback Gemini 3.1 Flash Live Preview if ConvAI supports it as a custom-LLM endpoint.
+**Selected Framework:** **ElevenLabs ConvAI** (Conversational AI, formerly "Agents Platform") as voice runtime + agent orchestration. **Voice ID locked**: `mr1ubFaLs5xVrh1EqWtc` (Polish-native multilingual). **Speech-to-text**: ElevenLabs Scribe v2 Realtime (~150ms latency, 92 languages with auto-detect — we offload language detection to ConvAI entirely). **Backend LLM work (scraper consolidation, ontology bootstrap, consent classifier) runs on Google Gemini** (3.1 Pro Preview for quality-sensitive tasks, 3.1 Flash-Lite for high-volume cheap tasks). **Agent in-call reasoning LLM is TBD Day 9** — depends on which LLMs ConvAI exposes as selectable; primary candidate is Anthropic Sonnet 4.6 EU for Polish naturalness, fallback Gemini 3.1 Flash Live Preview if ConvAI supports it as a custom-LLM endpoint.
 
 **Version:** `@elevenlabs/elevenlabs-js` ^2.x (Node), `@elevenlabs/react` ^1.0 (browser widget). Pin exact in `package.json` on Day 8.
 
@@ -200,7 +200,7 @@ export async function provisionAgent(args: {
 2. **`usageMode: "auto"` retrieval is opaque.** No control over chunk count, no visibility into what got retrieved. Counter-mitigation: ontology chunks are 200-500 tokens with one service per H2 (template-friendly retrieval), Polish synonyms front-loaded, prices as `Cena: X PLN` lines not tables (tables chunk badly).
 3. **Server-tool webhook timeout is short (~5s).** `check_availability` must return within 1.5s p95 or the agent will say "Sprawdzam..." then time out and improvise. Caching / async pre-warm on connect is mandatory once we wire a real PMS.
 4. **Tool argument hallucination.** Agent can invent argument values. Counter-mitigation: tight Zod-validated schemas on the webhook side, agent system prompt instructs explicit "use the values the caller said, do not invent."
-5. **Language switching mid-call**: setting `language: "pl"` is a _default_. Auto-detect must be implemented as either (a) ConvAI's language detect feature if available, or (b) a server-tool the agent calls on first turn that returns the detected language and triggers a voice swap. Verify Day 9.
+5. **Language switching mid-call**: handled by ConvAI's built-in Scribe v2 auto-detection (92 languages). We pass `language: "auto"` (or whichever the SDK exposes) and ConvAI swaps the ontology language section + voice settings without a server round-trip. Our own Gemini-based language detector is intentionally dropped — fewer moving parts, lower latency.
 6. **Knowledge-base size cap per agent**: confirm in docs Day 8. If we exceed, split into multiple KB documents and rely on retrieval ordering.
 7. **Agent-runtime LLM selection in ConvAI**: Day-9 verify. Check which LLMs ConvAI exposes natively (Anthropic Sonnet 4.6, OpenAI GPT-4o, xAI, etc.) and whether Gemini is selectable. If our preferred model isn't native, ConvAI supports a custom-LLM URL — we can proxy any provider through that, including Gemini Live or Anthropic EU. Latency and EU residency are the constraints, not provider preference.
 
@@ -248,10 +248,10 @@ Updated 2026-05-15: switched to **Gemini-first stack**. User has paid Google AI 
 | Scraper consolidation                       | `gemini-3.1-pro-preview`                    | Paid         | Best quality on Google AI Studio. 1M-token context handles a full clinic-site dump in one call. ~$0.12 per onboarding (30K input + 5K output). Preview model — has tighter rate limits than GA. |
 | Ontology bootstrapping (post-vertical-lock) | `gemini-3.1-pro-preview`                    | Paid         | Same — quality matters for cross-tenant IP. Runs rarely (one batch when vertical locks).                                                                                                        |
 | Consent classifier                          | `gemini-3.1-flash-lite`                     | Free / cheap | Newest cheap model. ~$0.0001 per classification. Hundreds of free calls/day available; trivially affordable on paid.                                                                            |
-| Language detector                           | `gemini-3.1-flash-lite`                     | Free / cheap | Trivial task, lowest latency, lowest cost.                                                                                                                                                      |
+| Language detector                           | ConvAI Scribe v2 (built-in auto-detect)     | Included     | Offloaded to ElevenLabs entirely. 92 languages. No extra LLM call, no extra latency.                                                                                                            |
 | Agent in-call LLM (live conversation)       | TBD Day 9 — verify ConvAI's selectable LLMs | —            | Likely Anthropic Sonnet 4.6 (best Polish naturalness) OR Gemini 3.1 Flash Live Preview if ConvAI supports it as a custom-LLM endpoint. Fallback: GPT-4o EU.                                     |
 
-Common parameters: `temperature: 0` for all structured-output tasks; consent + language detector return strict Zod-validated JSON via Gemini's `responseSchema` mode. Agent LLM `temperature: 0.3` once selected.
+Common parameters: `temperature: 0` for all structured-output tasks; consent classifier returns strict Zod-validated JSON via Gemini's `responseSchema` mode. Agent LLM `temperature: 0.3` once selected.
 
 Hard rule baked into the scraper consolidation prompt: "If a price is not in the source text, output `unknown`. Do not infer prices from related services."
 
@@ -338,7 +338,7 @@ Stream LLM responses where the caller can wait (scraper consolidation can stream
 ### Prompt Engineering Discipline
 
 - **System prompt** = persona + rules + tool catalog. Stable across calls. Stored as a typed template builder (`buildSystemPrompt`) so we can refactor wording without touching every test.
-- **User prompts** are NOT used as the conversation channel (ConvAI uses the live audio transcript as the running user message). The "user content" for non-conversational LLM calls (consent classifier, scraper consolidation, language detect) is constructed deterministically from caller transcript / scraped markdown.
+- **User prompts** are NOT used as the conversation channel (ConvAI uses the live audio transcript as the running user message). The "user content" for non-conversational LLM calls (consent classifier, scraper consolidation) is constructed deterministically from caller transcript / scraped markdown.
 - **No few-shot in the system prompt**. Few-shot examples bloat every turn. Examples live in the KB as ontology documents where retrieval picks them when relevant.
 - Token budget per turn: system 800 + KB chunks ~2000 + history ~2000 + output 400 ≈ 5K — well under Sonnet's window. Watch this number in production traces.
 
@@ -352,7 +352,7 @@ Stream LLM responses where the caller can wait (scraper consolidation can stream
 
 - Voice runtime: $0.10-0.15/min (ElevenLabs Pro). 1,000 included min/mo at the 1,499 PLN tier; per-min refund offset 0.85 PLN.
 - Backend LLM cost per onboarding (Gemini 3.1 Pro Preview): ~30K input + 5K output tokens × $2/$12 per 1M = **~$0.12 per tenant scrape**. Negligible.
-- Backend LLM cost per call (Gemini 3.1 Flash-Lite for consent + language detection): ~50 input + 30 output tokens × $0.25/$1.50 per 1M = **~$0.0001 per call**. Negligible.
+- Backend LLM cost per call (Gemini 3.1 Flash-Lite for consent): ~50 input + 30 output tokens × $0.25/$1.50 per 1M = **~$0.0001 per call**. Negligible. Language detection is part of ElevenLabs Scribe v2 hourly cost ($0.39/hr) — no separate LLM bill.
 - Agent in-call LLM cost: TBD pending Day-9 LLM selection. Anthropic Sonnet 4.6 reference: ~$0.005/turn × 8 turns avg = $0.04/call. Negligible vs voice runtime.
 - Latency budget per turn (target): ASR finalize ≤500ms + LLM first-token ≤700ms + KB retrieval (parallel) ≤300ms + TTS first-byte ≤400ms = ~1.5s perceived. p95 target 2.5s.
 - Caching: Gemini context caching available for repeated system prompts ($0.20/$0.40 per 1M cached tokens for Pro Preview, $0.025 for Flash-Lite). Anthropic prompt caching ON if/when we use Sonnet for the agent runtime (saves 80%+ on tokens after first turn). Verify ConvAI exposes whichever provider's cache flag we end up using.

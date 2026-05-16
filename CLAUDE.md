@@ -42,8 +42,8 @@ The split is parallelizable. The only hard sync point is `packages/contracts/*` 
 
 - Backend: Node.js + TypeScript, `@elevenlabs/elevenlabs-js`, Docker for the orchestration service.
 - Frontend: Next.js + TypeScript + Tailwind + shadcn/ui.
-- DB: Postgres on Supabase, **Frankfurt region only**.
-- Hosting: Vercel, **`fra1` Frankfurt explicitly set** in `vercel.json`.
+- DB: Postgres on Supabase, **EU region only** (Ireland `eu-west-1` chosen for the project at `isctdelatfyrzcpynkuq.supabase.co`; Frankfurt also acceptable). RODO-compliant.
+- Hosting: Vercel, **`fra1` Frankfurt explicitly set** in `vercel.json` (compute close to Polish callers; ~50ms intra-EU hop to Supabase Ireland is negligible for our write-once-per-call pattern).
 - Backup hosting region: Hetzner Falkenstein as Vercel fallback.
 - Telephony: Twilio EU via ElevenLabs native integration, or ElevenLabs-managed numbers.
 - Browser demo widget: `@elevenlabs/react` v1.0.
@@ -100,7 +100,7 @@ Anti-patterns:
 - **Never log patient PII in Vercel logs.** Use structured logging that strips PII before flushing.
 - **Audio recordings: never stored.** Audio passes through ElevenLabs and is discarded. Audio saving permanently OFF on every agent.
 - **Transcripts: only stored if `consent_flag === true`.** Consent flow runs deterministically at the start of every call. Default to false if unclear.
-- **EU regions everywhere.** Vercel `fra1`, Supabase Frankfurt, Twilio EU media region, LLM in EU.
+- **EU regions everywhere.** Vercel `fra1`, Supabase Ireland (`eu-west-1`), Twilio EU media region, LLM in EU.
 - **ElevenLabs workspace setting** "Use conversation data for model improvement" → OFF on Day 1.
 - **Polish phrasing is canonical**, not literal translations. Every patient-facing string must read naturally to a native Polish speaker.
 - **Voice runtime is abstracted** behind `VoiceAgentProvider` interface in `packages/contracts/`. ElevenLabs today, swappable to Vapi or Synthflow tomorrow.

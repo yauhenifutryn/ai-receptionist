@@ -1,0 +1,16 @@
+# Vendor-provided agent skill files — do not reformat or they'll diverge from upstream.
+.agents/
+skills-lock.json
+
+# Build artifacts and dependencies.
+node_modules/
+.next/
+dist/
+build/
+.turbo/
+.vercel/
+pnpm-lock.yaml
+
+# Supabase CLI local state.
+supabase/.temp/
+supabase/.branches/

@@ -33,6 +33,11 @@ coverage/
 # Turbo
 .turbo/
 
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+.supabase/
+
 # Python (scraper)
 __pycache__/
 *.py[cod]

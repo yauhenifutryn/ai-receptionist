@@ -86,7 +86,9 @@ export async function openTestSession(hint: string): Promise<TestSessionHandle> 
       await fs.appendFile(eventsPath, line, "utf-8");
     },
     async write(filename, content) {
-      await fs.writeFile(path.join(dir, filename), content, "utf-8");
+      const full = path.join(dir, filename);
+      await fs.mkdir(path.dirname(full), { recursive: true });
+      await fs.writeFile(full, content, "utf-8");
     },
   };
 }
@@ -115,7 +117,9 @@ export async function openExistingSession(
       await fs.appendFile(eventsPath, line, "utf-8");
     },
     async write(filename, content) {
-      await fs.writeFile(path.join(dir, filename), content, "utf-8");
+      const full = path.join(dir, filename);
+      await fs.mkdir(path.dirname(full), { recursive: true });
+      await fs.writeFile(full, content, "utf-8");
     },
   };
 }

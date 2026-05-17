@@ -6,7 +6,14 @@ import type { FirecrawlClient, FirecrawlPage } from "./firecrawl.js";
 export { createFirecrawlClient } from "./firecrawl.js";
 export { consolidate, CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES } from "./consolidate.js";
 export { scraperOutputToMarkdown } from "./to-markdown.js";
-export { shouldScrape, DEFAULT_RELEVANCE_QUERY } from "./url-filter.js";
+export {
+  shouldScrape,
+  dedupeByLanguage,
+  detectLanguagePrefixes,
+  filterCandidates,
+  DEFAULT_RELEVANCE_QUERY,
+  type FilterCandidatesResult,
+} from "./url-filter.js";
 export type { FirecrawlClient, FirecrawlPage, MapOptions } from "./firecrawl.js";
 
 const DEFAULT_MAX_PAGES = 25;

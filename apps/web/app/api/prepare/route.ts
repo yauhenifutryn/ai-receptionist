@@ -4,7 +4,7 @@ import {
   consolidate,
   createFirecrawlClient,
   scraperOutputToMarkdown,
-  shouldScrape,
+  filterCandidates,
   DEFAULT_RELEVANCE_QUERY,
 } from "@ai-receptionist/backend/scraper";
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
@@ -20,7 +20,7 @@ export const maxDuration = 60;
 const BodySchema = z.object({
   url: z.string().url(),
   searchQuery: z.string().min(1).max(500).optional(),
-  maxPages: z.number().int().positive().max(40).default(15),
+  maxPages: z.number().int().positive().max(40).default(25),
 });
 
 const DEFAULT_CONCURRENCY = 3;
@@ -84,15 +84,17 @@ export async function POST(req: NextRequest) {
           message: `Firecrawl returned ${links.length} URL${links.length === 1 ? "" : "s"}`,
         });
 
-        // 2. Filter.
+        // 2. Filter junk + dedupe translations.
         const ranked = [url, ...links.filter((l) => l !== url)];
-        const filtered = ranked.filter(shouldScrape);
-        const candidates = filtered.slice(0, maxPages);
-        const droppedCount = ranked.length - filtered.length;
+        const filter = filterCandidates(ranked);
+        const candidates = filter.kept.slice(0, maxPages);
+        const droppedCount = filter.droppedJunk.length + filter.droppedTranslations.length;
         await session?.event("filter:done", {
           rankedCount: ranked.length,
-          filteredCount: filtered.length,
-          droppedCount,
+          keptAfterFilter: filter.kept.length,
+          droppedJunkCount: filter.droppedJunk.length,
+          droppedTranslationsCount: filter.droppedTranslations.length,
+          detectedLanguagePrefixes: filter.detectedLanguagePrefixes,
           candidatesCount: candidates.length,
         });
         await session?.write(
@@ -100,18 +102,24 @@ export async function POST(req: NextRequest) {
           JSON.stringify(
             {
               ranked,
-              droppedByFilter: ranked.filter((u) => !shouldScrape(u)),
+              droppedJunk: filter.droppedJunk,
+              droppedTranslations: filter.droppedTranslations,
+              detectedLanguagePrefixes: filter.detectedLanguagePrefixes,
               candidates,
             },
             null,
             2,
           ),
         );
+        const langPart =
+          filter.droppedTranslations.length > 0
+            ? `, ${filter.droppedTranslations.length} non-Polish translation${filter.droppedTranslations.length === 1 ? "" : "s"} (${filter.detectedLanguagePrefixes.filter((p) => p !== "pl").join(", ") || "—"})`
+            : "";
         emit({
           type: "log",
           phase: "filter",
           percent: 22,
-          message: `Filter dropped ${droppedCount} junk URL${droppedCount === 1 ? "" : "s"}, keeping ${candidates.length} for scrape`,
+          message: `Filter dropped ${filter.droppedJunk.length} junk${langPart}; keeping ${candidates.length} of ${filter.kept.length} for scrape`,
         });
 
         // 3. Scrape with progress per page.

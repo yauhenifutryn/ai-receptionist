@@ -81,6 +81,12 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
   ): Promise<ProvisionAgentResult> {
     const voiceId = input.voiceId ?? this.defaultVoiceId;
     const language = input.defaultLanguage ?? "pl";
+    const systemPrompt =
+      input.systemPromptOverride ??
+      buildSystemPrompt({
+        tenantDisplayName: input.tenantDisplayName,
+        language,
+      });
 
     const body = await this.request<{ agent_id?: string; id?: string }>(
       "POST",
@@ -90,10 +96,7 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
         conversation_config: {
           agent: {
             prompt: {
-              prompt: buildSystemPrompt({
-                tenantDisplayName: input.tenantDisplayName,
-                language,
-              }),
+              prompt: systemPrompt,
               llm: this.agentLlm,
               temperature: DEFAULT_AGENT_TEMPERATURE,
               tools: [

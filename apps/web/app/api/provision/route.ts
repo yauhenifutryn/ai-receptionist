@@ -11,6 +11,11 @@ const BodySchema = z.object({
   ownerEmail: z.string().email().optional(),
   knowledgeMarkdown: z.string().min(20).max(200_000),
   language: z.enum(["pl", "en", "ru"]).default("pl"),
+  /** Optional verbatim system prompt the user reviewed in the wizard. */
+  systemPrompt: z.string().min(50).max(20_000).optional(),
+  /** Optional source URL captured at /api/prepare time. Stored on the tenant
+   *  row for provenance. */
+  sourceUrl: z.string().url().optional(),
 });
 
 interface ProvisionResponse {
@@ -53,6 +58,7 @@ export async function POST(req: NextRequest) {
       name: input.tenantName,
       display_name: input.tenantName,
       owner_email: input.ownerEmail ?? null,
+      source_url: input.sourceUrl ?? null,
     })
     .select("id")
     .single();
@@ -90,6 +96,7 @@ export async function POST(req: NextRequest) {
       serverToolBaseUrl,
       postCallWebhookUrl,
       defaultLanguage: input.language,
+      ...(input.systemPrompt ? { systemPromptOverride: input.systemPrompt } : {}),
     });
   } catch (e) {
     return NextResponse.json(

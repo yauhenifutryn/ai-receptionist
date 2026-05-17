@@ -26,6 +26,10 @@ export interface ProvisionAgentInput {
   /** Optional overrides; provider applies sensible defaults if omitted. */
   voiceId?: string;
   defaultLanguage?: SupportedLanguage;
+  /** Optional verbatim system prompt. If absent, provider builds a default
+   *  template. Pass when the wizard let the user review/edit the prompt
+   *  before provisioning. */
+  systemPromptOverride?: string;
 }
 
 export interface ProvisionAgentResult {

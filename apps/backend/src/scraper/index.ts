@@ -5,6 +5,7 @@ import type { FirecrawlClient, FirecrawlPage } from "./firecrawl.js";
 
 export { createFirecrawlClient } from "./firecrawl.js";
 export { consolidate, CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES } from "./consolidate.js";
+export { scraperOutputToMarkdown } from "./to-markdown.js";
 export type { FirecrawlClient, FirecrawlPage } from "./firecrawl.js";
 
 const DEFAULT_MAX_PAGES = 25;

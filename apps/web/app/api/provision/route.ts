@@ -10,7 +10,6 @@ const BodySchema = z.object({
   tenantName: z.string().min(2).max(120),
   ownerEmail: z.string().email().optional(),
   knowledgeMarkdown: z.string().min(20).max(200_000),
-  language: z.enum(["pl", "en", "ru"]).default("pl"),
   /** Optional verbatim system prompt the user reviewed in the wizard. */
   systemPrompt: z.string().min(50).max(20_000).optional(),
   /** Optional source URL captured at /api/prepare time. Stored on the tenant
@@ -95,7 +94,7 @@ export async function POST(req: NextRequest) {
       knowledgeBaseDocumentIds: [knowledgeDocumentId],
       serverToolBaseUrl,
       postCallWebhookUrl,
-      defaultLanguage: input.language,
+      defaultLanguage: "pl",
       ...(input.systemPrompt ? { systemPromptOverride: input.systemPrompt } : {}),
     });
   } catch (e) {
@@ -116,7 +115,7 @@ export async function POST(req: NextRequest) {
     provider: "elevenlabs",
     provider_agent_id: provisionResult.agentId,
     voice_id: null,
-    default_language: input.language,
+    default_language: "pl",
     status: "live",
   });
   if (agentErr) {

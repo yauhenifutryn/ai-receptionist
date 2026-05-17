@@ -1,7 +1,7 @@
 "use client";
 
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface TranscriptEntry {
   id: string;
@@ -9,6 +9,8 @@ interface TranscriptEntry {
   text: string;
   timestamp: number;
 }
+
+type Mode = "voice" | "chat";
 
 export default function TestAgentClient({ agentId }: { agentId: string }) {
   return (
@@ -19,15 +21,16 @@ export default function TestAgentClient({ agentId }: { agentId: string }) {
 }
 
 function TestAgentInner({ agentId }: { agentId: string }) {
+  const [mode, setMode] = useState<Mode>("voice");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [micPermission, setMicPermission] = useState<"unknown" | "granted" | "denied">(
     "unknown",
   );
+  const [chatInput, setChatInput] = useState("");
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   const conversation = useConversation({
-    onConnect: () => {
-      // Conversation id is read via getId() once connected.
-    },
+    onConnect: () => {},
     onDisconnect: () => {},
     onMessage: (msg: { source?: string; message?: string }) => {
       const role = msg.source === "user" ? "user" : "agent";
@@ -35,12 +38,7 @@ function TestAgentInner({ agentId }: { agentId: string }) {
       if (!text) return;
       setTranscript((t) => [
         ...t,
-        {
-          id: `${Date.now()}-${t.length}`,
-          role,
-          text,
-          timestamp: Date.now(),
-        },
+        { id: `${Date.now()}-${t.length}`, role, text, timestamp: Date.now() },
       ]);
     },
     onError: (err: unknown) => {
@@ -54,6 +52,10 @@ function TestAgentInner({ agentId }: { agentId: string }) {
     status === "connected" ? safeCall(() => conversation.getId()) : null;
 
   useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcript.length]);
+
+  useEffect(() => {
     if (typeof navigator === "undefined") return;
     if (!navigator.permissions || !navigator.permissions.query) return;
     navigator.permissions
@@ -64,9 +66,7 @@ function TestAgentInner({ agentId }: { agentId: string }) {
           setMicPermission(result.state as "granted" | "denied");
         };
       })
-      .catch(() => {
-        // Permissions API not exposed; we'll request on demand.
-      });
+      .catch(() => {});
   }, []);
 
   async function requestMic() {
@@ -78,25 +78,48 @@ function TestAgentInner({ agentId }: { agentId: string }) {
     }
   }
 
-  async function startCall() {
-    if (micPermission !== "granted") await requestMic();
-    conversation.startSession({ agentId });
+  async function startSession() {
+    if (mode === "voice" && micPermission !== "granted") await requestMic();
+    if (mode === "voice") {
+      conversation.startSession({ agentId });
+    } else {
+      conversation.startSession({ agentId, textOnly: true });
+    }
   }
 
-  function endCall() {
+  function endSession() {
     conversation.endSession();
+  }
+
+  async function switchMode(next: Mode) {
+    if (next === mode) return;
+    if (status === "connected") conversation.endSession();
+    setMode(next);
+    setChatInput("");
+  }
+
+  function handleSendChat(e: React.FormEvent) {
+    e.preventDefault();
+    const text = chatInput.trim();
+    if (!text || status !== "connected") return;
+    conversation.sendUserMessage(text);
+    setChatInput("");
   }
 
   const statusLabel = useMemo(() => {
     switch (status) {
       case "connected":
-        return isSpeaking ? "Agent speaking" : "Listening to you";
+        return mode === "voice"
+          ? isSpeaking
+            ? "Agent speaking"
+            : "Listening to you"
+          : "Connected (chat)";
       case "connecting":
         return "Connecting…";
       default:
         return "Ready";
     }
-  }, [status, isSpeaking]);
+  }, [status, isSpeaking, mode]);
 
   const statusColor =
     status === "connected"
@@ -113,11 +136,13 @@ function TestAgentInner({ agentId }: { agentId: string }) {
         </span>
         <h1 className="text-3xl font-semibold tracking-tight">Talk to the agent</h1>
         <p className="text-neutral-600">
-          Allow microphone access, click <em>Start call</em>, and have a
-          conversation in Polish. The agent will run consent first, then answer
-          from its knowledge base and try to book an appointment for you.
+          Test in voice (mic + speakers) or chat (text only). Chat mode is great
+          for scripted regression checks; voice mode tests the full Polish TTS
+          experience a real caller would hear.
         </p>
       </header>
+
+      <ModeToggle mode={mode} disabled={status === "connecting"} onChange={switchMode} />
 
       <section className="flex flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -128,19 +153,19 @@ function TestAgentInner({ agentId }: { agentId: string }) {
           <div className="flex items-center gap-3">
             {status === "connected" ? (
               <button
-                onClick={endCall}
+                onClick={endSession}
                 className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-300 hover:bg-rose-100"
               >
-                End call
+                {mode === "voice" ? "End call" : "End chat"}
               </button>
             ) : (
               <button
-                onClick={startCall}
+                onClick={startSession}
                 disabled={status === "connecting"}
                 className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Start call
-                <span aria-hidden>●</span>
+                {mode === "voice" ? "Start call" : "Start chat"}
+                <span aria-hidden>{mode === "voice" ? "●" : "→"}</span>
               </button>
             )}
           </div>
@@ -148,16 +173,19 @@ function TestAgentInner({ agentId }: { agentId: string }) {
 
         <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
           <Row label="Agent ID" value={agentId} mono />
-          <Row label="Microphone" value={micPermissionLabel(micPermission)} />
+          {mode === "voice" ? (
+            <Row label="Microphone" value={micPermissionLabel(micPermission)} />
+          ) : (
+            <Row label="Mode" value="Text only (no microphone)" />
+          )}
           {conversationId ? (
             <Row label="Conversation ID" value={conversationId} mono />
           ) : null}
         </dl>
 
-        {micPermission === "denied" ? (
+        {mode === "voice" && micPermission === "denied" ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Microphone is blocked. Open browser site settings, allow microphone,
-            then reload.
+            Microphone is blocked. Open browser site settings, allow microphone, then reload.
           </div>
         ) : null}
       </section>
@@ -176,10 +204,12 @@ function TestAgentInner({ agentId }: { agentId: string }) {
             </button>
           ) : null}
         </div>
-        <div className="flex min-h-[200px] flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <div className="flex min-h-[240px] flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           {transcript.length === 0 ? (
             <p className="my-auto text-center text-sm text-neutral-400">
-              Transcript appears here as you talk.
+              {mode === "voice"
+                ? "Transcript appears here as you talk."
+                : "Send your first message below to start."}
             </p>
           ) : (
             transcript.map((entry) => (
@@ -202,8 +232,70 @@ function TestAgentInner({ agentId }: { agentId: string }) {
               </div>
             ))
           )}
+          <div ref={transcriptEndRef} />
         </div>
+
+        {mode === "chat" ? (
+          <form
+            onSubmit={handleSendChat}
+            className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm"
+          >
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder={
+                status === "connected"
+                  ? "Napisz wiadomość po polsku…"
+                  : "Click Start chat to begin"
+              }
+              disabled={status !== "connected"}
+              className="flex-1 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm transition focus:border-neutral-400 focus:bg-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={status !== "connected" || chatInput.trim().length === 0}
+              className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Send
+            </button>
+          </form>
+        ) : null}
       </section>
+    </div>
+  );
+}
+
+function ModeToggle({
+  mode,
+  disabled,
+  onChange,
+}: {
+  mode: Mode;
+  disabled: boolean;
+  onChange: (m: Mode) => void;
+}) {
+  return (
+    <div className="inline-flex w-fit items-center rounded-full border border-neutral-200 bg-white p-1 shadow-sm">
+      {(["voice", "chat"] as const).map((m) => {
+        const active = mode === m;
+        return (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onChange(m)}
+            disabled={disabled}
+            className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition ${
+              active
+                ? "bg-neutral-900 text-white"
+                : "text-neutral-600 hover:text-neutral-900"
+            } disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            <span aria-hidden>{m === "voice" ? "🎙" : "💬"}</span>
+            {m === "voice" ? "Voice" : "Chat"}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -1,8 +1,7 @@
-import { CONSENT_QUESTION, type ConsentLanguage } from "../consent/script.js";
+import { CONSENT_QUESTION } from "../consent/script.js";
 
 export interface BuildSystemPromptArgs {
   tenantDisplayName: string;
-  language?: ConsentLanguage;
   /** Optional vertical hint surfaced in the Environment + Goal sections. */
   verticalHint?: string;
 }
@@ -32,8 +31,6 @@ export interface BuildSystemPromptArgs {
  * grounded in retrieval and say "nie mam tej informacji" otherwise.
  */
 export function buildSystemPrompt(args: BuildSystemPromptArgs): string {
-  const language: ConsentLanguage = args.language ?? "pl";
-  const consentQuestion = CONSENT_QUESTION[language];
   const tenant = args.tenantDisplayName;
   const verticalLine = args.verticalHint
     ? `The business operates in: ${args.verticalHint}.`
@@ -59,12 +56,16 @@ export function buildSystemPrompt(args: BuildSystemPromptArgs): string {
     ]),
     section("Goal", [
       "On every call, in order:",
-      `1. Greet the caller as ${tenant}'s receptionist and disclose that you are an AI assistant.`,
-      `2. Run the consent flow exactly once. Ask, verbatim: "${consentQuestion}" Wait for the caller's reply before continuing. The classifier records consent server-side; you do not need to track it.`,
+      `1. Greet the caller as ${tenant}'s receptionist in Polish by default; disclose that you are an AI assistant. If the caller responds in English or Russian, switch language for the rest of the call.`,
+      "2. Run the consent flow exactly once, in the caller's detected language. Ask, verbatim:",
+      `   - Polish: "${CONSENT_QUESTION.pl}"`,
+      `   - English: "${CONSENT_QUESTION.en}"`,
+      `   - Russian: "${CONSENT_QUESTION.ru}"`,
+      "   Wait for the caller's reply before continuing. The classifier records consent server-side; you do not need to track it.",
       "3. Identify what the caller needs: information (services, prices, hours, staff), an appointment, or something out of scope.",
       "4. For information requests: answer ONLY from the knowledge base. If the answer is not there, say so honestly and offer a callback.",
       "5. For appointments: call check_availability with the right serviceCategory, present up to three slots verbally, wait for the caller to choose one, confirm slot + name + phone back to them, then call create_booking.",
-      "6. For out-of-scope or operationally complex requests: escalate with \"Łączę z koordynatorem\" — do not improvise.",
+      "6. For out-of-scope or operationally complex requests: escalate with \"Łączę z koordynatorem\" (PL), \"Connecting you to a coordinator\" (EN), or \"Соединяю с координатором\" (RU) — do not improvise.",
       "7. End the call politely once the caller's goal is met.",
     ]),
     section("Guardrails", [

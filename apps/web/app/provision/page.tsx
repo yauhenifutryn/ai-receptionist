@@ -12,6 +12,8 @@ interface PrepareResponse {
   scraperSummary: {
     sourceUrl: string;
     scrapedAt: string;
+    urlsMapped: number;
+    urlsDroppedByFilter: number;
     pagesScraped: number;
     servicesCount: number;
     staffCount: number;
@@ -36,7 +38,6 @@ interface RecentAgent {
 
 interface DraftState {
   url: string;
-  language: "pl" | "en" | "ru";
   tenantName: string;
   knowledgeMarkdown: string;
   systemPrompt: string;
@@ -45,7 +46,7 @@ interface DraftState {
 }
 
 const STORAGE_KEYS = {
-  draft: "ai-receptionist:provision:draft-v2",
+  draft: "ai-receptionist:provision:draft-v3",
   recent: "ai-receptionist:provision:recent",
 } as const;
 
@@ -53,7 +54,6 @@ const RECENT_LIMIT = 10;
 
 const EMPTY_DRAFT: DraftState = {
   url: "",
-  language: "pl",
   tenantName: "",
   knowledgeMarkdown: "",
   systemPrompt: "",
@@ -72,7 +72,6 @@ export default function ProvisionPage() {
       const raw = window.localStorage.getItem(STORAGE_KEYS.draft);
       if (raw) {
         const parsed = JSON.parse(raw) as DraftState;
-        // Reset "preparing"/"provisioning" — these are transient and shouldn't persist.
         const step: Step =
           parsed.step === "review" || parsed.step === "input"
             ? parsed.step
@@ -132,7 +131,7 @@ export default function ProvisionPage() {
       const res = await fetch("/api/prepare", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: draft.url, language: draft.language }),
+        body: JSON.stringify({ url: draft.url }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -166,7 +165,6 @@ export default function ProvisionPage() {
           tenantName: draft.tenantName,
           knowledgeMarkdown: draft.knowledgeMarkdown,
           systemPrompt: draft.systemPrompt,
-          language: draft.language,
           sourceUrl: draft.url,
         }),
       });
@@ -212,11 +210,9 @@ export default function ProvisionPage() {
       {(draft.step === "input" || draft.step === "preparing") && (
         <InputCard
           url={draft.url}
-          language={draft.language}
           submitting={draft.step === "preparing"}
           restoredFromDraft={restoredFromDraft && draft.url !== ""}
           onChangeUrl={(url) => setDraft((d) => ({ ...d, url }))}
-          onChangeLanguage={(language) => setDraft((d) => ({ ...d, language }))}
           onSubmit={handlePrepare}
           onClearDraft={clearDraft}
           error={error}
@@ -248,14 +244,14 @@ function Header({ step }: { step: Step }) {
   return (
     <header className="flex flex-col gap-3">
       <span className="font-mono text-xs uppercase tracking-wider text-neutral-400">
-        Step {stepNumber} of 3 · {stepLabel(step)}
+        Step {stepNumber} of 2 · {stepLabel(step)}
       </span>
       <h1 className="text-3xl font-semibold tracking-tight">
         {stepNumber === 1 ? "Provision a new agent" : "Review the generated brief"}
       </h1>
       <p className="max-w-2xl text-neutral-600">
         {stepNumber === 1
-          ? "Paste a business URL. We scrape every page, run Gemini to consolidate it into a curated knowledge base, and draft a voice-agent system prompt grounded in the result."
+          ? "Paste a business URL. Firecrawl ranks pages by relevance, drops obvious junk (blog archives, cookie pages, binaries), then Gemini consolidates the result into a curated knowledge base and drafts a voice-agent system prompt."
           : "Read carefully. Edit anything that's wrong. When you provision, the agent gets exactly what you see here — no surprises in production."}
       </p>
     </header>
@@ -323,16 +319,14 @@ function RecentAgents({
 
 function InputCard(props: {
   url: string;
-  language: "pl" | "en" | "ru";
   submitting: boolean;
   restoredFromDraft: boolean;
   onChangeUrl: (v: string) => void;
-  onChangeLanguage: (v: "pl" | "en" | "ru") => void;
   onSubmit: (e: React.FormEvent) => void;
   onClearDraft: () => void;
   error: string | null;
 }) {
-  const { url, language, submitting, restoredFromDraft, onChangeUrl, onChangeLanguage, onSubmit, onClearDraft, error } = props;
+  const { url, submitting, restoredFromDraft, onChangeUrl, onSubmit, onClearDraft, error } = props;
   return (
     <form
       onSubmit={onSubmit}
@@ -354,7 +348,7 @@ function InputCard(props: {
       <Field
         id="url"
         label="Business website URL"
-        hint="Firecrawl maps + scrapes up to 15 pages, then Gemini consolidates into a single knowledge document."
+        hint="Polish-first by default. The agent auto-switches to English or Russian if the caller does — no language picker needed."
       >
         <input
           id="url"
@@ -368,30 +362,6 @@ function InputCard(props: {
         />
       </Field>
 
-      <Field
-        id="language"
-        label="Primary language"
-        hint="ElevenLabs auto-detects PL/EN/RU mid-call; this is the greeting language and the system-prompt locale."
-      >
-        <div className="flex gap-2">
-          {(["pl", "en", "ru"] as const).map((lang) => (
-            <button
-              key={lang}
-              type="button"
-              onClick={() => onChangeLanguage(lang)}
-              disabled={submitting}
-              className={`rounded-lg border px-4 py-2 text-sm font-medium uppercase tracking-wider transition ${
-                language === lang
-                  ? "border-neutral-900 bg-neutral-900 text-white"
-                  : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
-              } disabled:opacity-50`}
-            >
-              {lang}
-            </button>
-          ))}
-        </div>
-      </Field>
-
       {error ? (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {error}
@@ -400,7 +370,7 @@ function InputCard(props: {
 
       <div className="flex items-center justify-between gap-4 border-t border-neutral-100 pt-6">
         <p className="text-xs text-neutral-500">
-          Map → scrape (parallel) → Gemini consolidation. Typically 15-40 seconds depending on site size.
+          Map (relevance-ranked) → filter junk → scrape top 15 in parallel → Gemini consolidation. 15-40 seconds typical.
         </p>
         <button
           type="submit"
@@ -443,6 +413,8 @@ function ReviewCard(props: {
           </h2>
           <dl className="mt-3 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
             <Row label="Source URL" value={summary.sourceUrl} mono />
+            <Row label="URLs mapped" value={String(summary.urlsMapped)} />
+            <Row label="Dropped by filter" value={String(summary.urlsDroppedByFilter)} />
             <Row label="Pages scraped" value={String(summary.pagesScraped)} />
             <Row label="Services found" value={String(summary.servicesCount)} />
             <Row label="Staff found" value={String(summary.staffCount)} />
@@ -481,7 +453,7 @@ function ReviewCard(props: {
         <Field
           id="systemPrompt"
           label="System prompt"
-          hint="The agent's persona, rules, tools, and error handling. Structured per ElevenLabs prompting guide (6 blocks). Edit if you want different tone or constraints."
+          hint="Personality · Environment · Tone · Goal · Guardrails · Tools · Error handling. Includes consent variants in PL/EN/RU so the agent switches based on the caller. Edit if you want different rules or tone."
         >
           <textarea
             id="systemPrompt"
@@ -500,7 +472,7 @@ function ReviewCard(props: {
         <Field
           id="knowledgeMarkdown"
           label="Knowledge document"
-          hint="What the agent retrieves from at runtime. Sections become RAG chunks. Hard rule: prices marked 'unknown' must stay unknown — never invent."
+          hint="What the agent retrieves from at runtime. H2 sections become RAG chunks. Hard rule: prices marked 'unknown' must stay unknown — never invent."
         >
           <textarea
             id="knowledgeMarkdown"

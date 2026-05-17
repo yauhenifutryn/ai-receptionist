@@ -85,7 +85,6 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
       input.systemPromptOverride ??
       buildSystemPrompt({
         tenantDisplayName: input.tenantDisplayName,
-        language,
       });
 
     const body = await this.request<{ agent_id?: string; id?: string }>(

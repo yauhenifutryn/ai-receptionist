@@ -5,6 +5,100 @@ import {
 import type { LLMClient } from "../lib/llm.js";
 import type { FirecrawlPage } from "./firecrawl.js";
 
+/**
+ * Gemini-side JSON Schema (OpenAPI 3.0 subset) for ScraperOutput. Used as
+ * responseSchema so the model returns the exact shape ScraperOutputSchema
+ * (Zod) expects. Mirrors packages/contracts/src/scraper.schema.ts — keep
+ * in sync if that contract changes.
+ */
+const SCRAPER_OUTPUT_JSON_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    sourceUrl: { type: "STRING" },
+    scrapedAt: { type: "STRING" },
+    tenant: {
+      type: "OBJECT",
+      properties: {
+        name: { type: "STRING" },
+        address: { type: "STRING" },
+        phone: { type: "STRING" },
+        email: { type: "STRING" },
+        description: { type: "STRING" },
+        hours: {
+          type: "OBJECT",
+          properties: {
+            monday: { type: "STRING" },
+            tuesday: { type: "STRING" },
+            wednesday: { type: "STRING" },
+            thursday: { type: "STRING" },
+            friday: { type: "STRING" },
+            saturday: { type: "STRING" },
+            sunday: { type: "STRING" },
+            notes: { type: "STRING" },
+          },
+        },
+      },
+      required: ["name"],
+    },
+    staff: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          name: { type: "STRING" },
+          role: { type: "STRING" },
+          specialization: { type: "STRING" },
+          languages: { type: "ARRAY", items: { type: "STRING" } },
+        },
+        required: ["name"],
+      },
+    },
+    services: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          name: { type: "STRING" },
+          synonyms: { type: "ARRAY", items: { type: "STRING" } },
+          description: { type: "STRING" },
+          durationMinutes: { type: "INTEGER" },
+          nfzCovered: {
+            type: "STRING",
+            enum: ["full", "partial", "none", "unknown"],
+          },
+          requiresConsultationFirst: { type: "BOOLEAN" },
+          // price.amount is union(number | "unknown") which Gemini's
+          // OpenAPI subset can't express. Constraining only `currency`
+          // and leaving `amount` unspecified lets the model return either
+          // shape; Zod handles the union on the receive side.
+          price: {
+            type: "OBJECT",
+            properties: {
+              currency: { type: "STRING", enum: ["PLN"] },
+            },
+            required: ["currency"],
+          },
+        },
+        required: ["name"],
+      },
+    },
+    faq: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          question: { type: "STRING" },
+          answer: { type: "STRING" },
+        },
+        required: ["question", "answer"],
+      },
+    },
+    unsorted: { type: "STRING" },
+    hasUnknownPrices: { type: "BOOLEAN" },
+  },
+  required: ["sourceUrl", "scrapedAt", "tenant"],
+} as const;
+
 export const CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES =
   "Hard rule: never invent prices. If a price is not in the source markdown, set price.amount to the literal string \"unknown\". Do not infer prices from related services. Mark hasUnknownPrices=true whenever at least one service has unknown price.";
 
@@ -53,6 +147,7 @@ export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput>
     system: SYSTEM_PROMPT,
     user: buildUserPrompt(args.rootUrl, args.pages),
     schema: ScraperOutputSchema,
+    jsonSchema: SCRAPER_OUTPUT_JSON_SCHEMA,
     temperature: 0,
     maxOutputTokens: 8192,
   });

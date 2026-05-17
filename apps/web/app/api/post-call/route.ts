@@ -4,12 +4,28 @@ import {
   handlePostCall,
 } from "@ai-receptionist/backend/post-call";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
+import { verifyElevenLabsWebhook } from "@/lib/verify-webhook-signature";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null);
+  // F6: HMAC verify before any state-changing work. Forged payloads
+  // would otherwise flip consent flags / transcript storage / recovered-
+  // revenue counters with only an agentId guess.
+  const verified = await verifyElevenLabsWebhook(req);
+  if (!verified.ok) {
+    return NextResponse.json(
+      { error: "webhook_unverified", reason: verified.reason },
+      { status: verified.status },
+    );
+  }
+  let body: unknown;
+  try {
+    body = JSON.parse(verified.rawBody);
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
   if (body == null) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }

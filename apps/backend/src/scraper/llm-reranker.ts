@@ -31,6 +31,31 @@ const RerankResponseSchema = z.object({
   ranked: z.array(ScoreItemSchema),
 });
 
+/**
+ * Gemini-side JSON Schema (OpenAPI 3.0 subset) for gen-time constraint.
+ * Mirrors RerankResponseSchema so the model can't return shapes that
+ * fail Zod post-validation. Without this, an oversized `reason` killed
+ * the rerank earlier in this branch's history.
+ */
+const RERANK_RESPONSE_JSON_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    ranked: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          url: { type: "STRING" },
+          score: { type: "NUMBER" },
+          reason: { type: "STRING" },
+        },
+        required: ["url", "score", "reason"],
+      },
+    },
+  },
+  required: ["ranked"],
+} as const;
+
 export type RerankItem = z.infer<typeof ScoreItemSchema>;
 
 export interface RerankArgs {
@@ -86,6 +111,7 @@ export async function rerankUrls(args: RerankArgs): Promise<RerankItem[]> {
     system: SYSTEM_PROMPT,
     user: buildUserPrompt(args),
     schema: RerankResponseSchema,
+    jsonSchema: RERANK_RESPONSE_JSON_SCHEMA,
     temperature: 0,
     maxOutputTokens: 8192,
   });

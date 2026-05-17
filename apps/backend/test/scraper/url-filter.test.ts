@@ -111,6 +111,38 @@ describe("detectLanguagePrefixes (semantic, no hardcoded ISO list)", () => {
     ];
     expect(detectLanguagePrefixes(urls).has("ai")).toBe(false);
   });
+
+  it("F8: does not flag two non-ISO 2-letter slugs that just co-occur (/ai/ + /qa/)", () => {
+    const urls = [
+      "https://klinika.pl/ai/marketing",
+      "https://klinika.pl/qa/quality",
+      "https://klinika.pl/uslugi",
+    ];
+    const detected = detectLanguagePrefixes(urls);
+    expect(detected.has("ai")).toBe(false);
+    expect(detected.has("qa")).toBe(false);
+  });
+
+  it("F8: mixed ISO + non-ISO co-occurrence — only ISO is flagged", () => {
+    const urls = [
+      "https://klinika.pl/en/contact",
+      "https://klinika.pl/ai/marketing",
+      "https://klinika.pl/uslugi",
+    ];
+    const detected = detectLanguagePrefixes(urls);
+    expect(detected.has("en")).toBe(true);
+    expect(detected.has("ai")).toBe(false);
+  });
+
+  it("F9: ISO singleton with transliterated tail is detected (no overlap needed)", () => {
+    // /doctors/oleh-vus (Polish spelling) and /en/doctors/oleg-vus (English
+    // transliteration) — old code missed this because exact tails differed.
+    const urls = [
+      "https://klinika.pl/doctors/oleh-vus",
+      "https://klinika.pl/en/doctors/oleg-vus",
+    ];
+    expect(detectLanguagePrefixes(urls).has("en")).toBe(true);
+  });
 });
 
 describe("dedupeByLanguage (drop non-Polish translations)", () => {

@@ -81,6 +81,21 @@ const BLOCKED_REGEX: ReadonlyArray<RegExp> = [
 
 const PRIMARY_LANG = "pl";
 
+/**
+ * Common ISO-639-1 codes that appear as language namespaces in real
+ * multilingual sites. Used to gate Rule 1 (transitive detection) so
+ * accidental 2-letter slugs like `/ai/` or `/qa/` aren't misclassified
+ * as languages. Not exhaustive — only codes we've seen on production
+ * sites in the EU/PL market. Add more as needed.
+ */
+const KNOWN_ISO_LANGS: ReadonlySet<string> = new Set([
+  "pl", "en", "de", "fr", "es", "it", "pt", "ru", "uk", "be", "cs", "sk",
+  "nl", "hu", "ro", "bg", "tr", "hr", "sl", "sv", "da", "fi", "no", "et",
+  "lv", "lt", "el", "ar", "zh", "ja", "ko", "he", "fa", "vi", "th", "id",
+  "ms", "ga", "mt", "is", "sq", "mk", "sr", "bs", "ka", "hy", "az", "kk",
+  "uz", "ky", "tt", "ba", "tg", "mn", "ne", "hi", "bn", "ur", "ta", "te",
+]);
+
 export interface FilterCandidatesResult {
   kept: string[];
   droppedJunk: string[];
@@ -122,17 +137,22 @@ export function shouldScrape(url: string): boolean {
 }
 
 /**
- * Detect language prefixes purely from the URL set. Two rules:
+ * Detect language prefixes purely from the URL set. Three rules:
  *
- *   Rule 1 (transitive): if 2+ distinct 2-letter first-segments appear
- *     across the URL set, every one of them is treated as a language
- *     namespace. Real localizations always come in sets, so seeing /en/
- *     alongside /uk/ is near-certain proof both are languages — even if
- *     each appears only once.
+ *   Rule 1 (transitive, ISO-gated): if 2+ distinct 2-letter first-segments
+ *     appear AND at least one is in KNOWN_ISO_LANGS, all the *language-
+ *     looking* prefixes in the set are treated as languages. Real
+ *     localizations always come in sets, so /en/ + /uk/ = near-certain
+ *     both are languages. The ISO gate prevents pathological co-occurrence
+ *     of unrelated 2-letter slugs like `/ai/` + `/qa/` from being dropped.
  *
- *   Rule 2 (singleton fallback): when only one 2-letter prefix appears,
- *     require multiplicity (3+ URLs) or tail-overlap with an unprefixed
- *     path to avoid misclassifying a one-off page like /ai or /qa.
+ *   Rule 2 (singleton allowlist): a lone 2-letter prefix is treated as a
+ *     language if it's in KNOWN_ISO_LANGS — `/en/contact` alone is a
+ *     strong-enough signal that the whole namespace is English.
+ *
+ *   Rule 3 (singleton fallback): if it's NOT in KNOWN_ISO_LANGS, fall
+ *     back to multiplicity (3+ URLs) or tail-overlap with an unprefixed
+ *     path before treating it as a language.
  *
  * Returns the set of detected prefixes (e.g. {"en", "uk", "ru"}).
  */
@@ -159,17 +179,29 @@ export function detectLanguagePrefixes(urls: string[]): Set<string> {
     }
   }
 
-  // Rule 1: 2+ distinct 2-letter prefixes -> all are languages.
-  if (prefixToTails.size >= 2) {
-    return new Set(prefixToTails.keys());
+  const prefixes = Array.from(prefixToTails.keys());
+  const isoPrefixes = prefixes.filter((p) => KNOWN_ISO_LANGS.has(p));
+
+  // Rule 1: 2+ distinct 2-letter prefixes AND at least one is ISO ->
+  // treat every ISO prefix in the set as a language. Non-ISO prefixes
+  // that just happened to co-occur (e.g. /ai/, /qa/) are NOT flagged.
+  if (prefixes.length >= 2 && isoPrefixes.length >= 1) {
+    return new Set(isoPrefixes);
   }
 
-  // Rule 2: single prefix only -> require multiplicity or overlap.
+  // Rule 2 + 3: singleton handling.
   const detected = new Set<string>();
   for (const [prefix, tails] of prefixToTails) {
-    let overlap = 0;
-    for (const t of tails) if (unprefixedTails.has(t)) overlap++;
-    if (overlap >= 1 || tails.size >= 3) detected.add(prefix);
+    if (KNOWN_ISO_LANGS.has(prefix)) {
+      // Rule 2: ISO singleton is enough on its own. /en/ is a language
+      // namespace whether it has 1 page or 100.
+      detected.add(prefix);
+    } else {
+      // Rule 3: non-ISO singleton needs hard evidence.
+      let overlap = 0;
+      for (const t of tails) if (unprefixedTails.has(t)) overlap++;
+      if (overlap >= 1 || tails.size >= 3) detected.add(prefix);
+    }
   }
   return detected;
 }

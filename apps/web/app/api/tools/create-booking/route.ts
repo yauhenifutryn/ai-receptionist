@@ -4,12 +4,27 @@ import {
   handleCreateBooking,
 } from "@ai-receptionist/backend/tools";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
+import { verifyElevenLabsWebhook } from "@/lib/verify-webhook-signature";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null);
+  // F1: Verify before any DB write. Bookings write tenant_id + PII;
+  // an unverified caller could forge bookings against any agent.
+  const verified = await verifyElevenLabsWebhook(req);
+  if (!verified.ok) {
+    return NextResponse.json(
+      { error: "webhook_unverified", reason: verified.reason },
+      { status: verified.status },
+    );
+  }
+  let body: { conversationId?: unknown } | null = null;
+  try {
+    body = JSON.parse(verified.rawBody);
+  } catch {
+    body = null;
+  }
   if (!body) {
     return NextResponse.json(
       { code: "validation_failed", callerSafeMessage: "Nie udało mi się odczytać żądania." },

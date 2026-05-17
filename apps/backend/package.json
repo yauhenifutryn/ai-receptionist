@@ -3,6 +3,44 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./orchestration": {
+      "types": "./dist/orchestration/index.d.ts",
+      "default": "./dist/orchestration/index.js"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "default": "./dist/tools/index.js"
+    },
+    "./post-call": {
+      "types": "./dist/post-call/index.d.ts",
+      "default": "./dist/post-call/index.js"
+    },
+    "./scraper": {
+      "types": "./dist/scraper/index.d.ts",
+      "default": "./dist/scraper/index.js"
+    },
+    "./consent": {
+      "types": "./dist/consent/classifier.d.ts",
+      "default": "./dist/consent/classifier.js"
+    },
+    "./lib/logger": {
+      "types": "./dist/lib/logger.d.ts",
+      "default": "./dist/lib/logger.js"
+    },
+    "./lib/llm": {
+      "types": "./dist/lib/llm.d.ts",
+      "default": "./dist/lib/llm.js"
+    },
+    "./lib/gemini-provider": {
+      "types": "./dist/lib/gemini-provider.d.ts",
+      "default": "./dist/lib/gemini-provider.js"
+    },
+    "./prompts": {
+      "types": "./dist/prompts/system-prompt.d.ts",
+      "default": "./dist/prompts/system-prompt.js"
+    }
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node --enable-source-maps dist/index.js",

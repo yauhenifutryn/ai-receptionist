@@ -63,6 +63,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ai-receptionist/backend':
+        specifier: workspace:*
+        version: link:../backend
       '@ai-receptionist/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

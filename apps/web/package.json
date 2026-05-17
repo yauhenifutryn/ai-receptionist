@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
+    "prebuild": "pnpm -F @ai-receptionist/contracts run build && pnpm -F @ai-receptionist/backend run build",
     "build": "next build",
     "start": "next start -p 3000",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -11,6 +12,7 @@
     "test": "echo 'no tests yet'"
   },
   "dependencies": {
+    "@ai-receptionist/backend": "workspace:*",
     "@ai-receptionist/contracts": "workspace:*",
     "@elevenlabs/react": "^1.0.6",
     "@supabase/ssr": "^0.5.2",

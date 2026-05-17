@@ -2,8 +2,8 @@
 const nextConfig = {
   // Next.js 16 promoted typedRoutes out of `experimental`.
   typedRoutes: true,
-  // Workspace-internal packages must be transpiled by Next when imported as TS source.
-  transpilePackages: ["@ai-receptionist/contracts"],
+  // Both workspace packages ship as pre-built .js via their `exports` maps
+  // (built to dist/). No transpilePackages needed.
 };
 
 export default nextConfig;

@@ -19,19 +19,26 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const DEFAULT_CONCURRENCY = 3;
+const RERANK_INPUT_CAP = 60;
+const SCRAPE_FLOOR = 8;
+const SCRAPE_CEILING_MAX = 40;
+
 const BodySchema = z.object({
   url: z.string().url(),
   searchQuery: z.string().min(1).max(500).optional(),
-  /** Hard ceiling on pages scraped after LLM re-rank. Dynamic floor is 8. */
-  maxPages: z.number().int().positive().max(40).default(30),
+  /** Hard ceiling on pages scraped after LLM re-rank. Cannot be lower than
+   *  SCRAPE_FLOOR — the pipeline guarantees a minimum-evidence set. */
+  maxPages: z
+    .number()
+    .int()
+    .min(SCRAPE_FLOOR)
+    .max(SCRAPE_CEILING_MAX)
+    .default(30),
   /** URLs scoring below this in re-rank are dropped (unless we'd fall under
    *  the floor of 8). Tunable per call for noisier sites. */
   rerankThreshold: z.number().min(0).max(1).default(0.5),
 });
-
-const DEFAULT_CONCURRENCY = 3;
-const RERANK_INPUT_CAP = 60;
-const SCRAPE_FLOOR = 8;
 
 /**
  * /api/prepare streams NDJSON progress events to the client so the wizard
@@ -60,12 +67,29 @@ export async function POST(req: NextRequest) {
   if (!firecrawlKey) return jsonError("firecrawl_api_key_missing", "Set FIRECRAWL_API_KEY", 500);
   if (!geminiKey) return jsonError("gemini_api_key_missing", "Set GEMINI_API_KEY", 500);
 
+  // If the browser tab closes mid-stream we want to stop running paid
+  // Firecrawl/Gemini work. The controller's cancel() fires on disconnect;
+  // we use an AbortController so downstream loops can bail between calls.
+  // Note: in-flight HTTP calls keep running (firecrawl/gemini clients don't
+  // accept a signal yet); but subsequent loop iterations and gemini calls
+  // will short-circuit, which eliminates the bulk of the cost leak.
+  const abort = new AbortController();
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
+    cancel(reason) {
+      abort.abort(reason ?? "client_disconnect");
+    },
     async start(controller) {
+      let streamClosed = false;
       const emit = (event: Record<string, unknown>) => {
-        controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+        if (abort.signal.aborted || streamClosed) return;
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+        } catch {
+          streamClosed = true;
+        }
       };
+      const aborted = () => abort.signal.aborted;
 
       const session = await openTestSession(url).catch(() => null);
       await session?.event("prepare:start", { url, searchQuery, maxPages });
@@ -83,6 +107,7 @@ export async function POST(req: NextRequest) {
           search: searchQuery ?? DEFAULT_RELEVANCE_QUERY,
           limit: 100,
         });
+        if (aborted()) return;
         await session?.event("firecrawl:map", { linksCount: links.length });
         await session?.write("01-firecrawl-map.json", JSON.stringify({ url, links }, null, 2));
         emit({
@@ -142,6 +167,7 @@ export async function POST(req: NextRequest) {
         const rerankStart = Date.now();
         const reranked = await rerankUrls({ rootUrl: url, urls: toRerank, llm });
         const rerankMs = Date.now() - rerankStart;
+        if (aborted()) return;
         const candidates = pickByScore(reranked, {
           threshold: rerankThreshold,
           floor: SCRAPE_FLOOR,
@@ -200,7 +226,9 @@ export async function POST(req: NextRequest) {
               message: `Scraped ${done}/${total} · ${shorten(lastUrl)}`,
             });
           },
+          abort.signal,
         );
+        if (aborted()) return;
         const validPages = pages.filter((p) => p.markdown.length > 0);
         await session?.event("firecrawl:scrape", { pagesCount: validPages.length });
         await session?.write(
@@ -239,7 +267,9 @@ export async function POST(req: NextRequest) {
           percent: 78,
           message: "Consolidating with Gemini 3.1 Pro Preview (this is the slowest step)…",
         });
+        if (aborted()) return;
         const scraperOutput = await consolidate({ rootUrl: url, pages: validPages, llm });
+        if (aborted()) return;
         await session?.event("gemini:consolidate", {
           tenantName: scraperOutput.tenant.name,
           services: scraperOutput.services.length,
@@ -299,11 +329,22 @@ export async function POST(req: NextRequest) {
           },
         });
       } catch (e) {
-        const msg = (e as Error).message;
-        await session?.event("prepare:error", { code: "unexpected", message: msg });
-        emit({ type: "error", code: "unexpected", message: msg });
+        if (aborted()) {
+          await session?.event("prepare:aborted", { reason: "client_disconnect" });
+        } else {
+          const msg = (e as Error).message;
+          await session?.event("prepare:error", { code: "unexpected", message: msg });
+          emit({ type: "error", code: "unexpected", message: msg });
+        }
       } finally {
-        controller.close();
+        if (!streamClosed) {
+          streamClosed = true;
+          try {
+            controller.close();
+          } catch {
+            // cancel() may have already closed the controller
+          }
+        }
       }
     },
   });
@@ -340,6 +381,7 @@ async function scrapeWithProgress(
   urls: string[],
   concurrency: number,
   onProgress: (done: number, total: number, lastUrl: string) => void,
+  signal?: AbortSignal,
 ): Promise<FirecrawlPage[]> {
   const out: FirecrawlPage[] = new Array(urls.length);
   let index = 0;
@@ -349,6 +391,7 @@ async function scrapeWithProgress(
     { length: Math.min(concurrency, urls.length) },
     async () => {
       while (true) {
+        if (signal?.aborted) return;
         const i = index++;
         if (i >= urls.length) return;
         const u = urls[i]!;

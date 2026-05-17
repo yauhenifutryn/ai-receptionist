@@ -97,7 +97,11 @@ export async function rerankUrls(args: RerankArgs): Promise<RerankItem[]> {
   for (const u of args.urls) {
     const scored = byUrl.get(u);
     if (scored) out.push(scored);
-    else out.push({ url: u, score: 0.5, reason: "no score from model — neutral default" });
+    // Omitted URLs get score 0.0 (below any reasonable threshold) so
+    // junk the model implicitly rejected can't sneak past pickByScore.
+    // pickByScore's floor will still backfill these if no scored URLs
+    // qualify — but they will never outrank legitimately-scored URLs.
+    else out.push({ url: u, score: 0, reason: "model omitted this URL — defaulted below threshold" });
   }
   out.sort((a, b) => b.score - a.score);
   return out;

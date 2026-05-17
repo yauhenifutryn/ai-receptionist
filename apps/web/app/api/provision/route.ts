@@ -72,11 +72,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const origin = req.nextUrl.origin;
+  // ElevenLabs cloud calls back to our webhooks (server tools + post-call).
+  // In dev that's localhost — unreachable from their cloud. PUBLIC_BASE_URL
+  // overrides the request origin so an ngrok / production URL can be used.
+  // In production we refuse unreachable origins to prevent silent webhook
+  // failure that only shows up when a real call lands.
+  const baseUrl = resolveBaseUrl(req);
+  if (!baseUrl.ok) {
+    await session?.event("provision:error", {
+      code: "public_base_url_unreachable",
+      message: baseUrl.message,
+    });
+    return NextResponse.json(
+      { error: "public_base_url_unreachable", message: baseUrl.message },
+      { status: 500 },
+    );
+  }
   // Provider appends "/tools/<name>" to this base, so /api must be included
   // here — otherwise ElevenLabs POSTs to /tools/* which 404s in Next.js.
-  const serverToolBaseUrl = `${origin}/api`;
-  const postCallWebhookUrl = `${origin}/api/post-call`;
+  const serverToolBaseUrl = `${baseUrl.value}/api`;
+  const postCallWebhookUrl = `${baseUrl.value}/api/post-call`;
 
   const supabase = getServiceRoleSupabase();
   const provider = new ElevenLabsConvAIProvider({ apiKey });
@@ -171,12 +186,24 @@ export async function POST(req: NextRequest) {
     status: "live",
   });
   if (agentErr) {
+    // Roll back the cloud agent so we don't leave a billable orphan with
+    // no local DB row. Best-effort: if delete fails, surface both errors.
+    let rollback: "ok" | "failed" = "ok";
+    let rollbackError: string | undefined;
+    try {
+      await provider.deleteAgent({ agentId: provisionResult.agentId });
+    } catch (e) {
+      rollback = "failed";
+      rollbackError = (e as Error).message;
+    }
     await session?.event("provision:error", {
       code: "agent_row_insert_failed",
       message: agentErr.message,
       tenantId,
       knowledgeDocumentId,
       agentId: provisionResult.agentId,
+      rollback,
+      ...(rollbackError ? { rollbackError } : {}),
     });
     return NextResponse.json(
       {
@@ -185,6 +212,8 @@ export async function POST(req: NextRequest) {
         tenantId,
         knowledgeDocumentId,
         agentId: provisionResult.agentId,
+        rollback,
+        ...(rollbackError ? { rollbackError } : {}),
       },
       { status: 500 },
     );
@@ -218,4 +247,44 @@ export async function POST(req: NextRequest) {
     ...(session?.slug ? { sessionSlug: session.slug } : {}),
   };
   return NextResponse.json(body, { status: 200 });
+}
+
+type BaseUrlResult =
+  | { ok: true; value: string }
+  | { ok: false; message: string };
+
+/**
+ * Pick the canonical public base URL ElevenLabs cloud should call back on:
+ *   - PUBLIC_BASE_URL env wins (use this in deployed envs)
+ *   - Falls back to req.nextUrl.origin (localhost in dev)
+ *   - In production, refuses to provision against localhost/private origins
+ *     because those webhooks would silently fail when ElevenLabs hits them.
+ */
+function resolveBaseUrl(req: NextRequest): BaseUrlResult {
+  const envBase = process.env.PUBLIC_BASE_URL?.trim();
+  const candidate = envBase && envBase.length > 0 ? envBase : req.nextUrl.origin;
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    return { ok: false, message: `invalid base URL: ${candidate}` };
+  }
+  const isProd = process.env.NODE_ENV === "production";
+  const host = parsed.hostname;
+  const isUnreachable =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "0.0.0.0" ||
+    host.startsWith("10.") ||
+    host.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  if (isProd && isUnreachable) {
+    return {
+      ok: false,
+      message: `PUBLIC_BASE_URL must be a publicly reachable URL in production (got '${parsed.origin}'). Set PUBLIC_BASE_URL env to your production domain or an ngrok URL.`,
+    };
+  }
+  // Strip trailing slash for predictable concatenation.
+  const normalized = parsed.origin + parsed.pathname.replace(/\/+$/, "");
+  return { ok: true, value: normalized };
 }

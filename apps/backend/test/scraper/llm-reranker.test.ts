@@ -78,7 +78,7 @@ describe("rerankUrls (LLM call)", () => {
     expect(out[0]!.score).toBe(0.95);
   });
 
-  it("inserts neutral score for URLs the model omitted", async () => {
+  it("scores omitted URLs at 0 so they fall below any reasonable threshold", async () => {
     const fakeProvider = {
       generateJson: vi.fn().mockResolvedValue({
         text: JSON.stringify({
@@ -94,8 +94,33 @@ describe("rerankUrls (LLM call)", () => {
     });
     expect(out).toHaveLength(2);
     const uslugi = out.find((r) => r.url === "https://x.pl/uslugi")!;
-    expect(uslugi.score).toBe(0.5);
-    expect(uslugi.reason).toMatch(/neutral/);
+    expect(uslugi.score).toBe(0);
+    expect(uslugi.reason).toMatch(/omitted/);
+  });
+
+  it("omitted URLs do not jump above scored-bad URLs (F5 regression)", async () => {
+    const fakeProvider = {
+      generateJson: vi.fn().mockResolvedValue({
+        text: JSON.stringify({
+          ranked: [
+            { url: "https://x.pl/cennik", score: 0.9, reason: "" },
+            { url: "https://x.pl/blog", score: 0.4, reason: "bad" },
+          ],
+        }),
+      }),
+    };
+    const llm = new LLMClient(fakeProvider);
+    const out = await rerankUrls({
+      rootUrl: "https://x.pl",
+      urls: ["https://x.pl/cennik", "https://x.pl/blog", "https://x.pl/mystery"],
+      llm,
+    });
+    // Sorted desc: cennik (0.9), blog (0.4), mystery (0.0)
+    expect(out.map((r) => r.url)).toEqual([
+      "https://x.pl/cennik",
+      "https://x.pl/blog",
+      "https://x.pl/mystery",
+    ]);
   });
 
   it("returns [] for empty input without calling LLM", async () => {

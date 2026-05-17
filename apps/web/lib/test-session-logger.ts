@@ -41,6 +41,23 @@ function slugify(input: string): string {
     .toLowerCase();
 }
 
+/**
+ * Slug must be a single safe basename: only A-Za-z0-9 plus `-_.` and
+ * the `__` separator used by openTestSession. No path separators,
+ * no leading dots, length-bounded. Rejects "..", "../escape", absolute
+ * paths, and anything else that could escape the sessions root.
+ */
+const SAFE_SLUG_RE = /^[A-Za-z0-9_.-]{1,200}$/;
+function isSafeSlug(slug: string): boolean {
+  if (typeof slug !== "string") return false;
+  if (slug.length === 0 || slug.length > 200) return false;
+  if (slug.startsWith(".")) return false;
+  if (slug.includes("/") || slug.includes("\\") || slug.includes("..")) return false;
+  return SAFE_SLUG_RE.test(slug);
+}
+
+export const __testing = { isSafeSlug };
+
 export interface TestSessionHandle {
   /** Absolute path to the session directory. */
   dir: string;
@@ -97,12 +114,22 @@ export async function openTestSession(hint: string): Promise<TestSessionHandle> 
  * Re-open an existing session by slug. Used by /api/provision to append to the
  * /api/prepare session for the same tenant when the user goes through both
  * steps in one browser.
+ *
+ * Hardened against path traversal: only safe-character basenames are
+ * accepted, and the final resolved path must live under the sessions
+ * root. Anything else returns null instead of opening an attacker-
+ * controlled directory.
  */
 export async function openExistingSession(
   slug: string,
 ): Promise<TestSessionHandle | null> {
+  if (!isSafeSlug(slug)) return null;
   const root = await resolveRoot();
-  const dir = path.join(root, slug);
+  const dir = path.resolve(root, slug);
+  // Defense in depth: even if isSafeSlug somehow lets a traversal
+  // through (e.g. unicode normalization), the resolved path must still
+  // sit under root.
+  if (dir !== root && !dir.startsWith(root + path.sep)) return null;
   try {
     await fs.access(dir);
   } catch {

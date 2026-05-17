@@ -67,3 +67,8 @@ docs/research/
 # Logs
 *.log
 logs/
+.vercel
+
+# Local test-session artifacts — full record of each /api/prepare + /api/provision
+# run for human + Claude review. Local only, contains real scraped clinic data.
+test-sessions/

@@ -9,6 +9,7 @@ interface PrepareResponse {
   suggestedTenantName: string;
   knowledgeMarkdown: string;
   systemPrompt: string;
+  sessionSlug?: string;
   scraperSummary: {
     sourceUrl: string;
     scrapedAt: string;
@@ -42,7 +43,15 @@ interface DraftState {
   knowledgeMarkdown: string;
   systemPrompt: string;
   scraperSummary?: PrepareResponse["scraperSummary"];
+  sessionSlug?: string;
   step: Step;
+}
+
+interface ProgressLine {
+  phase: string;
+  message: string;
+  percent: number;
+  timestamp: number;
 }
 
 const STORAGE_KEYS = {
@@ -66,6 +75,7 @@ export default function ProvisionPage() {
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentAgent[]>([]);
   const [restoredFromDraft, setRestoredFromDraft] = useState(false);
+  const [progress, setProgress] = useState<ProgressLine[]>([]);
 
   useEffect(() => {
     try {
@@ -126,27 +136,78 @@ export default function ProvisionPage() {
   async function handlePrepare(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setProgress([]);
     setDraft((d) => ({ ...d, step: "preparing" }));
+
     try {
       const res = await fetch("/api/prepare", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ url: draft.url }),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json?.message ?? json?.error ?? `Prepare failed (${res.status})`);
+
+      if (!res.ok || !res.body) {
+        const text = await res.text().catch(() => "");
+        setError(text || `Prepare failed (${res.status})`);
         setDraft((d) => ({ ...d, step: "input" }));
         return;
       }
-      const data = json as PrepareResponse;
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let doneResult: PrepareResponse | null = null;
+      let errorMsg: string | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let evt: { type: string; [k: string]: unknown };
+          try {
+            evt = JSON.parse(line) as typeof evt;
+          } catch {
+            continue;
+          }
+          if (evt.type === "log") {
+            const entry: ProgressLine = {
+              phase: String(evt.phase ?? ""),
+              message: String(evt.message ?? ""),
+              percent: typeof evt.percent === "number" ? evt.percent : 0,
+              timestamp: Date.now(),
+            };
+            setProgress((p) => [...p, entry]);
+          } else if (evt.type === "error") {
+            errorMsg = String(evt.message ?? evt.code ?? "Unknown error");
+          } else if (evt.type === "done") {
+            doneResult = evt.payload as PrepareResponse;
+          }
+        }
+      }
+
+      if (errorMsg) {
+        setError(errorMsg);
+        setDraft((d) => ({ ...d, step: "input" }));
+        return;
+      }
+      if (!doneResult) {
+        setError("Stream ended without a result");
+        setDraft((d) => ({ ...d, step: "input" }));
+        return;
+      }
+
       setDraft((d) => ({
         ...d,
         step: "review",
-        tenantName: data.suggestedTenantName,
-        knowledgeMarkdown: data.knowledgeMarkdown,
-        systemPrompt: data.systemPrompt,
-        scraperSummary: data.scraperSummary,
+        tenantName: doneResult.suggestedTenantName,
+        knowledgeMarkdown: doneResult.knowledgeMarkdown,
+        systemPrompt: doneResult.systemPrompt,
+        scraperSummary: doneResult.scraperSummary,
+        ...(doneResult.sessionSlug ? { sessionSlug: doneResult.sessionSlug } : {}),
       }));
     } catch (err) {
       setError((err as Error).message);
@@ -166,6 +227,7 @@ export default function ProvisionPage() {
           knowledgeMarkdown: draft.knowledgeMarkdown,
           systemPrompt: draft.systemPrompt,
           sourceUrl: draft.url,
+          ...(draft.sessionSlug ? { sessionSlug: draft.sessionSlug } : {}),
         }),
       });
       const json = await res.json();
@@ -216,6 +278,7 @@ export default function ProvisionPage() {
           onSubmit={handlePrepare}
           onClearDraft={clearDraft}
           error={error}
+          progress={progress}
         />
       )}
 
@@ -325,8 +388,9 @@ function InputCard(props: {
   onSubmit: (e: React.FormEvent) => void;
   onClearDraft: () => void;
   error: string | null;
+  progress: ProgressLine[];
 }) {
-  const { url, submitting, restoredFromDraft, onChangeUrl, onSubmit, onClearDraft, error } = props;
+  const { url, submitting, restoredFromDraft, onChangeUrl, onSubmit, onClearDraft, error, progress } = props;
   return (
     <form
       onSubmit={onSubmit}
@@ -382,14 +446,49 @@ function InputCard(props: {
         </button>
       </div>
 
-      {submitting ? (
-        <div className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
-          Scraping the site and consolidating with Gemini 3.1 Pro. This may take up to a minute on bigger sites.
-        </div>
-      ) : null}
+      {submitting ? <ProgressPanel progress={progress} /> : null}
     </form>
   );
+}
+
+function ProgressPanel({ progress }: { progress: ProgressLine[] }) {
+  const latest = progress[progress.length - 1];
+  const percent = Math.min(100, Math.max(0, latest?.percent ?? 0));
+  const lastMessage = latest?.message ?? "Starting…";
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-neutral-800">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+          {lastMessage}
+        </div>
+        <span className="font-mono text-xs tabular-nums text-neutral-500">{percent}%</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200">
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      {progress.length > 0 ? (
+        <div className="max-h-48 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-3 font-mono text-xs leading-relaxed text-neutral-600">
+          {progress.map((line, i) => (
+            <div key={i} className="flex items-baseline gap-2">
+              <span className="shrink-0 text-neutral-400">{formatClock(line.timestamp)}</span>
+              <span className="shrink-0 uppercase tracking-wider text-neutral-400">[{line.phase}]</span>
+              <span className="text-neutral-700">{line.message}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function formatClock(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 function ReviewCard(props: {

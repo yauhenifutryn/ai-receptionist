@@ -17,13 +17,15 @@ import { buildSystemPrompt } from "../prompts/system-prompt.js";
  * - Privacy hardened at provisioning per RODO: audio recording OFF,
  *   call data retention 0 days. Workspace-level "use for training" toggle
  *   must be flipped OFF in the EL UI (cannot be done via API).
- * - Agent in-call LLM defaults to claude-sonnet-4-6 (best Polish naturalness
- *   per AI-SPEC). Overridable for the Day-9 verification of ConvAI's
- *   selectable LLMs.
+ * - Agent in-call LLM defaults to qwen36-35b-a3b (~223ms latency,
+ *   ~$0.0023/min — ultra-low-latency tier on ElevenLabs). Two-tool surface
+ *   (check_availability + create_booking) is well within its agentic
+ *   capability. Fallback if Polish quality disappoints: claude-haiku-4-5
+ *   (~676ms, ~$0.0075/min, Anthropic Polish quality known-good).
  */
 
 export const DEFAULT_VOICE_ID = "mr1ubFaLs5xVrh1EqWtc";
-export const DEFAULT_AGENT_LLM = "claude-sonnet-4-6";
+export const DEFAULT_AGENT_LLM = "qwen36-35b-a3b";
 export const DEFAULT_AGENT_TEMPERATURE = 0.3;
 export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 

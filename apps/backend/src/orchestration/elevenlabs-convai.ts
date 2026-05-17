@@ -55,7 +55,8 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
     this.baseUrl = opts.baseUrl ?? DEFAULT_BASE_URL;
     this.doFetch = opts.fetcher ?? fetch;
     this.agentLlm = opts.agentLlm ?? DEFAULT_AGENT_LLM;
-    this.defaultVoiceId = opts.defaultVoiceId ?? DEFAULT_VOICE_ID;
+    this.defaultVoiceId =
+      opts.defaultVoiceId ?? process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID;
   }
 
   async uploadKnowledgeDocument(

@@ -108,8 +108,10 @@ export class LLMClient {
       }
     }
 
+    const causeMsg =
+      lastError instanceof Error ? lastError.message : String(lastError);
     throw new LLMClientError(
-      `All ${models.length} model(s) exhausted after ${attempts} attempt(s)`,
+      `All ${models.length} model(s) [${models.join(", ")}] exhausted after ${attempts} attempt(s). Last error: ${causeMsg}`,
       lastError,
     );
   }

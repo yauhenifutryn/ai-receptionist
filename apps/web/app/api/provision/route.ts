@@ -73,7 +73,9 @@ export async function POST(req: NextRequest) {
   }
 
   const origin = req.nextUrl.origin;
-  const serverToolBaseUrl = origin;
+  // Provider appends "/tools/<name>" to this base, so /api must be included
+  // here — otherwise ElevenLabs POSTs to /tools/* which 404s in Next.js.
+  const serverToolBaseUrl = `${origin}/api`;
   const postCallWebhookUrl = `${origin}/api/post-call`;
 
   const supabase = getServiceRoleSupabase();

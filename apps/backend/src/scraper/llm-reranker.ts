@@ -24,7 +24,7 @@ import type { LLMClient } from "../lib/llm.js";
 const ScoreItemSchema = z.object({
   url: z.string(),
   score: z.number().min(0).max(1),
-  reason: z.string().max(120),
+  reason: z.string().max(300),
 });
 
 const RerankResponseSchema = z.object({
@@ -55,7 +55,9 @@ const SYSTEM_PROMPT =
   "Use ONLY the URL path text to decide — you cannot see page content. " +
   "Higher score = more likely useful. Score 1.0 means certain (e.g. /cennik, /uslugi/implanty, /kontakt). " +
   "Score 0.0 means certain garbage (e.g. /blog/post-2019, /inwestorzy). " +
-  "Return ONE entry per input URL, preserving the URL string exactly. Output JSON only.";
+  "Return ONE entry per input URL, preserving the URL string exactly. " +
+  "Keep each 'reason' to a brief phrase under 80 characters. " +
+  "Output JSON only matching: {\"ranked\": [{\"url\": string, \"score\": number, \"reason\": string}, ...]}.";
 
 function buildUserPrompt(args: RerankArgs): string {
   const useCase = args.useCaseDescription ?? DEFAULT_USE_CASE;
@@ -81,12 +83,11 @@ export async function rerankUrls(args: RerankArgs): Promise<RerankItem[]> {
 
   const result = await args.llm.generateStructured({
     model: "gemini-3.1-flash-lite",
-    fallbackChain: ["gemini-3-flash-preview"],
     system: SYSTEM_PROMPT,
     user: buildUserPrompt(args),
     schema: RerankResponseSchema,
     temperature: 0,
-    maxOutputTokens: 4096,
+    maxOutputTokens: 8192,
   });
 
   const byUrl = new Map<string, RerankItem>();

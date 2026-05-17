@@ -14,6 +14,13 @@ export {
   DEFAULT_RELEVANCE_QUERY,
   type FilterCandidatesResult,
 } from "./url-filter.js";
+export {
+  rerankUrls,
+  pickByScore,
+  type RerankItem,
+  type RerankArgs,
+  type PickByScoreOptions,
+} from "./llm-reranker.js";
 export type { FirecrawlClient, FirecrawlPage, MapOptions } from "./firecrawl.js";
 
 const DEFAULT_MAX_PAGES = 25;

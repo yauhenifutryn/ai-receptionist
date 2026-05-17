@@ -5,6 +5,8 @@ import {
   createFirecrawlClient,
   scraperOutputToMarkdown,
   filterCandidates,
+  rerankUrls,
+  pickByScore,
   DEFAULT_RELEVANCE_QUERY,
 } from "@ai-receptionist/backend/scraper";
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
@@ -20,10 +22,16 @@ export const maxDuration = 60;
 const BodySchema = z.object({
   url: z.string().url(),
   searchQuery: z.string().min(1).max(500).optional(),
-  maxPages: z.number().int().positive().max(40).default(25),
+  /** Hard ceiling on pages scraped after LLM re-rank. Dynamic floor is 8. */
+  maxPages: z.number().int().positive().max(40).default(30),
+  /** URLs scoring below this in re-rank are dropped (unless we'd fall under
+   *  the floor of 8). Tunable per call for noisier sites. */
+  rerankThreshold: z.number().min(0).max(1).default(0.5),
 });
 
 const DEFAULT_CONCURRENCY = 3;
+const RERANK_INPUT_CAP = 60;
+const SCRAPE_FLOOR = 8;
 
 /**
  * /api/prepare streams NDJSON progress events to the client so the wizard
@@ -45,7 +53,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return jsonError("validation_failed", JSON.stringify(parsed.error.flatten()), 400);
   }
-  const { url, searchQuery, maxPages } = parsed.data;
+  const { url, searchQuery, maxPages, rerankThreshold } = parsed.data;
 
   const firecrawlKey = process.env.FIRECRAWL_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -87,15 +95,14 @@ export async function POST(req: NextRequest) {
         // 2. Filter junk + dedupe translations.
         const ranked = [url, ...links.filter((l) => l !== url)];
         const filter = filterCandidates(ranked);
-        const candidates = filter.kept.slice(0, maxPages);
+        const afterFilter = filter.kept;
         const droppedCount = filter.droppedJunk.length + filter.droppedTranslations.length;
         await session?.event("filter:done", {
           rankedCount: ranked.length,
-          keptAfterFilter: filter.kept.length,
+          keptAfterFilter: afterFilter.length,
           droppedJunkCount: filter.droppedJunk.length,
           droppedTranslationsCount: filter.droppedTranslations.length,
           detectedLanguagePrefixes: filter.detectedLanguagePrefixes,
-          candidatesCount: candidates.length,
         });
         await session?.write(
           "02-url-filter.json",
@@ -105,7 +112,7 @@ export async function POST(req: NextRequest) {
               droppedJunk: filter.droppedJunk,
               droppedTranslations: filter.droppedTranslations,
               detectedLanguagePrefixes: filter.detectedLanguagePrefixes,
-              candidates,
+              keptForRerank: afterFilter,
             },
             null,
             2,
@@ -118,15 +125,66 @@ export async function POST(req: NextRequest) {
         emit({
           type: "log",
           phase: "filter",
+          percent: 20,
+          message: `Filter dropped ${filter.droppedJunk.length} junk${langPart}; ${afterFilter.length} URL${afterFilter.length === 1 ? "" : "s"} survive`,
+        });
+
+        // 2b. LLM re-rank with Gemini Flash Lite (~1s, ~$0.0005).
+        // Scores each URL 0-1 from path text alone, then pickByScore takes
+        // everything >=threshold with a floor of 8 and ceiling of maxPages.
+        const toRerank = afterFilter.slice(0, RERANK_INPUT_CAP);
+        emit({
+          type: "log",
+          phase: "rerank",
           percent: 22,
-          message: `Filter dropped ${filter.droppedJunk.length} junk${langPart}; keeping ${candidates.length} of ${filter.kept.length} for scrape`,
+          message: `Re-ranking top ${toRerank.length} URL${toRerank.length === 1 ? "" : "s"} with Gemini Flash Lite…`,
+        });
+        const rerankStart = Date.now();
+        const reranked = await rerankUrls({ rootUrl: url, urls: toRerank, llm });
+        const rerankMs = Date.now() - rerankStart;
+        const candidates = pickByScore(reranked, {
+          threshold: rerankThreshold,
+          floor: SCRAPE_FLOOR,
+          ceiling: maxPages,
+        });
+        await session?.event("rerank:done", {
+          inputCount: toRerank.length,
+          rerankMs,
+          threshold: rerankThreshold,
+          floor: SCRAPE_FLOOR,
+          ceiling: maxPages,
+          pickedCount: candidates.length,
+          topScore: reranked[0]?.score ?? null,
+          bottomScore: reranked[reranked.length - 1]?.score ?? null,
+        });
+        await session?.write(
+          "03-rerank.json",
+          JSON.stringify(
+            {
+              rerankMs,
+              threshold: rerankThreshold,
+              floor: SCRAPE_FLOOR,
+              ceiling: maxPages,
+              ranked: reranked,
+              picked: candidates,
+            },
+            null,
+            2,
+          ),
+        );
+        const aboveT = reranked.filter((r) => r.score >= rerankThreshold).length;
+        emit({
+          type: "log",
+          phase: "rerank",
+          percent: 25,
+          message: `Rerank picked ${candidates.length} URL${candidates.length === 1 ? "" : "s"} (${aboveT} scored ≥${rerankThreshold.toFixed(2)}, top ${reranked[0]?.score.toFixed(2) ?? "—"})`,
         });
 
         // 3. Scrape with progress per page.
         emit({
           type: "log",
           phase: "scrape",
-          percent: 25,
+          percent: 28,
           message: `Scraping ${candidates.length} page${candidates.length === 1 ? "" : "s"} (concurrency ${DEFAULT_CONCURRENCY})…`,
         });
         const pages = await scrapeWithProgress(
@@ -134,7 +192,7 @@ export async function POST(req: NextRequest) {
           candidates,
           DEFAULT_CONCURRENCY,
           (done, total, lastUrl) => {
-            const pct = 25 + Math.round((done / total) * 45);
+            const pct = 28 + Math.round((done / total) * 42);
             emit({
               type: "log",
               phase: "scrape",
@@ -146,7 +204,7 @@ export async function POST(req: NextRequest) {
         const validPages = pages.filter((p) => p.markdown.length > 0);
         await session?.event("firecrawl:scrape", { pagesCount: validPages.length });
         await session?.write(
-          "03-firecrawl-pages.json",
+          "04-firecrawl-pages.json",
           JSON.stringify(
             validPages.map((p) => ({ url: p.url, markdownLength: p.markdown.length })),
             null,
@@ -190,7 +248,7 @@ export async function POST(req: NextRequest) {
           hasUnknownPrices: scraperOutput.hasUnknownPrices,
         });
         await session?.write(
-          "04-gemini-consolidated.json",
+          "05-gemini-consolidated.json",
           JSON.stringify(scraperOutput, null, 2),
         );
         emit({
@@ -205,8 +263,8 @@ export async function POST(req: NextRequest) {
         const systemPrompt = buildSystemPrompt({
           tenantDisplayName: scraperOutput.tenant.name,
         });
-        await session?.write("05-knowledge.md", knowledgeMarkdown);
-        await session?.write("06-system-prompt.md", systemPrompt);
+        await session?.write("06-knowledge.md", knowledgeMarkdown);
+        await session?.write("07-system-prompt.md", systemPrompt);
         await session?.event("prepare:done", {
           tenantName: scraperOutput.tenant.name,
           knowledgeMarkdownLength: knowledgeMarkdown.length,

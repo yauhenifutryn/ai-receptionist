@@ -21,6 +21,12 @@ export {
   type RerankArgs,
   type PickByScoreOptions,
 } from "./llm-reranker.js";
+export {
+  reportCoverage,
+  type CoverageReport,
+  type CoverageWarning,
+  type CoverageSeverity,
+} from "./coverage.js";
 export type { FirecrawlClient, FirecrawlPage, MapOptions } from "./firecrawl.js";
 
 const DEFAULT_MAX_PAGES = 25;

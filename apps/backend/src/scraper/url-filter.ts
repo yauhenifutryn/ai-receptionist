@@ -1,82 +1,46 @@
 /**
- * Heuristic URL filter — drops obvious junk and non-Polish translations
- * before Firecrawl scrape so we don't burn credits or scrape budget on
- * blog archives, cookie pages, sitemaps, or 4 language variants of the
- * same doctor page.
+ * URL filter — pure mechanical-noise drops only. Every content-shaped
+ * decision is delegated to the LLM rerank, which can apply semantic
+ * judgment per-site. This file used to carry topic blocklists ("blog",
+ * "privacy", "career"…) but those were brittle: every site is different,
+ * and the dental-clinic regression that took out `/service-category/*`
+ * (because "category" was in the list) proved the cost of guessing.
  *
- * Two layers:
+ * What stays here:
+ *   1. URLs that physically can't be scraped to markdown:
+ *      - Binary file extensions (.pdf, .jpg, .xml, .zip, …)
+ *      - WordPress / CMS admin endpoints (/wp-admin, /wp-json, …)
+ *   2. URLs that are byte-for-byte duplicates of others:
+ *      - Paginated archives `/page/N/`
+ *      - Date-archive paths `/YYYY/MM/`
+ *      - Non-Polish language translations (separate dedupeByLanguage step)
  *
- *   1. shouldScrape(url): per-URL junk filter. Path-segment matching with
- *      word-split, so "/privacy-policy-and-information" drops because
- *      'privacy' is one of the words in the segment.
- *
- *   2. dedupeByLanguage(urls): set-level translation collapse. Detects
- *      language prefixes semantically from the URL set itself (no
- *      hardcoded ISO list). For each detected language namespace that
- *      isn't Polish, drops every URL under it. If a URL has no Polish
- *      version available, the non-Polish version is kept so we don't
- *      lose content on English-only or Ukrainian-only sites.
- *
- * filterCandidates(urls) is the top-level entrypoint used by /api/prepare.
- * It returns the kept set + structured drop reasons so the wizard can
- * show the user exactly what was removed and why.
+ * Everything else — yes, even `/blog/`, `/cookie-banner/`, `/careers/` —
+ * passes through to the rerank, which scores it 0-1 and lets pickByScore
+ * decide. If the LLM rerank itself fails, the safe default is to scrape
+ * more, not less; we'd rather burn a few extra Firecrawl credits than
+ * miss the pricing page.
  */
 
-const BLOCKED_WORDS: ReadonlySet<string> = new Set([
-  "blog",
-  "blogi",
-  "news",
-  "aktualnosci",
-  "aktualności",
-  "press",
-  "prasa",
-  "career",
-  "careers",
-  "kariera",
-  "praca",
-  "job",
-  "jobs",
-  "privacy",
-  "prywatnosci",
-  "prywatności",
-  "polityka",
-  "terms",
-  "regulamin",
-  "cookie",
-  "cookies",
-  "ciasteczka",
-  "tag",
-  "tags",
-  "author",
-  "autor",
-  "category",
-  "kategoria",
-  "search",
-  "szukaj",
-  "404",
-  "feed",
-  "rss",
-  "sitemap",
-  "login",
-  "logowanie",
-  "register",
-  "rejestracja",
-  "checkout",
-  "koszyk",
-  "cart",
-]);
-
-const BLOCKED_WP_SEGMENTS: ReadonlySet<string> = new Set([
-  "wp-json",
+/**
+ * Truly mechanical noise: these are not content decisions. wp-admin
+ * returns an admin login page; binary files Firecrawl can't markdownify;
+ * paginated archives are duplicates of page 1.
+ */
+const MECHANICAL_BLOCKED_SEGMENTS: ReadonlySet<string> = new Set([
   "wp-admin",
+  "wp-json",
   "wp-content",
   "wp-includes",
 ]);
 
-const BLOCKED_REGEX: ReadonlyArray<RegExp> = [
+const MECHANICAL_BLOCKED_REGEX: ReadonlyArray<RegExp> = [
+  // Pagination — duplicate content of underlying archive
   /\/page\/\d+/i,
+  // Date archives like /2023/04/post-title — duplicate of canonical post
   /\/\d{4}\/\d{2}\//,
-  /\.(jpg|jpeg|png|gif|webp|svg|pdf|zip|mp4|mp3|wav)$/i,
+  // Binary / non-html that Firecrawl can't convert to markdown
+  /\.(jpg|jpeg|png|gif|webp|svg|ico|bmp|tiff?|pdf|zip|tar|gz|rar|7z|mp4|mp3|wav|m4a|mov|avi|webm|xml|xsl|json|rss|atom|css|js|woff2?|ttf|eot)$/i,
 ];
 
 const PRIMARY_LANG = "pl";
@@ -104,12 +68,8 @@ export interface FilterCandidatesResult {
 }
 
 /**
- * Per-URL junk filter. Drops paths whose segments match blocked words,
- * obvious admin/template prefixes, or known binary/archive patterns.
- *
- * Segment matching is word-level: each "/seg/" is split on '-' and each
- * word checked against BLOCKED_WORDS. This catches segments like
- * 'privacy-policy-and-information' or 'cookie-settings'.
+ * Per-URL mechanical-noise filter. Drops only what physically can't
+ * be scraped or is provably duplicate content. NO content judgments.
  */
 export function shouldScrape(url: string): boolean {
   let parsed: URL;
@@ -123,14 +83,10 @@ export function shouldScrape(url: string): boolean {
     .split("/")
     .filter((s) => s.length > 0);
   for (const seg of segments) {
-    if (BLOCKED_WP_SEGMENTS.has(seg)) return false;
-    const words = seg.split(/[-_]/).filter((w) => w.length > 0);
-    for (const w of words) {
-      if (BLOCKED_WORDS.has(w)) return false;
-    }
+    if (MECHANICAL_BLOCKED_SEGMENTS.has(seg)) return false;
   }
   const lower = url.toLowerCase();
-  for (const re of BLOCKED_REGEX) {
+  for (const re of MECHANICAL_BLOCKED_REGEX) {
     if (re.test(lower)) return false;
   }
   return true;
@@ -193,8 +149,7 @@ export function detectLanguagePrefixes(urls: string[]): Set<string> {
   const detected = new Set<string>();
   for (const [prefix, tails] of prefixToTails) {
     if (KNOWN_ISO_LANGS.has(prefix)) {
-      // Rule 2: ISO singleton is enough on its own. /en/ is a language
-      // namespace whether it has 1 page or 100.
+      // Rule 2: ISO singleton is enough on its own.
       detected.add(prefix);
     } else {
       // Rule 3: non-ISO singleton needs hard evidence.
@@ -210,9 +165,8 @@ export function detectLanguagePrefixes(urls: string[]): Set<string> {
  * Drop URLs that live under a detected non-Polish language prefix.
  * Keeps the Polish prefix (if used) and all unprefixed URLs.
  *
- * Safe on English-only or single-language sites: detection requires
- * multiple URLs under a prefix OR overlap with unprefixed paths, so a
- * site with just `/en/` and nothing else gets all URLs kept.
+ * Safe net: if dedup would drop every URL (purely non-Polish site),
+ * keep everything — we'd rather scrape non-Polish content than nothing.
  */
 export function dedupeByLanguage(urls: string[]): {
   kept: string[];
@@ -241,9 +195,6 @@ export function dedupeByLanguage(urls: string[]): {
       kept.push(u);
     }
   }
-  // Safety net: never zero out the kept set. If dedup would drop every
-  // URL (e.g., a site with only English+Ukrainian and no Polish), keep
-  // everything — we'd rather scrape non-Polish content than nothing.
   if (kept.length === 0 && urls.length > 0) {
     return {
       kept: [...urls],
@@ -255,9 +206,11 @@ export function dedupeByLanguage(urls: string[]): {
 }
 
 /**
- * Top-level entrypoint. Applies junk filter then language dedup and
- * returns structured drop reasons so the caller can surface them in
- * progress events and session artifacts.
+ * Top-level entrypoint. Applies mechanical-noise filter then language
+ * dedup. Every content-shape decision is left to the downstream LLM
+ * rerank — this function will NOT drop a URL just because it contains
+ * the word "blog" or "career" or "category". Per the rule of thumb:
+ * scrape everything except completely obvious noise.
  */
 export function filterCandidates(urls: string[]): FilterCandidatesResult {
   const afterJunk: string[] = [];

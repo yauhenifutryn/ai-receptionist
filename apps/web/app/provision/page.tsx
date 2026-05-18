@@ -5,11 +5,35 @@ import { useEffect, useState } from "react";
 
 type Step = "input" | "preparing" | "review" | "provisioning";
 
+interface CoverageWarning {
+  severity: "critical" | "high" | "medium";
+  code: string;
+  message: string;
+  suggestion?: string;
+}
+
+interface CoverageReport {
+  score: number;
+  warnings: CoverageWarning[];
+  details: {
+    tenantName: string;
+    hasPhone: boolean;
+    hasAddress: boolean;
+    hasEmail: boolean;
+    hasHours: boolean;
+    servicesCount: number;
+    servicesWithPrices: number;
+    staffCount: number;
+    faqCount: number;
+  };
+}
+
 interface PrepareResponse {
   suggestedTenantName: string;
   knowledgeMarkdown: string;
   systemPrompt: string;
   sessionSlug?: string;
+  coverage?: CoverageReport;
   scraperSummary: {
     sourceUrl: string;
     scrapedAt: string;
@@ -43,6 +67,7 @@ interface DraftState {
   knowledgeMarkdown: string;
   systemPrompt: string;
   scraperSummary?: PrepareResponse["scraperSummary"];
+  coverage?: CoverageReport;
   sessionSlug?: string;
   step: Step;
 }
@@ -207,6 +232,7 @@ export default function ProvisionPage() {
         knowledgeMarkdown: doneResult.knowledgeMarkdown,
         systemPrompt: doneResult.systemPrompt,
         scraperSummary: doneResult.scraperSummary,
+        ...(doneResult.coverage ? { coverage: doneResult.coverage } : {}),
         ...(doneResult.sessionSlug ? { sessionSlug: doneResult.sessionSlug } : {}),
       }));
     } catch (err) {
@@ -505,6 +531,7 @@ function ReviewCard(props: {
   const summary = draft.scraperSummary;
   return (
     <div className="flex flex-col gap-6">
+      {draft.coverage ? <CoverageBanner coverage={draft.coverage} /> : null}
       {summary ? (
         <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
@@ -650,5 +677,64 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
         {value}
       </dd>
     </div>
+  );
+}
+
+function CoverageBanner({ coverage }: { coverage: CoverageReport }) {
+  if (coverage.warnings.length === 0) {
+    return (
+      <section className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-500 text-sm font-semibold text-white">
+          ✓
+        </span>
+        <div className="flex-1">
+          <div className="text-sm font-medium text-emerald-900">
+            Coverage 100% — agent has everything it needs to handle calls
+          </div>
+          <div className="text-xs text-emerald-700">
+            Phone, address, hours, and {coverage.details.servicesWithPrices} of {coverage.details.servicesCount} services with prices.
+          </div>
+        </div>
+      </section>
+    );
+  }
+  const critical = coverage.warnings.filter((w) => w.severity === "critical");
+  const high = coverage.warnings.filter((w) => w.severity === "high");
+  const medium = coverage.warnings.filter((w) => w.severity === "medium");
+  const tone = critical.length > 0 ? "rose" : high.length > 0 ? "amber" : "neutral";
+  const palette = {
+    rose: { border: "border-rose-200", bg: "bg-rose-50", chip: "bg-rose-500", title: "text-rose-900", body: "text-rose-800" },
+    amber: { border: "border-amber-200", bg: "bg-amber-50", chip: "bg-amber-500", title: "text-amber-900", body: "text-amber-800" },
+    neutral: { border: "border-neutral-200", bg: "bg-neutral-50", chip: "bg-neutral-500", title: "text-neutral-900", body: "text-neutral-700" },
+  }[tone];
+  return (
+    <section className={`flex flex-col gap-3 rounded-2xl border ${palette.border} ${palette.bg} p-4`}>
+      <div className="flex items-center gap-3">
+        <span className={`grid h-8 w-8 place-items-center rounded-full ${palette.chip} text-sm font-semibold text-white`}>
+          !
+        </span>
+        <div className="flex-1">
+          <div className={`text-sm font-medium ${palette.title}`}>
+            Coverage {Math.round(coverage.score * 100)}% — {critical.length > 0 ? `${critical.length} critical · ` : ""}{high.length > 0 ? `${high.length} high · ` : ""}{medium.length > 0 ? `${medium.length} medium` : ""}
+          </div>
+          <div className={`text-xs ${palette.body}`}>
+            The scrape missed information the agent will need. Review below and either re-run with a fresh URL or add the missing details by editing the knowledge document.
+          </div>
+        </div>
+      </div>
+      <ul className="flex flex-col gap-2 pl-11">
+        {coverage.warnings.map((w) => (
+          <li key={w.code} className="text-xs">
+            <span className={`mr-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+              w.severity === "critical" ? "bg-rose-200 text-rose-900" :
+              w.severity === "high" ? "bg-amber-200 text-amber-900" :
+              "bg-neutral-200 text-neutral-700"
+            }`}>{w.severity}</span>
+            <span className={palette.body}>{w.message}</span>
+            {w.suggestion ? <div className={`mt-0.5 pl-2 italic ${palette.body} opacity-80`}>→ {w.suggestion}</div> : null}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

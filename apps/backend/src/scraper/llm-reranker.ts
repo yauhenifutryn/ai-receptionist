@@ -75,11 +75,19 @@ const DEFAULT_USE_CASE =
   "marketing landing pages with no concrete info, navigation pages, archives.";
 
 const SYSTEM_PROMPT =
-  "You are a URL classifier. For each URL you are given, score it from 0.0 to 1.0 based on " +
-  "how likely it is to contain information useful to a voice-receptionist agent. " +
-  "Use ONLY the URL path text to decide — you cannot see page content. " +
-  "Higher score = more likely useful. Score 1.0 means certain (e.g. /cennik, /uslugi/implanty, /kontakt). " +
-  "Score 0.0 means certain garbage (e.g. /blog/post-2019, /inwestorzy). " +
+  "You are the SOLE content judge for which URLs get scraped from a business website. " +
+  "There is no other filter — if you mark a URL low, it will not be scraped and its " +
+  "content will be missing from the agent's knowledge base. Be INCLUSIVE: when in doubt, score higher. " +
+  "Better to scrape a borderline page than to miss the pricing page hiding behind an unusual slug. " +
+  "\n\n" +
+  "Score each URL 0.0 to 1.0 from the URL path text alone (you cannot see page content). " +
+  "Scoring rubric: " +
+  "0.9-1.0 = obvious must-have (e.g. /cennik, /uslugi, /service-category/implanty, /kontakt, /godziny, /faq, /doctors/X, /zespol, /o-nas). " +
+  "0.6-0.8 = likely useful detail page (e.g. /implant-leczenie, /najlepsze-opcje-X, /pilna-pomoc, sub-pages of services). " +
+  "0.4-0.6 = uncertain — could contain pricing or service info, lean toward scraping (e.g. /promocje, /pakiety, /before-after, generic article slugs). " +
+  "0.2-0.4 = probably not useful but possible to contain stray contact / hours info (e.g. /blog/clinic-news, /press-release). " +
+  "0.0-0.2 = clearly noise (e.g. /authors/jan-kowalski, /tag/promo, /404). " +
+  "\n\n" +
   "Return ONE entry per input URL, preserving the URL string exactly. " +
   "Keep each 'reason' to a brief phrase under 80 characters. " +
   "Output JSON only matching: {\"ranked\": [{\"url\": string, \"score\": number, \"reason\": string}, ...]}.";

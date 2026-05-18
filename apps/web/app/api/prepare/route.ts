@@ -7,6 +7,7 @@ import {
   filterCandidates,
   rerankUrls,
   pickByScore,
+  reportCoverage,
   DEFAULT_RELEVANCE_QUERY,
 } from "@ai-receptionist/backend/scraper";
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
@@ -20,24 +21,30 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const DEFAULT_CONCURRENCY = 3;
-const RERANK_INPUT_CAP = 60;
+const FIRECRAWL_MAP_LIMIT = 150;
+const RERANK_INPUT_CAP = 100;
 const SCRAPE_FLOOR = 8;
-const SCRAPE_CEILING_MAX = 40;
+const SCRAPE_CEILING_MAX = 50;
 
 const BodySchema = z.object({
   url: z.string().url(),
   searchQuery: z.string().min(1).max(500).optional(),
   /** Hard ceiling on pages scraped after LLM re-rank. Cannot be lower than
-   *  SCRAPE_FLOOR — the pipeline guarantees a minimum-evidence set. */
+   *  SCRAPE_FLOOR — the pipeline guarantees a minimum-evidence set.
+   *  Increased from 30 -> 35: the heuristic filter no longer drops content,
+   *  so the rerank now sees the real candidate pool. Better to scrape a
+   *  borderline page than miss the pricing one. */
   maxPages: z
     .number()
     .int()
     .min(SCRAPE_FLOOR)
     .max(SCRAPE_CEILING_MAX)
-    .default(30),
+    .default(35),
   /** URLs scoring below this in re-rank are dropped (unless we'd fall under
-   *  the floor of 8). Tunable per call for noisier sites. */
-  rerankThreshold: z.number().min(0).max(1).default(0.5),
+   *  the floor of 8). Lowered from 0.5 -> 0.4 because the rerank is now the
+   *  ONLY content judge — being permissive here is safer than relying on a
+   *  pre-rerank heuristic that we removed. */
+  rerankThreshold: z.number().min(0).max(1).default(0.4),
 });
 
 /**
@@ -105,7 +112,7 @@ export async function POST(req: NextRequest) {
         emit({ type: "log", phase: "map", percent: 8, message: "Mapping site with Firecrawl (relevance-ranked)…" });
         const links = await firecrawl.map(url, {
           search: searchQuery ?? DEFAULT_RELEVANCE_QUERY,
-          limit: 100,
+          limit: FIRECRAWL_MAP_LIMIT,
         });
         if (aborted()) return;
         await session?.event("firecrawl:map", { linksCount: links.length });
@@ -288,6 +295,38 @@ export async function POST(req: NextRequest) {
           message: `Gemini extracted: ${scraperOutput.services.length} services · ${scraperOutput.staff.length} staff · ${scraperOutput.faq.length} FAQ`,
         });
 
+        // 4b. Coverage validation — deterministic check on the consolidated
+        // output. Surfaces structured warnings so the wizard can show a
+        // banner when critical fields (phone, prices, hours) are missing.
+        const coverage = reportCoverage(scraperOutput);
+        await session?.event("coverage:report", {
+          score: coverage.score,
+          warningCount: coverage.warnings.length,
+          warnings: coverage.warnings.map((w) => ({ code: w.code, severity: w.severity })),
+          details: coverage.details,
+        });
+        await session?.write(
+          "05a-coverage.json",
+          JSON.stringify(coverage, null, 2),
+        );
+        if (coverage.warnings.length > 0) {
+          const critical = coverage.warnings.filter((w) => w.severity === "critical").length;
+          const high = coverage.warnings.filter((w) => w.severity === "high").length;
+          emit({
+            type: "log",
+            phase: "coverage",
+            percent: 94,
+            message: `Coverage score ${Math.round(coverage.score * 100)}% — ${critical} critical, ${high} high, ${coverage.warnings.length} total warning${coverage.warnings.length === 1 ? "" : "s"}`,
+          });
+        } else {
+          emit({
+            type: "log",
+            phase: "coverage",
+            percent: 94,
+            message: `Coverage 100% — phone, address, hours, services-with-prices all captured`,
+          });
+        }
+
         // 5. Render artifacts.
         const knowledgeMarkdown = scraperOutputToMarkdown(scraperOutput);
         const systemPrompt = buildSystemPrompt({
@@ -326,6 +365,7 @@ export async function POST(req: NextRequest) {
               faqCount: scraperOutput.faq.length,
               hasUnknownPrices: scraperOutput.hasUnknownPrices,
             },
+            coverage,
           },
         });
       } catch (e) {

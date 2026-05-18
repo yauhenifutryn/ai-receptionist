@@ -12,10 +12,29 @@ import { z } from "zod";
  * If a price is not in the source markdown, set `priceUnit: "unknown"`.
  */
 
+/**
+ * Universal price shape handling every real-world variant we hit on
+ * Polish clinic sites:
+ *   - exact:    `200 PLN`               → min=200, max=200, qualifier="exact"
+ *   - range:    `250-400 PLN`           → min=250, max=400, qualifier="range"
+ *   - bounded:  `od 4 000 do 18 000 PLN`→ min=4000, max=18000, qualifier="range"
+ *   - from:     `od 380 PLN`            → min=380, qualifier="from"
+ *   - unknown:  `na zapytanie`          → qualifier="unknown"
+ *
+ * `display` is the verbatim source text so the agent can quote the
+ * original phrasing. `min`/`max` are numeric for any agent-side
+ * reasoning. `variant` captures qualifiers like "dzieci do 10 lat".
+ */
 const PolishLikeMoneySchema = z
   .object({
-    amount: z.union([z.number(), z.literal("unknown")]),
     currency: z.literal("PLN"),
+    display: z.string().optional(),
+    min: z.number().optional(),
+    max: z.number().optional(),
+    qualifier: z
+      .enum(["exact", "from", "to", "range", "starting", "unknown"])
+      .optional(),
+    variant: z.string().optional(),
   })
   .strict();
 

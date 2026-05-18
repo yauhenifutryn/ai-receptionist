@@ -10,6 +10,7 @@ import {
   rerankUrls,
   pickByScore,
   reportCoverage,
+  extractInternalLinks,
   DEFAULT_RELEVANCE_QUERY,
 } from "@ai-receptionist/backend/scraper";
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
@@ -323,9 +324,110 @@ export async function POST(req: NextRequest) {
         emit({
           type: "log",
           phase: "scrape",
-          percent: 72,
-          message: `Scrape complete: ${validPages.length} page${validPages.length === 1 ? "" : "s"} with content`,
+          percent: 65,
+          message: `First-pass scrape complete: ${validPages.length} page${validPages.length === 1 ? "" : "s"} with content`,
         });
+
+        // 3b. Discovery iteration — parse internal links out of the
+        // scraped markdown to catch URLs Firecrawl's /map missed
+        // (e.g. /cennik when not in the sitemap). One pass only to
+        // avoid infinite crawl. Universal — no canonical path probes.
+        const seenUrls = new Set(validPages.map((p) => p.url));
+        const discovered = extractInternalLinks(validPages, url);
+        const newLinks = discovered.filter((u) => !seenUrls.has(u));
+        if (newLinks.length > 0 && !aborted()) {
+          const newFilter = filterCandidates(newLinks);
+          const newKept = newFilter.kept;
+          await session?.event("discover:done", {
+            extractedFromPages: validPages.length,
+            discoveredCount: discovered.length,
+            newCount: newLinks.length,
+            keptAfterFilter: newKept.length,
+          });
+          await session?.write(
+            "04a-discovered.json",
+            JSON.stringify(
+              {
+                discovered,
+                newAndUnseen: newLinks,
+                keptAfterFilter: newKept,
+                droppedJunk: newFilter.droppedJunk,
+                droppedTranslations: newFilter.droppedTranslations,
+              },
+              null,
+              2,
+            ),
+          );
+          if (newKept.length > 0) {
+            emit({
+              type: "log",
+              phase: "discover",
+              percent: 67,
+              message: `Discovered ${newKept.length} new URL${newKept.length === 1 ? "" : "s"} from scraped pages — running second rerank`,
+            });
+            const remainingBudget = Math.max(0, maxPages - validPages.length);
+            if (remainingBudget > 0) {
+              const newReranked = await rerankUrls({
+                rootUrl: url,
+                urls: newKept.slice(0, RERANK_INPUT_CAP),
+                llm,
+              });
+              if (aborted()) return;
+              const newPicked = pickByScore(newReranked, {
+                threshold: rerankThreshold,
+                floor: Math.min(remainingBudget, 3),
+                ceiling: remainingBudget,
+              });
+              await session?.write(
+                "04b-discover-rerank.json",
+                JSON.stringify(
+                  { ranked: newReranked, picked: newPicked, budget: remainingBudget },
+                  null,
+                  2,
+                ),
+              );
+              if (newPicked.length > 0) {
+                emit({
+                  type: "log",
+                  phase: "discover",
+                  percent: 68,
+                  message: `Second-pass scrape: ${newPicked.length} URL${newPicked.length === 1 ? "" : "s"} (budget ${remainingBudget})`,
+                });
+                const morePages = await scrapeWithProgress(
+                  firecrawl,
+                  newPicked,
+                  DEFAULT_CONCURRENCY,
+                  (done, total, lastUrl) => {
+                    emit({
+                      type: "log",
+                      phase: "discover",
+                      percent: 68 + Math.round((done / total) * 4),
+                      message: `Discover-scrape ${done}/${total} · ${shorten(lastUrl)}`,
+                    });
+                  },
+                  abort.signal,
+                );
+                if (aborted()) return;
+                const moreValid = morePages.filter((p) => p.markdown.length > 0);
+                for (let i = 0; i < moreValid.length; i++) {
+                  const p = moreValid[i]!;
+                  const safe = p.url.replace(/[^a-zA-Z0-9-]+/g, "-").slice(0, 100);
+                  await session?.write(
+                    `pages/discover-${String(i + 1).padStart(2, "0")}-${safe}.md`,
+                    p.markdown,
+                  );
+                }
+                validPages = [...validPages, ...moreValid];
+                emit({
+                  type: "log",
+                  phase: "discover",
+                  percent: 72,
+                  message: `Discovery added ${moreValid.length} more page${moreValid.length === 1 ? "" : "s"} — total ${validPages.length}`,
+                });
+              }
+            }
+          }
+        }
         } // end else (live-scrape branch)
 
         // Both resume + live-scrape converge here.

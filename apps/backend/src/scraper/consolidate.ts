@@ -67,14 +67,21 @@ const SCRAPER_OUTPUT_JSON_SCHEMA = {
             enum: ["full", "partial", "none", "unknown"],
           },
           requiresConsultationFirst: { type: "BOOLEAN" },
-          // price.amount is union(number | "unknown") which Gemini's
-          // OpenAPI subset can't express. Constraining only `currency`
-          // and leaving `amount` unspecified lets the model return either
-          // shape; Zod handles the union on the receive side.
+          // Universal price shape — handles exact / range / from / to /
+          // starting / unknown. All numeric fields optional so Gemini
+          // can omit min when only max is present, etc.
           price: {
             type: "OBJECT",
             properties: {
               currency: { type: "STRING", enum: ["PLN"] },
+              display: { type: "STRING" },
+              min: { type: "NUMBER" },
+              max: { type: "NUMBER" },
+              qualifier: {
+                type: "STRING",
+                enum: ["exact", "from", "to", "range", "starting", "unknown"],
+              },
+              variant: { type: "STRING" },
             },
             required: ["currency"],
           },
@@ -100,7 +107,7 @@ const SCRAPER_OUTPUT_JSON_SCHEMA = {
 } as const;
 
 export const CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES =
-  "Hard rule: never invent prices. If a price is not in the source markdown, set price.amount to the literal string \"unknown\". Do not infer prices from related services. Mark hasUnknownPrices=true whenever at least one service has unknown price.";
+  "Hard rule: never invent prices. If NO price is in the source markdown, omit the price field entirely OR set qualifier=\"unknown\". But if a price IS in the source — including a RANGE like \"od 4 000 do 18 000 PLN\" or \"250-400 PLN\" or \"od 380 PLN\" — capture it. Mark hasUnknownPrices=true whenever at least one service has no concrete price.";
 
 const SYSTEM_PROMPT = [
   "You are a structured-data extractor for a multi-tenant voice receptionist.",
@@ -112,7 +119,25 @@ const SYSTEM_PROMPT = [
   "",
   CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES,
   "",
-  "For each service emit { name, synonyms[], nfzCovered: \"full\"|\"partial\"|\"none\"|\"unknown\", price?: { amount: number | \"unknown\", currency: \"PLN\" } }.",
+  "PRICE EXTRACTION RULES — read carefully, this is where you most often fail:",
+  "Real clinic prices come in many shapes. Map them like this:",
+  "  - \"200 PLN\"                  → { currency:\"PLN\", display:\"200 PLN\", min:200, max:200, qualifier:\"exact\" }",
+  "  - \"250-400 PLN\"              → { currency:\"PLN\", display:\"250-400 PLN\", min:250, max:400, qualifier:\"range\" }",
+  "  - \"od 4 000 do 18 000 PLN\"   → { currency:\"PLN\", display:\"od 4 000 do 18 000 PLN\", min:4000, max:18000, qualifier:\"range\" }",
+  "  - \"od 380 PLN\"               → { currency:\"PLN\", display:\"od 380 PLN\", min:380, qualifier:\"from\" }",
+  "  - \"od 350 PLN\"               → { currency:\"PLN\", display:\"od 350 PLN\", min:350, qualifier:\"from\" }",
+  "  - \"od 3500 PLN\" (no spaces)  → { currency:\"PLN\", display:\"od 3500 PLN\", min:3500, qualifier:\"from\" }",
+  "  - variant like \"dzieci do 10 lat 150 PLN\" → set variant:\"dzieci do 10 lat\", min:150, max:150, qualifier:\"exact\"",
+  "  - \"na zapytanie\" / no number → { currency:\"PLN\", qualifier:\"unknown\" } OR omit price entirely",
+  "STRICT RULES:",
+  "  - qualifier=\"range\" REQUIRES BOTH min AND max populated (e.g., \"500-900 PLN\" → min:500 AND max:900). Never set qualifier=\"range\" with only one of them — use \"from\" instead if only the lower bound is known.",
+  "  - qualifier=\"exact\" REQUIRES min=max (both the same number).",
+  "  - `variant` is for caller-segmenting qualifiers ONLY (e.g., \"dzieci\", \"dorośli\", \"z aparatem ortodontycznym\"). NEVER put the price text into variant. If there is no segmenting qualifier, omit variant.",
+  "  - Always preserve the verbatim source text in `display` so the agent can quote it.",
+  "  - Strip thousands separators (\"4 000\" → 4000) when filling min/max.",
+  "If the same service appears at multiple price points across the source (e.g. /cennik page lists multiple variants), pick the most common shape or create ONE service entry whose price covers the full observed range.",
+  "",
+  "For each service emit { name, synonyms[], nfzCovered, price?, durationMinutes? }.",
   "For each staff member emit { name, role?, specialization?, languages[] }.",
   "For each FAQ emit { question, answer }.",
   "Polish synonyms should be front-loaded for each service.",
@@ -155,24 +180,29 @@ function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
 export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput> {
   const now = args.now ?? (() => new Date());
   const result = await args.llm.generateStructured({
-    model: "gemini-3.1-pro-preview",
-    fallbackChain: ["gemini-2.5-pro", "gemini-3-flash-preview"],
+    // Flash 2.5 stable is the primary: empirically faster than the
+    // 3-flash-PREVIEW variant for large structured-output requests
+    // (-preview models have stricter rate limits). Stable Flash 2.5
+    // handles 400K+ input tokens reliably and finishes in ~30-90s
+    // instead of the 15-20 min we saw with 3-flash-preview.
+    // Pro stays as last-ditch fallback for Zod-validation failures.
+    model: "gemini-2.5-flash",
+    fallbackChain: ["gemini-3-flash-preview", "gemini-3.1-pro-preview"],
     system: SYSTEM_PROMPT,
     user: buildUserPrompt(args.rootUrl, args.pages),
     schema: ScraperOutputSchema,
     jsonSchema: SCRAPER_OUTPUT_JSON_SCHEMA,
     temperature: 0,
-    // Set to the model's hard ceiling, not a self-imposed limit. Big
-    // clinics with deep service catalogs + multi-paragraph descriptions
-    // can emit 30K+ tokens; we'd rather let Gemini finish than truncate
-    // mid-JSON. If the model itself supports more in the future, raise
-    // this. (KB output is intentionally unbounded — never cap the user's
-    // knowledge.)
+    // KB OUTPUT is unbounded by policy — model's hard ceiling only.
+    // Big catalogs can emit 30K+ tokens, never truncate mid-JSON.
     maxOutputTokens: 65535,
   });
   const out = result.data;
   const hasUnknown = out.services.some(
-    (s) => s.price?.amount === "unknown",
+    (s) =>
+      !s.price ||
+      s.price.qualifier === "unknown" ||
+      (typeof s.price.min !== "number" && typeof s.price.max !== "number"),
   );
   if (hasUnknown && !out.hasUnknownPrices) {
     return { ...out, hasUnknownPrices: true };

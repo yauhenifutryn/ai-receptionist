@@ -1,4 +1,4 @@
-import type { ScraperOutput } from "@ai-receptionist/contracts";
+import type { ScraperOutput, ScraperService } from "@ai-receptionist/contracts";
 
 /**
  * Render a ScraperOutput as the markdown knowledge.md document attached
@@ -94,15 +94,7 @@ function servicesBlock(out: ScraperOutput): string {
         : svc.name;
     lines.push(`### ${synonymsLead}`);
     if (svc.description) lines.push(svc.description.trim());
-    if (svc.price) {
-      const priceText =
-        svc.price.amount === "unknown"
-          ? "Cena: unknown (do potwierdzenia z recepcją)"
-          : `Cena: ${svc.price.amount} ${svc.price.currency}`;
-      lines.push(priceText);
-    } else {
-      lines.push("Cena: unknown (do potwierdzenia z recepcją)");
-    }
+    lines.push(`Cena: ${formatPrice(svc.price)}`);
     if (svc.durationMinutes) {
       lines.push(`Czas trwania: około ${svc.durationMinutes} minut`);
     }
@@ -131,6 +123,53 @@ function faqBlock(out: ScraperOutput): string {
     lines.push("");
   }
   return lines.join("\n").trimEnd();
+}
+
+/**
+ * Render the new universal price shape as a natural Polish phrase the
+ * agent will read aloud. Preserves the verbatim `display` when available
+ * (so an "od X PLN" stays an "od X PLN" in the KB), otherwise composes
+ * from min/max/qualifier.
+ */
+function formatPrice(price: ScraperService["price"]): string {
+  if (!price) return "nieznana (do potwierdzenia z recepcją)";
+  // Suppress variant when it equals the display string — Gemini sometimes
+  // copies the price text into both fields, which would otherwise render
+  // as "Cena: 420 PLN (420 PLN)".
+  const variant =
+    price.variant && price.variant.trim() !== (price.display ?? "").trim()
+      ? price.variant
+      : undefined;
+  if (price.display && price.display.trim().length > 0) {
+    return variant ? `${price.display} (${variant})` : price.display;
+  }
+  const cur = price.currency;
+  const fmt = (n: number) => n.toLocaleString("pl-PL");
+  let core: string;
+  if (price.qualifier === "unknown") {
+    core = "nieznana (do potwierdzenia z recepcją)";
+  } else if (price.qualifier === "exact" && typeof price.min === "number") {
+    core = `${fmt(price.min)} ${cur}`;
+  } else if (
+    price.qualifier === "range" &&
+    typeof price.min === "number" &&
+    typeof price.max === "number"
+  ) {
+    core = `od ${fmt(price.min)} do ${fmt(price.max)} ${cur}`;
+  } else if (price.qualifier === "from" && typeof price.min === "number") {
+    core = `od ${fmt(price.min)} ${cur}`;
+  } else if (price.qualifier === "to" && typeof price.max === "number") {
+    core = `do ${fmt(price.max)} ${cur}`;
+  } else if (price.qualifier === "starting" && typeof price.min === "number") {
+    core = `od ${fmt(price.min)} ${cur}`;
+  } else if (typeof price.min === "number" && typeof price.max === "number") {
+    core = `${fmt(price.min)} - ${fmt(price.max)} ${cur}`;
+  } else if (typeof price.min === "number") {
+    core = `${fmt(price.min)} ${cur}`;
+  } else {
+    core = "nieznana (do potwierdzenia z recepcją)";
+  }
+  return variant ? `${core} (${variant})` : core;
 }
 
 function provenanceBlock(out: ScraperOutput): string {

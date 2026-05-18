@@ -33,14 +33,14 @@ const SAMPLE: ScraperOutput = {
       name: "Konsultacja",
       synonyms: ["wizyta", "przegląd"],
       nfzCovered: "unknown",
-      price: { amount: 180, currency: "PLN" },
+      price: { currency: "PLN", display: "180 PLN", min: 180, max: 180, qualifier: "exact" },
       durationMinutes: 30,
     },
     {
       name: "Wizyta nocna",
       synonyms: ["pogotowie"],
       nfzCovered: "none",
-      price: { amount: "unknown", currency: "PLN" },
+      price: { currency: "PLN", qualifier: "unknown" },
     },
   ],
   faq: [
@@ -78,9 +78,9 @@ describe("scraperOutputToMarkdown (W2.1 KB formatter)", () => {
     expect(md).not.toContain("|"); // no markdown tables
   });
 
-  it("marks unknown prices explicitly with the literal word", () => {
+  it("marks unknown prices with a clear Polish phrase the agent can read aloud", () => {
     const md = scraperOutputToMarkdown(SAMPLE);
-    expect(md).toContain("Cena: unknown");
+    expect(md).toContain("Cena: nieznana (do potwierdzenia z recepcją)");
   });
 
   it("includes provenance metadata", () => {

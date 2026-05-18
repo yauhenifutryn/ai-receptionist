@@ -55,7 +55,9 @@ export function reportCoverage(out: ScraperOutput): CoverageReport {
     hasHours: hasAnyHours(out),
     servicesCount: out.services.length,
     servicesWithPrices: out.services.filter(
-      (s) => s.price && typeof s.price.amount === "number",
+      (s) =>
+        s.price &&
+        (typeof s.price.min === "number" || typeof s.price.max === "number"),
     ).length,
     staffCount: out.staff.length,
     faqCount: out.faq.length,

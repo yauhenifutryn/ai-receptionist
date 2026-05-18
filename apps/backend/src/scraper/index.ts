@@ -27,6 +27,7 @@ export {
   type CoverageWarning,
   type CoverageSeverity,
 } from "./coverage.js";
+export { extractInternalLinks } from "./discover-links.js";
 export type { FirecrawlClient, FirecrawlPage, MapOptions } from "./firecrawl.js";
 
 const DEFAULT_MAX_PAGES = 25;

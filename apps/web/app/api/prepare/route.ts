@@ -1,4 +1,6 @@
 import { type NextRequest } from "next/server";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 import {
   consolidate,
@@ -14,7 +16,7 @@ import { LLMClient } from "@ai-receptionist/backend/lib/llm";
 import { createGeminiProvider } from "@ai-receptionist/backend/lib/gemini-provider";
 import { buildSystemPrompt } from "@ai-receptionist/backend/prompts";
 import type { FirecrawlPage } from "@ai-receptionist/backend/scraper";
-import { openTestSession } from "@/lib/test-session-logger";
+import { openTestSession, openExistingSession } from "@/lib/test-session-logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +47,11 @@ const BodySchema = z.object({
    *  ONLY content judge — being permissive here is safer than relying on a
    *  pre-rerank heuristic that we removed. */
   rerankThreshold: z.number().min(0).max(1).default(0.4),
+  /** Resume from a previous session's cached scrape — skips
+   *  map / filter / rerank / scrape and goes straight to consolidate.
+   *  Used when consolidate failed (e.g., Gemini parse error) and the
+   *  user wants to retry without re-paying for Firecrawl scrapes. */
+  resumeSessionSlug: z.string().min(1).max(200).optional(),
 });
 
 /**
@@ -67,7 +74,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return jsonError("validation_failed", JSON.stringify(parsed.error.flatten()), 400);
   }
-  const { url, searchQuery, maxPages, rerankThreshold } = parsed.data;
+  const { url, searchQuery, maxPages, rerankThreshold, resumeSessionSlug } = parsed.data;
 
   const firecrawlKey = process.env.FIRECRAWL_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -98,16 +105,68 @@ export async function POST(req: NextRequest) {
       };
       const aborted = () => abort.signal.aborted;
 
-      const session = await openTestSession(url).catch(() => null);
-      await session?.event("prepare:start", { url, searchQuery, maxPages });
-      emit({ type: "log", phase: "init", percent: 2, message: `Starting scrape of ${url}` });
+      // If resuming, reopen the existing session; otherwise start a new one.
+      const session =
+        (resumeSessionSlug ? await openExistingSession(resumeSessionSlug) : null) ??
+        (await openTestSession(url).catch(() => null));
+      // Surface the session slug to the client immediately so the wizard can
+      // offer "Resume from cached scrape" if a later step fails.
+      if (session?.slug) {
+        emit({ type: "session", slug: session.slug });
+      }
+      await session?.event("prepare:start", { url, searchQuery, maxPages, resumeSessionSlug });
+      emit({
+        type: "log",
+        phase: "init",
+        percent: 2,
+        message: resumeSessionSlug
+          ? `Resuming from cached scrape (session ${resumeSessionSlug})`
+          : `Starting scrape of ${url}`,
+      });
 
       const firecrawl = createFirecrawlClient({ apiKey: firecrawlKey });
       const llm = new LLMClient(createGeminiProvider({ apiKey: geminiKey }), {
         defaultMaxRetries: 1,
       });
 
+      // Shared state populated by either the live-scrape branch or the
+      // cache-load branch, then consumed by consolidate + render.
+      let validPages: FirecrawlPage[] = [];
+      let urlsMapped = 0;
+      let droppedCount = 0;
+
       try {
+        if (resumeSessionSlug && session) {
+          // RESUME PATH: load cached pages from the session dir on disk and
+          // skip directly to consolidate. No Firecrawl, no rerank.
+          emit({
+            type: "log",
+            phase: "resume",
+            percent: 10,
+            message: `Loading cached pages from session…`,
+          });
+          const loaded = await loadCachedScrape(session.dir);
+          if (loaded.pages.length === 0) {
+            emit({
+              type: "error",
+              code: "resume_no_cache",
+              message: `No cached pages found in session ${resumeSessionSlug}. Re-run from scratch instead.`,
+            });
+            return;
+          }
+          validPages = loaded.pages;
+          urlsMapped = loaded.urlsMapped;
+          droppedCount = loaded.droppedCount;
+          await session.event("resume:loaded", {
+            cachedPages: validPages.length,
+          });
+          emit({
+            type: "log",
+            phase: "resume",
+            percent: 70,
+            message: `Loaded ${validPages.length} cached page${validPages.length === 1 ? "" : "s"}, skipping straight to consolidate`,
+          });
+        } else {
         // 1. Map.
         emit({ type: "log", phase: "map", percent: 8, message: "Mapping site with Firecrawl (relevance-ranked)…" });
         const links = await firecrawl.map(url, {
@@ -126,9 +185,10 @@ export async function POST(req: NextRequest) {
 
         // 2. Filter junk + dedupe translations.
         const ranked = [url, ...links.filter((l) => l !== url)];
+        urlsMapped = ranked.length;
         const filter = filterCandidates(ranked);
         const afterFilter = filter.kept;
-        const droppedCount = filter.droppedJunk.length + filter.droppedTranslations.length;
+        droppedCount = filter.droppedJunk.length + filter.droppedTranslations.length;
         await session?.event("filter:done", {
           rankedCount: ranked.length,
           keptAfterFilter: afterFilter.length,
@@ -236,7 +296,7 @@ export async function POST(req: NextRequest) {
           abort.signal,
         );
         if (aborted()) return;
-        const validPages = pages.filter((p) => p.markdown.length > 0);
+        validPages = pages.filter((p) => p.markdown.length > 0);
         await session?.event("firecrawl:scrape", { pagesCount: validPages.length });
         await session?.write(
           "04-firecrawl-pages.json",
@@ -266,6 +326,9 @@ export async function POST(req: NextRequest) {
           percent: 72,
           message: `Scrape complete: ${validPages.length} page${validPages.length === 1 ? "" : "s"} with content`,
         });
+        } // end else (live-scrape branch)
+
+        // Both resume + live-scrape converge here.
 
         // 4. Consolidate.
         emit({
@@ -357,7 +420,7 @@ export async function POST(req: NextRequest) {
             scraperSummary: {
               sourceUrl: scraperOutput.sourceUrl,
               scrapedAt: scraperOutput.scrapedAt,
-              urlsMapped: ranked.length,
+              urlsMapped,
               urlsDroppedByFilter: droppedCount,
               pagesScraped: validPages.length,
               servicesCount: scraperOutput.services.length,
@@ -414,6 +477,58 @@ function shorten(u: string): string {
   } catch {
     return u.length > 50 ? u.slice(0, 50) + "…" : u;
   }
+}
+
+/**
+ * Reload a previous scrape's pages from the on-disk session artifact so
+ * /api/prepare can skip Firecrawl entirely when consolidate fails mid-
+ * pipeline. Reads 04-firecrawl-pages.json (URL + length manifest) plus
+ * pages/<idx>-<slug>.md for each entry. Returns the same FirecrawlPage
+ * shape the live scrape produces.
+ *
+ * Future: when we add UI-driven client-supplied knowledge appending,
+ * the consolidator should semantically merge that input into the scrape
+ * result (de-dupe near-identical service rows, never overwrite scraped
+ * content with stale manual entries). Out of scope for this commit.
+ */
+async function loadCachedScrape(
+  sessionDir: string,
+): Promise<{ pages: FirecrawlPage[]; urlsMapped: number; droppedCount: number }> {
+  let manifest: Array<{ url: string; markdownLength: number }> = [];
+  try {
+    const raw = await fs.readFile(
+      path.join(sessionDir, "04-firecrawl-pages.json"),
+      "utf-8",
+    );
+    manifest = JSON.parse(raw);
+  } catch {
+    return { pages: [], urlsMapped: 0, droppedCount: 0 };
+  }
+
+  const pagesDir = path.join(sessionDir, "pages");
+  let files: string[] = [];
+  try {
+    files = (await fs.readdir(pagesDir)).filter((f) => f.endsWith(".md")).sort();
+  } catch {
+    return { pages: [], urlsMapped: 0, droppedCount: 0 };
+  }
+
+  const pages: FirecrawlPage[] = [];
+  for (let i = 0; i < files.length && i < manifest.length; i++) {
+    const fileName = files[i]!;
+    const entry = manifest[i]!;
+    try {
+      const md = await fs.readFile(path.join(pagesDir, fileName), "utf-8");
+      pages.push({ url: entry.url, markdown: md });
+    } catch {
+      // skip unreadable file
+    }
+  }
+
+  // We don't bother recovering original urlsMapped/droppedCount counts;
+  // they're cosmetic in the resume path. The scraperSummary in the UI
+  // will just show 0 for these and the actual pagesScraped count.
+  return { pages, urlsMapped: 0, droppedCount: 0 };
 }
 
 async function scrapeWithProgress(

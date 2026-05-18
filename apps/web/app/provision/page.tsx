@@ -101,6 +101,10 @@ export default function ProvisionPage() {
   const [recent, setRecent] = useState<RecentAgent[]>([]);
   const [restoredFromDraft, setRestoredFromDraft] = useState(false);
   const [progress, setProgress] = useState<ProgressLine[]>([]);
+  /** Set whenever a prepare run starts and the server emits a session
+   *  slug. Cleared on a clean success. If prepare errors after the
+   *  scrape phase, this is the slug we offer to resume from. */
+  const [resumableSlug, setResumableSlug] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -158,17 +162,22 @@ export default function ProvisionPage() {
     }
   }
 
-  async function handlePrepare(e: React.FormEvent) {
-    e.preventDefault();
+  async function handlePrepare(
+    e: React.FormEvent | null,
+    opts: { resumeSlug?: string } = {},
+  ) {
+    if (e) e.preventDefault();
     setError(null);
     setProgress([]);
     setDraft((d) => ({ ...d, step: "preparing" }));
 
     try {
+      const body: Record<string, unknown> = { url: draft.url };
+      if (opts.resumeSlug) body.resumeSessionSlug = opts.resumeSlug;
       const res = await fetch("/api/prepare", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: draft.url }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok || !res.body) {
@@ -183,6 +192,7 @@ export default function ProvisionPage() {
       let buffer = "";
       let doneResult: PrepareResponse | null = null;
       let errorMsg: string | null = null;
+      let liveSlug: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -198,7 +208,10 @@ export default function ProvisionPage() {
           } catch {
             continue;
           }
-          if (evt.type === "log") {
+          if (evt.type === "session") {
+            liveSlug = String(evt.slug ?? "") || null;
+            if (liveSlug) setResumableSlug(liveSlug);
+          } else if (evt.type === "log") {
             const entry: ProgressLine = {
               phase: String(evt.phase ?? ""),
               message: String(evt.message ?? ""),
@@ -225,6 +238,9 @@ export default function ProvisionPage() {
         return;
       }
 
+      // Clean success — wipe the resume-slug so we don't offer to resume
+      // from a session that already completed.
+      setResumableSlug(null);
       setDraft((d) => ({
         ...d,
         step: "review",
@@ -301,10 +317,12 @@ export default function ProvisionPage() {
           submitting={draft.step === "preparing"}
           restoredFromDraft={restoredFromDraft && draft.url !== ""}
           onChangeUrl={(url) => setDraft((d) => ({ ...d, url }))}
-          onSubmit={handlePrepare}
+          onSubmit={(e) => handlePrepare(e)}
           onClearDraft={clearDraft}
           error={error}
           progress={progress}
+          resumableSlug={resumableSlug}
+          onResume={() => handlePrepare(null, { resumeSlug: resumableSlug! })}
         />
       )}
 
@@ -415,8 +433,10 @@ function InputCard(props: {
   onClearDraft: () => void;
   error: string | null;
   progress: ProgressLine[];
+  resumableSlug: string | null;
+  onResume: () => void;
 }) {
-  const { url, submitting, restoredFromDraft, onChangeUrl, onSubmit, onClearDraft, error, progress } = props;
+  const { url, submitting, restoredFromDraft, onChangeUrl, onSubmit, onClearDraft, error, progress, resumableSlug, onResume } = props;
   return (
     <form
       onSubmit={onSubmit}
@@ -453,15 +473,26 @@ function InputCard(props: {
       </Field>
 
       {error ? (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-          {error}
+        <div className="flex flex-col gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <div className="break-words">{error}</div>
+          {resumableSlug && !submitting ? (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-rose-300 bg-white/60 px-3 py-2">
+              <div className="text-xs text-rose-900">
+                Scrape data is cached for this session. You can retry without re-running Firecrawl.
+              </div>
+              <button
+                type="button"
+                onClick={onResume}
+                className="shrink-0 rounded-full bg-rose-900 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-rose-800"
+              >
+                Retry from cached scrape →
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-4 border-t border-neutral-100 pt-6">
-        <p className="text-xs text-neutral-500">
-          Map (relevance-ranked) → filter junk → scrape top 15 in parallel → Gemini consolidation. 15-40 seconds typical.
-        </p>
+      <div className="flex items-center justify-end gap-4 border-t border-neutral-100 pt-6">
         <button
           type="submit"
           disabled={submitting || !url}

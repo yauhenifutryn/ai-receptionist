@@ -126,10 +126,18 @@ export interface ConsolidateArgs {
   now?: () => Date;
 }
 
+/**
+ * Per-page char cap inside the consolidation prompt. Set to a very high
+ * value (effectively no cap for normal sites) so we don't accidentally
+ * truncate the page that has the prices. Gemini Pro's 1M-token context
+ * comfortably swallows 35 pages of 50K chars each.
+ */
+const PER_PAGE_CHAR_CAP = 50000;
+
 function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
   const blocks = pages.map(
     (p, i) =>
-      `--- Page ${i + 1}: ${p.url} ---\n${p.markdown.slice(0, 20000)}`,
+      `--- Page ${i + 1}: ${p.url} ---\n${p.markdown.slice(0, PER_PAGE_CHAR_CAP)}`,
   );
   return [
     `Root URL: ${rootUrl}`,
@@ -149,7 +157,13 @@ export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput>
     schema: ScraperOutputSchema,
     jsonSchema: SCRAPER_OUTPUT_JSON_SCHEMA,
     temperature: 0,
-    maxOutputTokens: 8192,
+    // Set to the model's hard ceiling, not a self-imposed limit. Big
+    // clinics with deep service catalogs + multi-paragraph descriptions
+    // can emit 30K+ tokens; we'd rather let Gemini finish than truncate
+    // mid-JSON. If the model itself supports more in the future, raise
+    // this. (KB output is intentionally unbounded — never cap the user's
+    // knowledge.)
+    maxOutputTokens: 65535,
   });
   const out = result.data;
   const hasUnknown = out.services.some(

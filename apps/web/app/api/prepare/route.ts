@@ -437,7 +437,7 @@ export async function POST(req: NextRequest) {
           type: "log",
           phase: "consolidate",
           percent: 78,
-          message: "Consolidating with Gemini 3.1 Pro Preview (this is the slowest step)…",
+          message: "Consolidating with Gemini 2.5 Flash…",
         });
         if (aborted()) return;
         const scraperOutput = await consolidate({ rootUrl: url, pages: validPages, llm });

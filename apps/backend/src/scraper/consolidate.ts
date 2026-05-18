@@ -180,14 +180,16 @@ function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
 export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput> {
   const now = args.now ?? (() => new Date());
   const result = await args.llm.generateStructured({
-    // Flash 2.5 stable is the primary: empirically faster than the
-    // 3-flash-PREVIEW variant for large structured-output requests
-    // (-preview models have stricter rate limits). Stable Flash 2.5
-    // handles 400K+ input tokens reliably and finishes in ~30-90s
-    // instead of the 15-20 min we saw with 3-flash-preview.
-    // Pro stays as last-ditch fallback for Zod-validation failures.
-    model: "gemini-2.5-flash",
-    fallbackChain: ["gemini-3-flash-preview", "gemini-3.1-pro-preview"],
+    // Gemini 3 Flash (preview) is the newest-gen text Flash on Google AI
+    // Studio. Note: `gemini-3.1-flash` doesn't exist — Google only
+    // shipped 3.1 Flash variants for image/TTS/live modalities, not
+    // text. The 3.x text Flash is `gemini-3-flash-preview`.
+    //
+    // Fallback chain prioritizes stability over generation:
+    //   1) Stable 2.5 flash — proven reliable on big consolidations
+    //   2) Pro preview — last-ditch if both Flash variants fail
+    model: "gemini-3-flash-preview",
+    fallbackChain: ["gemini-2.5-flash", "gemini-3.1-pro-preview"],
     system: SYSTEM_PROMPT,
     user: buildUserPrompt(args.rootUrl, args.pages),
     schema: ScraperOutputSchema,

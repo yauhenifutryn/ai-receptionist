@@ -127,12 +127,22 @@ export interface ConsolidateArgs {
 }
 
 /**
- * Per-page char cap inside the consolidation prompt. Set to a very high
- * value (effectively no cap for normal sites) so we don't accidentally
- * truncate the page that has the prices. Gemini Pro's 1M-token context
- * comfortably swallows 35 pages of 50K chars each.
+ * Per-page char cap inside the consolidation prompt. Bounded by Gemini's
+ * external rate limits, NOT a self-imposed quality limit:
+ *   - Free tier: 250K input tokens / minute. 35 pages * 50K chars
+ *     (my earlier "no cap" attempt) = ~437K tokens — blows the limit.
+ *   - Paid tier: 2M tokens / minute (plenty of headroom).
+ * Worth noting: clinic / shop service pages put services, prices, hours,
+ * and contact details in the first 5-10K characters anyway. The rest
+ * is usually marketing prose that doesn't add KB value.
+ *
+ * 12K * 35 pages = 420K chars ≈ 105K tokens. Comfortably under free
+ * tier limits with room for retries within a single minute.
+ *
+ * KB OUTPUT remains unbounded (maxOutputTokens at model max). This cap
+ * is about the input prompt to Gemini, not the KB we produce from it.
  */
-const PER_PAGE_CHAR_CAP = 50000;
+const PER_PAGE_CHAR_CAP = 12000;
 
 function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
   const blocks = pages.map(

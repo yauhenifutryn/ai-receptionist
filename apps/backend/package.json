@@ -12,6 +12,14 @@
       "types": "./dist/tools/index.d.ts",
       "default": "./dist/tools/index.js"
     },
+    "./integrations/calendar": {
+      "types": "./dist/integrations/calendar/index.d.ts",
+      "default": "./dist/integrations/calendar/index.js"
+    },
+    "./integrations/sms": {
+      "types": "./dist/integrations/sms/index.d.ts",
+      "default": "./dist/integrations/sms/index.js"
+    },
     "./post-call": {
       "types": "./dist/post-call/index.d.ts",
       "default": "./dist/post-call/index.js"

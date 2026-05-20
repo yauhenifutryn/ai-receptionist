@@ -29,7 +29,25 @@ function TestAgentInner({ agentId }: { agentId: string }) {
 
   const conversation = useConversation({
     onConnect: () => {},
-    onDisconnect: () => {},
+    onDisconnect: () => {
+      // Best-effort: tell the backend to fetch the canonical EL record and
+      // persist it into the `conversations` table. Failure is non-fatal —
+      // the list view can lazy-retry on open if a row never materializes.
+      const id = safeCall(() => conversation.getId());
+      if (id) {
+        void fetch("/api/conversations/finalize", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            conversationId: id,
+            agentId,
+            source: "browser_test",
+          }),
+        }).catch(() => {
+          // swallowed; lazy retry on next list-view open
+        });
+      }
+    },
     onMessage: (msg: { source?: string; message?: string }) => {
       const role = msg.source === "user" ? "user" : "agent";
       const text = msg.message ?? "";
@@ -402,6 +420,7 @@ async function persistTranscriptTurn(
         text: entry.text,
         timestamp: entry.timestamp,
         source: mode,
+        surface: "browser_test",
       }),
     });
   } catch (err) {

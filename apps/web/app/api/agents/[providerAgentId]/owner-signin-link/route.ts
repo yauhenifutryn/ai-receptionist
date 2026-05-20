@@ -9,36 +9,46 @@ const BodySchema = z.object({
   email: z.string().email().max(320),
 });
 
+/** Outer-token TTL — independent of Supabase's 1h action_link TTL. */
+const SIGNIN_TOKEN_TTL_DAYS = 14;
+
 /**
  * POST /api/agents/[providerAgentId]/owner-signin-link
  *
- * Operator-only. Generates a one-time magic-link URL the operator can copy
- * and side-channel to the prospect (Slack / WhatsApp / their own mailbox).
+ * Operator-only. Mints a long-TTL (14 day) outer token wrapped around
+ * Supabase's short-lived action_link. The operator copies the URL and
+ * side-channels it to a prospect (Slack / WhatsApp / their own mailbox).
+ * Prospect clicks any time in the 14-day window → /auth/owner-link
+ * validates the outer token, mints a fresh 1h action_link at click time,
+ * and 302-redirects to it. The Supabase token thus stays short-lived
+ * (security) while the outer URL survives back-and-forth (UX).
+ *
  * This is the manual-delivery escape hatch while Resend custom-domain
  * delivery is not yet configured — `onboarding@resend.dev` only ships to
  * Resend-authorized addresses, so a real prospect can't receive an OTP by
- * email. The action_link from supabase.auth.admin.generateLink lets the
- * invitee click straight through to /owner/conversations as themselves.
+ * email. Once Resend custom-domain is live, the regular Invite-owner
+ * button is the right path. This one stays useful for ad-hoc shares.
  *
  * Also upserts the `tenant_invitations` row (idempotent on (tenant_id, email))
  * so the materialization-on-first-verify path in /api/auth/verify-otp still
  * works if the operator skipped the regular "Invite owner" button.
  *
  * Security:
- *   - 409 if the invited email is in operator_emails. Issuing a magiclink
- *     to an operator would let them sign in as tenant-owner, mis-routing
- *     them through the access-grant logic. Defense in depth.
- *   - The returned URL is NOT logged anywhere persistent. Generate, return,
- *     discard. Treat it like a temporary password on the operator side.
+ *   - 409 if the invited email is in operator_emails — issuing a magiclink
+ *     to an operator would mis-route them through tenant-owner access logic.
+ *   - The outer token is opaque (uuid v4), DB-stored, single-use, expires
+ *     after 14 days.
+ *   - Operator regenerating rotates the token (old one stops working).
+ *   - The returned URL is NOT logged anywhere persistent.
  *
  * Returns:
- *   - 200 ok   — { ok: true, url, expires_at }
+ *   - 200 ok   — { ok: true, url, expires_at: ISO string }
  *   - 400      — validation_failed
  *   - 401      — no session
  *   - 403      — caller is not in operator_emails
  *   - 404      — agent_not_found
  *   - 409      — email_is_operator
- *   - 500      — invitation_upsert_failed | generate_link_failed
+ *   - 500      — invitation_upsert_failed | token_persist_failed
  */
 export async function POST(
   req: NextRequest,
@@ -67,8 +77,7 @@ export async function POST(
     .maybeSingle();
   if (!op) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
-  // Reject if the invitee is itself an operator (defense in depth — same
-  // guard as /owner-invite).
+  // Reject if the invitee is itself an operator.
   const { data: collides } = await service
     .from("operator_emails")
     .select("email")
@@ -88,14 +97,20 @@ export async function POST(
     return NextResponse.json({ error: "agent_not_found" }, { status: 404 });
   }
 
-  // Record the invitation (idempotent). Mirror /owner-invite so the row
-  // exists even when operator goes straight to "generate link".
+  // Mint a fresh outer token. Rotating on regenerate (clear consumed-at
+  // so a second click on a previously-used invitation works again).
+  const signinToken = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + SIGNIN_TOKEN_TTL_DAYS * 86400 * 1000);
+
   const { error: upsertErr } = await service.from("tenant_invitations").upsert(
     {
       tenant_id: agentRow.tenant_id,
       email,
       role: "owner",
       invited_by_operator: userData.user.id,
+      signin_token: signinToken,
+      signin_token_expires_at: expiresAt.toISOString(),
+      signin_token_consumed_at: null,
     },
     { onConflict: "tenant_id,email", ignoreDuplicates: false },
   );
@@ -106,35 +121,14 @@ export async function POST(
     );
   }
 
-  // Derive the site base URL. Prefer NEXT_PUBLIC_SITE_URL (explicit prod
-  // override), fall back to the request origin so Vercel preview deploys
-  // and localhost work without configuration.
   const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    new URL(req.url).origin;
-  const redirectTo = `${siteUrl}/owner/conversations`;
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? new URL(req.url).origin;
+  const url = `${siteUrl}/auth/owner-link?token=${encodeURIComponent(signinToken)}`;
 
-  const { data: linkData, error: linkErr } = await service.auth.admin.generateLink({
-    type: "magiclink",
-    email,
-    options: { redirectTo },
-  });
-  if (linkErr || !linkData?.properties?.action_link) {
-    return NextResponse.json(
-      {
-        error: "generate_link_failed",
-        message: linkErr?.message ?? "action_link missing from generateLink response",
-      },
-      { status: 500 },
-    );
-  }
-
-  // Supabase's generateLink response doesn't include an explicit expires_at;
-  // the default magic-link TTL is 1 hour (configurable in dashboard, default
-  // 3600s). Surface as a human-readable hint, not a hard timestamp.
   return NextResponse.json({
     ok: true,
-    url: linkData.properties.action_link,
-    expires_at: "approximately 1 hour",
+    url,
+    expires_at: expiresAt.toISOString(),
+    ttl_days: SIGNIN_TOKEN_TTL_DAYS,
   });
 }

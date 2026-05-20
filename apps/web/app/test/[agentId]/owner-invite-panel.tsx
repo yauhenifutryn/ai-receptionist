@@ -29,6 +29,7 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
     "idle",
   );
   const [linkUrl, setLinkUrl] = useState("");
+  const [linkExpiresAt, setLinkExpiresAt] = useState<string | null>(null);
   const [linkErr, setLinkErr] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -69,6 +70,7 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
     setLinkState("submitting");
     setLinkErr("");
     setLinkUrl("");
+    setLinkExpiresAt(null);
     setCopied(false);
     try {
       const r = await fetch(
@@ -82,12 +84,15 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
       const body = (await r.json().catch(() => ({}))) as {
         ok?: boolean;
         url?: string;
+        expires_at?: string;
+        ttl_days?: number;
         error?: string;
         message?: string;
       };
       if (r.ok && body.url) {
         setLinkState("ok");
         setLinkUrl(body.url);
+        setLinkExpiresAt(body.expires_at ?? null);
       } else {
         setLinkState("err");
         setLinkErr(body.message ?? body.error ?? `Failed (${r.status}).`);
@@ -162,10 +167,12 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
         <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3">
           <p className="text-xs leading-relaxed text-neutral-600">
             This URL signs the owner in directly without email. Copy and send via your
-            channel of choice (Slack, WhatsApp, your own email). Link is valid for
-            ~1 hour and can only be used once &mdash; treat it like a temporary password.
-            Once Resend custom-domain delivery is configured, the invited owner will also
-            receive the same link by email.
+            channel of choice (Slack, WhatsApp, your own email).
+            {linkExpiresAt
+              ? ` Valid until ${new Date(linkExpiresAt).toLocaleDateString("pl-PL", { year: "numeric", month: "short", day: "numeric" })}, single-use.`
+              : " Valid for ~14 days, single-use."}
+            {" "}Treat it like a temporary password &mdash; anyone with the URL signs in as
+            this email until first use or expiry. Regenerate to rotate.
           </p>
           <div className="flex flex-wrap gap-2">
             <input

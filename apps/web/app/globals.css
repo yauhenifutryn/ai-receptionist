@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================================
+   Public landing design tokens (editorial / letterpress / paper)
+   Operator console pages may override on their own routes.
+   ============================================================ */
+:root {
+  /* Surfaces — tinted cream, never pure white */
+  --paper: oklch(0.985 0.006 80);
+  --paper-deep: oklch(0.965 0.008 80);
+  --hairline: oklch(0.86 0.012 60);
+
+  /* Ink */
+  --ink: oklch(0.22 0.012 60);
+  --ink-soft: oklch(0.42 0.012 60);
+  --ink-faint: oklch(0.58 0.012 60);
+
+  /* Oxblood accent — single committed colour */
+  --oxblood: oklch(0.42 0.10 25);
+  --oxblood-deep: oklch(0.36 0.08 25);
+  --oxblood-cream: oklch(0.985 0.006 80);
+
+  /* Type stacks — system-only, no font fetches.
+     Charter ships on macOS/iOS; Sitka Text covers Windows;
+     Cambria/Georgia round out the fallback. All handle pl diacritics. */
+  --font-serif: "Charter", "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Source Code Pro", monospace;
+}

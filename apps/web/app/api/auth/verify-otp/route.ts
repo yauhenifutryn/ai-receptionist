@@ -69,7 +69,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
   }
   if (!allowed) {
-    // Defense-in-depth: owners must have a pending tenant_invitations row.
+    // Defense-in-depth: owners must have either a pending tenant_invitations
+    // row (first-time bootstrap) OR an already-materialized tenant_members
+    // row (returning owner whose invitation has been consumed).
     const { data: pendingInvite, error: inviteErr } = await service
       .from("tenant_invitations")
       .select("id")
@@ -79,7 +81,18 @@ export async function POST(req: NextRequest) {
     if (inviteErr) {
       return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
     }
+    let hasMembership = false;
     if (!pendingInvite) {
+      const { data: rpcData, error: rpcErr } = await service.rpc(
+        "is_active_tenant_member",
+        { p_email: email },
+      );
+      if (rpcErr) {
+        return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
+      }
+      hasMembership = rpcData === true;
+    }
+    if (!pendingInvite && !hasMembership) {
       return NextResponse.json(
         {
           error: "not_authorized",

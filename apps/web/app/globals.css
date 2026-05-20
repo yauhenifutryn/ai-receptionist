@@ -21,6 +21,18 @@
   --oxblood: oklch(0.42 0.10 25);
   --oxblood-deep: oklch(0.36 0.08 25);
   --oxblood-cream: oklch(0.985 0.006 80);
+  --oxblood-dim: oklch(0.55 0.07 25);
+  --oxblood-live: oklch(0.50 0.13 25);
+
+  /* Extra paper tones for layered density */
+  --paper-warmer: oklch(0.955 0.010 80);
+  --paper-cream: oklch(0.945 0.012 80);
+  --hairline-faint: oklch(0.91 0.008 60);
+  --hairline-softest: oklch(0.93 0.006 60);
+
+  /* Pulsing oxblood for "live" indicators (slightly more saturated than --oxblood-live) */
+  --oxblood-pulse: oklch(0.52 0.14 25);
+  --oxblood-bar: oklch(0.48 0.11 25);
 
   /* Type stacks — system-only, no font fetches.
      Charter ships on macOS/iOS; Sitka Text covers Windows;

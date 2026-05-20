@@ -61,8 +61,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
   }
   if (!allowed) {
-    // Owners get in via a pending tenant_invitations row, not the operator
-    // allow-list. Materialization into tenant_members happens in verify-otp.
+    // Two more allow-list paths exist for non-operators:
+    //   (a) a pending tenant_invitations row (first-time owner bootstrap)
+    //   (b) an already-materialized tenant_members row (returning owner)
+    // Either is sufficient. Without (b), a returning owner who's been signed
+    // out would be locked out, because their invitation row was consumed on
+    // first sign-in.
     const { data: pendingInvite, error: inviteErr } = await service
       .from("tenant_invitations")
       .select("id")
@@ -72,7 +76,18 @@ export async function POST(req: NextRequest) {
     if (inviteErr) {
       return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
     }
+    let hasMembership = false;
     if (!pendingInvite) {
+      const { data: rpcData, error: rpcErr } = await service.rpc(
+        "is_active_tenant_member",
+        { p_email: email },
+      );
+      if (rpcErr) {
+        return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
+      }
+      hasMembership = rpcData === true;
+    }
+    if (!pendingInvite && !hasMembership) {
       return NextResponse.json(
         {
           error: "not_authorized",

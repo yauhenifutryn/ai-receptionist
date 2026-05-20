@@ -1,7 +1,6 @@
 /**
  * Storage abstractions consumed by the tool handlers. Injectable so the
- * handlers can be tested without a live Supabase. The default implementation
- * (createSupabaseBookingsRepository) lands when we wire @supabase/supabase-js.
+ * handlers can be tested without a live Supabase.
  */
 
 import type { AppointmentCategory } from "@ai-receptionist/contracts";
@@ -17,6 +16,10 @@ export interface InsertBookingArgs {
   conversationId: string;
   requestId: string;
   slotId: string;
+  /** Provider-side external booking id (e.g. "sim_xyz" for simulated). */
+  externalId: string;
+  /** URL-safe short token for /b/<token> confirmation page. */
+  shortToken: string;
   patientName: string;
   patientPhone: string;
   appointmentCategory: AppointmentCategory;
@@ -29,6 +32,7 @@ export interface BookingRow {
   id: string;
   tenantId: string;
   requestId: string;
+  shortToken: string;
   startsAt: string;
   endsAt: string;
 }

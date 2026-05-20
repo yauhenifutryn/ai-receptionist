@@ -29,7 +29,7 @@ export function createSupabaseBookingsRepository(
     async findBookingByRequestId(requestId: string): Promise<BookingRow | null> {
       const { data, error } = await client
         .from("bookings")
-        .select("id, tenant_id, request_id, starts_at, ends_at")
+        .select("id, tenant_id, request_id, short_token, starts_at, ends_at")
         .eq("request_id", requestId)
         .maybeSingle();
       if (error) throw new Error(`bookings lookup failed: ${error.message}`);
@@ -38,6 +38,7 @@ export function createSupabaseBookingsRepository(
         id: data.id,
         tenantId: data.tenant_id,
         requestId: data.request_id,
+        shortToken: data.short_token,
         startsAt: data.starts_at,
         endsAt: data.ends_at,
       };
@@ -52,6 +53,8 @@ export function createSupabaseBookingsRepository(
           conversation_id: args.conversationId,
           request_id: args.requestId,
           slot_id: args.slotId,
+          external_id: args.externalId,
+          short_token: args.shortToken,
           patient_name: args.patientName,
           patient_phone: args.patientPhone,
           appointment_category: args.appointmentCategory,
@@ -60,13 +63,14 @@ export function createSupabaseBookingsRepository(
           notes: args.notes ?? null,
           status: "booked",
         })
-        .select("id, tenant_id, request_id, starts_at, ends_at")
+        .select("id, tenant_id, request_id, short_token, starts_at, ends_at")
         .single();
       if (error) throw new Error(`booking insert failed: ${error.message}`);
       return {
         id: data.id,
         tenantId: data.tenant_id,
         requestId: data.request_id,
+        shortToken: data.short_token,
         startsAt: data.starts_at,
         endsAt: data.ends_at,
       };

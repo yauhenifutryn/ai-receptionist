@@ -2,15 +2,16 @@ import type { AppointmentCategory } from "./appointment-category.enum.js";
 
 /**
  * CalendarProvider — abstraction over per-tenant booking systems (PMS / CRM /
- * raw calendar). Vertical-agnostic. Each vertical's preferred PMS plugs into
- * this interface as its own implementation in `apps/backend/calendar/`:
+ * raw calendar). Vertical-agnostic. Each provider plugs into this interface
+ * as its own implementation in `apps/backend/src/integrations/calendar/`:
  *
- *   - vet: VetmanagerProvider (TBD post-vertical-lock)
- *   - HVAC: GoogleCalendarProvider (default fallback)
- *   - dental (deprecated for us): BooksyProvider
+ *   - SimulatedCalendarProvider — sprint default; synthesizes slots; no I/O
+ *   - GoogleCalendarProvider     — post-pilot, when a clinic uses Workspace
+ *   - BooksyCalendarProvider     — post-pilot, gated on partner API access
+ *   - MedfileCalendarProvider    — post-pilot, REST API for PL medical clinics
  *
- * Two operations are required for the W1 wedge: list available slots and
- * create a booking. Cancel/reschedule are deferred to W2.
+ * List + create are required. Cancel is optional — providers that don't
+ * implement it surface as "patient must call the clinic to cancel".
  */
 
 export interface AvailabilityWindow {
@@ -46,12 +47,19 @@ export interface CreateBookingInput {
 export interface CreateBookingResult {
   /** Provider-side booking identifier. Stored in our `bookings.external_id`. */
   externalId: string;
-  /** Sanity-check echo of the persisted slot (post-PMS-side validation). */
+  /** Sanity-check echo of the persisted slot (post-provider-side validation). */
   startsAt: Date;
   endsAt: Date;
+}
+
+export interface CancelBookingInput {
+  tenantId: string;
+  externalId: string;
 }
 
 export interface CalendarProvider {
   listAvailableSlots(input: ListAvailableSlotsInput): Promise<AvailableSlot[]>;
   createBooking(input: CreateBookingInput): Promise<CreateBookingResult>;
+  /** Optional. Providers that don't support cancellation omit this. */
+  cancelBooking?(input: CancelBookingInput): Promise<void>;
 }

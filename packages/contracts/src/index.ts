@@ -5,6 +5,7 @@
 export * from "./appointment-category.enum.js";
 export * from "./calendar-provider.js";
 export * from "./consent-flag.schema.js";
+export * from "./conversations.schema.js";
 export * from "./post-call-webhook.schema.js";
 export * from "./scraper.schema.js";
 export * from "./server-tools.contract.js";

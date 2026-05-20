@@ -65,6 +65,8 @@ export interface RerankArgs {
   /** Optional override of the use-case description so non-clinic verticals
    *  (vet, salon, gym) can be reranked correctly without changing this file. */
   useCaseDescription?: string;
+  /** Cancel the in-flight rerank when the client disconnects or hits Cancel. */
+  signal?: AbortSignal;
 }
 
 const DEFAULT_USE_CASE =
@@ -122,6 +124,7 @@ export async function rerankUrls(args: RerankArgs): Promise<RerankItem[]> {
     jsonSchema: RERANK_RESPONSE_JSON_SCHEMA,
     temperature: 0,
     maxOutputTokens: 8192,
+    ...(args.signal !== undefined ? { abortSignal: args.signal } : {}),
   });
 
   const byUrl = new Map<string, RerankItem>();

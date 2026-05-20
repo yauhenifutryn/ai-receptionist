@@ -15,7 +15,7 @@ import {
 } from "@ai-receptionist/backend/scraper";
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
 import { createGeminiProvider } from "@ai-receptionist/backend/lib/gemini-provider";
-import { buildSystemPrompt } from "@ai-receptionist/backend/prompts";
+import { buildSystemPrompt, extractPolishCity } from "@ai-receptionist/backend/prompts";
 import type { FirecrawlPage } from "@ai-receptionist/backend/scraper";
 import { openTestSession, openExistingSession } from "@/lib/test-session-logger";
 
@@ -233,7 +233,7 @@ export async function POST(req: NextRequest) {
           message: `Re-ranking top ${toRerank.length} URL${toRerank.length === 1 ? "" : "s"} with Gemini Flash Lite…`,
         });
         const rerankStart = Date.now();
-        const reranked = await rerankUrls({ rootUrl: url, urls: toRerank, llm });
+        const reranked = await rerankUrls({ rootUrl: url, urls: toRerank, llm, signal: abort.signal });
         const rerankMs = Date.now() - rerankStart;
         if (aborted()) return;
         const candidates = pickByScore(reranked, {
@@ -371,6 +371,7 @@ export async function POST(req: NextRequest) {
                 rootUrl: url,
                 urls: newKept.slice(0, RERANK_INPUT_CAP),
                 llm,
+                signal: abort.signal,
               });
               if (aborted()) return;
               const newPicked = pickByScore(newReranked, {
@@ -433,15 +434,65 @@ export async function POST(req: NextRequest) {
         // Both resume + live-scrape converge here.
 
         // 4. Consolidate.
+        // Show the user what's about to be sent to Gemini: page count + the
+        // actual char count after per-page capping (must match the cap in
+        // consolidate.ts → PER_PAGE_CHAR_CAP). Tokens are estimated at
+        // ~4 chars/token (Gemini tokenizer is close enough for status text).
+        const CONSOLIDATE_PER_PAGE_CAP = 50000;
+        const inputChars = validPages.reduce(
+          (sum, p) => sum + Math.min(p.markdown.length, CONSOLIDATE_PER_PAGE_CAP),
+          0,
+        );
+        const inputWords = validPages.reduce(
+          (sum, p) =>
+            sum +
+            p.markdown
+              .slice(0, CONSOLIDATE_PER_PAGE_CAP)
+              .split(/\s+/)
+              .filter(Boolean).length,
+          0,
+        );
+        const inputTokens = Math.round(inputChars / 4);
         emit({
           type: "log",
           phase: "consolidate",
           percent: 78,
-          message: "Consolidating with Gemini 3 Flash…",
+          message: `Consolidating ${validPages.length} page${validPages.length === 1 ? "" : "s"} with Gemini 3 Flash · ${inputChars.toLocaleString("en-US")} chars · ${inputWords.toLocaleString("en-US")} words · ~${inputTokens.toLocaleString("en-US")} tokens (4-9 min for full quality)`,
         });
         if (aborted()) return;
-        const scraperOutput = await consolidate({ rootUrl: url, pages: validPages, llm });
+        // Heartbeat so the wizard log doesn't look frozen during the long
+        // single Gemini call. Emits "Still consolidating… Ns elapsed" every
+        // 15s. Stops on resolve, throw, or abort via try/finally.
+        const consolidateStart = Date.now();
+        const heartbeat = setInterval(() => {
+          if (abort.signal.aborted) return;
+          const elapsed = Math.round((Date.now() - consolidateStart) / 1000);
+          emit({
+            type: "log",
+            phase: "consolidate",
+            percent: 78,
+            message: `Still consolidating… ${elapsed}s elapsed — Gemini is processing ${inputChars.toLocaleString("en-US")} chars`,
+          });
+        }, 15000);
+        let scraperOutput;
+        try {
+          scraperOutput = await consolidate({
+            rootUrl: url,
+            pages: validPages,
+            llm,
+            signal: abort.signal,
+          });
+        } finally {
+          clearInterval(heartbeat);
+        }
         if (aborted()) return;
+        const consolidateMs = Date.now() - consolidateStart;
+        emit({
+          type: "log",
+          phase: "consolidate",
+          percent: 90,
+          message: `Consolidate done in ${(consolidateMs / 1000).toFixed(1)}s`,
+        });
         await session?.event("gemini:consolidate", {
           tenantName: scraperOutput.tenant.name,
           services: scraperOutput.services.length,
@@ -494,8 +545,10 @@ export async function POST(req: NextRequest) {
 
         // 5. Render artifacts.
         const knowledgeMarkdown = scraperOutputToMarkdown(scraperOutput);
+        const detectedCity = extractPolishCity(scraperOutput.tenant.address);
         const systemPrompt = buildSystemPrompt({
           tenantDisplayName: scraperOutput.tenant.name,
+          ...(detectedCity ? { city: detectedCity } : {}),
         });
         await session?.write("06-knowledge.md", knowledgeMarkdown);
         await session?.write("07-system-prompt.md", systemPrompt);

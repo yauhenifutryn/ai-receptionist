@@ -75,3 +75,9 @@ logs/
 # Local test-session artifacts — full record of each /api/prepare + /api/provision
 # run for human + Claude review. Local only, contains real scraped clinic data.
 test-sessions/
+
+# Local-only audit reports + admin one-off scripts
+REVIEW.md
+apps/backend/scripts/probe-*.mjs
+apps/backend/scripts/admin-magic-link.mjs
+apps/backend/scripts/patch-agent-prompt.mjs

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
+import type { Route } from "next";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,19 +31,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <div className="flex items-center gap-6 text-sm text-neutral-600">
               <Link
-                href="/provision"
+                href={"/dashboard" as Route}
                 className="transition hover:text-neutral-900"
               >
-                Provision
+                Dashboard
               </Link>
-              <a
-                href="https://github.com/yauhenifutryn/ai-receptionist"
-                target="_blank"
-                rel="noreferrer"
-                className="transition hover:text-neutral-900"
-              >
-                GitHub
-              </a>
             </div>
           </nav>
         </header>

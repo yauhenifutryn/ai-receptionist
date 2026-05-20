@@ -19,6 +19,19 @@ export interface GenerateJsonArgs {
   jsonSchema?: object;
   temperature?: number;
   maxOutputTokens?: number;
+  /**
+   * Gemini 2.5+ thinking budget. 0 disables thinking (fast, deterministic
+   * structured-extraction path). Undefined = model default (dynamic, can
+   * spend many minutes on large prompts). Only `gemini-*-flash*` and
+   * `gemini-*-pro*` accept this; flash-lite ignores it (no thinking).
+   */
+  thinkingBudget?: number;
+  /**
+   * Client-side abort signal. Aborting cancels the in-flight HTTP call
+   * to Google. NOTE per Google: cancellation does not stop server-side
+   * processing — you may still be billed for tokens already consumed.
+   */
+  abortSignal?: AbortSignal;
 }
 
 export interface LLMProvider {
@@ -35,6 +48,10 @@ export interface GenerateStructuredRequest<Schema extends z.ZodTypeAny> {
   temperature?: number;
   maxOutputTokens?: number;
   maxRetries?: number;
+  /** See GenerateJsonArgs.thinkingBudget. 0 disables thinking. */
+  thinkingBudget?: number;
+  /** See GenerateJsonArgs.abortSignal. Cancels in-flight HTTP call. */
+  abortSignal?: AbortSignal;
 }
 
 export interface GenerateStructuredResult<Schema extends z.ZodTypeAny> {
@@ -91,6 +108,12 @@ export class LLMClient {
             ...(req.maxOutputTokens !== undefined
               ? { maxOutputTokens: req.maxOutputTokens }
               : {}),
+            ...(req.thinkingBudget !== undefined
+              ? { thinkingBudget: req.thinkingBudget }
+              : {}),
+            ...(req.abortSignal !== undefined
+              ? { abortSignal: req.abortSignal }
+              : {}),
           });
           const parsedJson = safeJsonParse(text);
           if (parsedJson.ok) {
@@ -98,12 +121,37 @@ export class LLMClient {
             if (validated.success) {
               return { data: validated.data, modelUsed: model, attempts };
             }
-            lastError = new Error(`Zod validation failed: ${validated.error.message}`);
+            const msg = validated.error.message;
+            lastError = new Error(`Zod validation failed: ${msg}`);
+            console.warn(
+              `[LLMClient] attempt ${attempts} model=${model} retry=${retry} ZOD_FAIL ` +
+                `outputChars=${text.length} :: ${msg.slice(0, 1500)}`,
+            );
           } else {
             lastError = new Error(`JSON parse failed: ${parsedJson.error}`);
+            // Dump truncated/malformed text to /tmp so we can inspect it.
+            // Filename includes attempt + model so multiple runs are kept.
+            const dumpPath = `/tmp/llm-raw-${model}-attempt${attempts}-${Date.now()}.txt`;
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
+              require("node:fs").writeFileSync(dumpPath, text);
+            } catch {
+              // ignore dump failures
+            }
+            console.warn(
+              `[LLMClient] attempt ${attempts} model=${model} retry=${retry} JSON_PARSE_FAIL ` +
+                `outputChars=${text.length} dumpedTo=${dumpPath} :: ${parsedJson.error.slice(0, 300)}`,
+            );
+            console.warn(
+              `[LLMClient]   last 200 chars: ${JSON.stringify(text.slice(-200))}`,
+            );
           }
         } catch (e) {
           lastError = e;
+          const errMsg = e instanceof Error ? e.message : String(e);
+          console.warn(
+            `[LLMClient] attempt ${attempts} model=${model} retry=${retry} CALL_THREW :: ${errMsg.slice(0, 300)}`,
+          );
         }
         if (retry < maxRetries) await this.sleep(100 * Math.pow(2, retry));
       }

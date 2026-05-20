@@ -36,13 +36,27 @@ function TestAgentInner({ agentId }: { agentId: string }) {
       const role = msg.source === "user" ? "user" : "agent";
       const text = msg.message ?? "";
       if (!text) return;
-      setTranscript((t) => [
-        ...t,
-        { id: `${Date.now()}-${t.length}`, role, text, timestamp: Date.now() },
-      ]);
+      const entry = {
+        id: `${Date.now()}-${role}`,
+        role: role as "user" | "agent",
+        text,
+        timestamp: Date.now(),
+      };
+      setTranscript((t) => [...t, entry]);
+      void persistTranscriptTurn(agentId, conversation, entry, mode);
     },
     onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : JSON.stringify(err);
       console.error("ElevenLabs error", err);
+      setTranscript((t) => [
+        ...t,
+        {
+          id: `${Date.now()}-err`,
+          role: "agent",
+          text: `[transport error] ${msg.slice(0, 200)}`,
+          timestamp: Date.now(),
+        },
+      ]);
     },
   });
 
@@ -81,7 +95,16 @@ function TestAgentInner({ agentId }: { agentId: string }) {
   async function startSession() {
     if (mode === "voice" && micPermission !== "granted") await requestMic();
     if (mode === "voice") {
-      conversation.startSession({ agentId });
+      // Pin to WebSocket. The SDK now defaults to WebRTC (via LiveKit),
+      // which requires a server-side conversation token even for public
+      // agents in some EL workspaces — produces `NegotiationError: timed
+      // out` if a token isn't supplied. WebSocket needs no token for
+      // public agents and works out of the box. Switch to WebRTC + token
+      // when we deploy to production telephony (Twilio SIP path).
+      conversation.startSession({
+        agentId,
+        connectionType: "websocket",
+      });
     } else {
       conversation.startSession({ agentId, textOnly: true });
     }
@@ -102,6 +125,19 @@ function TestAgentInner({ agentId }: { agentId: string }) {
     e.preventDefault();
     const text = chatInput.trim();
     if (!text || status !== "connected") return;
+    // The ElevenLabs SDK does NOT echo user-typed chat back via onMessage
+    // (it only echoes ASR transcripts in voice mode + agent replies in both
+    // modes). So we push the user's message into the transcript ourselves;
+    // otherwise the chat bubble UI shows agent-only output, which is what
+    // the user reported.
+    const entry = {
+      id: `${Date.now()}-u`,
+      role: "user" as const,
+      text,
+      timestamp: Date.now(),
+    };
+    setTranscript((t) => [...t, entry]);
+    void persistTranscriptTurn(agentId, conversation, entry, mode);
     conversation.sendUserMessage(text);
     setChatInput("");
   }
@@ -215,12 +251,12 @@ function TestAgentInner({ agentId }: { agentId: string }) {
             transcript.map((entry) => (
               <div
                 key={entry.id}
-                className={`flex gap-3 text-sm ${
+                className={`flex items-start gap-3 text-sm ${
                   entry.role === "user" ? "flex-row-reverse text-right" : ""
                 }`}
               >
                 <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wider ${
+                  className={`mt-0.5 shrink-0 self-start rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wider ${
                     entry.role === "user"
                       ? "bg-neutral-100 text-neutral-700"
                       : "bg-emerald-100 text-emerald-800"
@@ -228,7 +264,15 @@ function TestAgentInner({ agentId }: { agentId: string }) {
                 >
                   {entry.role === "user" ? "You" : "Agent"}
                 </span>
-                <p className="max-w-[75%] leading-relaxed text-neutral-800">{entry.text}</p>
+                <p
+                  className={`max-w-[75%] rounded-2xl px-3 py-2 leading-relaxed ${
+                    entry.role === "user"
+                      ? "bg-neutral-50 text-neutral-800"
+                      : "bg-emerald-50 text-neutral-800"
+                  }`}
+                >
+                  {entry.text}
+                </p>
               </div>
             ))
           )}
@@ -330,5 +374,46 @@ function safeCall<T>(fn: () => T): T | null {
     return fn();
   } catch {
     return null;
+  }
+}
+
+/**
+ * Persist a single transcript turn to the backend so every demo session
+ * leaves a durable record on disk under
+ * `test-sessions/<agentId>/transcripts/<conversationId>.jsonl`. Best-effort:
+ * a failure is logged to console but never blocks the live UX.
+ *
+ * The conversation id is resolved via `conversation.getId()` which is
+ * available only after the SDK reports `connected`. Until then we fall
+ * back to a stable "pending" key so very early turns aren't dropped.
+ */
+async function persistTranscriptTurn(
+  agentId: string,
+  conversation: { getId?: () => string },
+  entry: { role: "user" | "agent"; text: string; timestamp: number },
+  mode: "voice" | "chat",
+): Promise<void> {
+  let conversationId = "pending";
+  try {
+    const id = conversation.getId?.();
+    if (typeof id === "string" && id.length > 0) conversationId = id;
+  } catch {
+    // SDK not connected yet — use fallback key
+  }
+  try {
+    await fetch("/api/test-transcript", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        agentId,
+        conversationId,
+        role: entry.role,
+        text: entry.text,
+        timestamp: entry.timestamp,
+        source: mode,
+      }),
+    });
+  } catch (err) {
+    console.warn("persistTranscriptTurn failed", err);
   }
 }

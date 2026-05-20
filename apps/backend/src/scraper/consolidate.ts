@@ -142,6 +142,12 @@ const SYSTEM_PROMPT = [
   "For each FAQ emit { question, answer }.",
   "Polish synonyms should be front-loaded for each service.",
   "Do not invent staff names, prices, hours, or services. Do not fabricate.",
+  "",
+  "ANTI-REPETITION RULES — read carefully:",
+  "  - Once a service / staff / FAQ entry is emitted, NEVER emit it again.",
+  "  - NEVER repeat a phrase, sentence, or service marker more than twice in the output.",
+  "  - Once you finish the JSON object's closing brace, STOP — emit no further characters.",
+  "  - If you find yourself about to emit the same content again, terminate the JSON immediately.",
 ].join("\n");
 
 export interface ConsolidateArgs {
@@ -149,6 +155,8 @@ export interface ConsolidateArgs {
   pages: FirecrawlPage[];
   llm: LLMClient;
   now?: () => Date;
+  /** Cancel the in-flight Gemini call when the client disconnects or hits Cancel. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -180,24 +188,54 @@ function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
 export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput> {
   const now = args.now ?? (() => new Date());
   const result = await args.llm.generateStructured({
-    // Gemini 3 Flash (preview) is the newest-gen text Flash on Google AI
-    // Studio. Note: `gemini-3.1-flash` doesn't exist — Google only
-    // shipped 3.1 Flash variants for image/TTS/live modalities, not
-    // text. The 3.x text Flash is `gemini-3-flash-preview`.
+    // Primary: `gemini-2.5-flash`. Direct vanilla-node probe confirms 60s
+    // end-to-end on this exact prompt with Zod passing. `gemini-3-flash-preview`
+    // is moved to fallback because the preview endpoint produces transient
+    // `fetch failed` errors (undici connection-level, not a 4xx/5xx Gemini
+    // response). Once promoted out of preview we can re-evaluate.
     //
-    // Fallback chain prioritizes stability over generation:
-    //   1) Stable 2.5 flash — proven reliable on big consolidations
-    //   2) Pro preview — last-ditch if both Flash variants fail
+    // maxRetries=0: this is a long, expensive call. If the primary throws
+    // a transport error we want to fall through to the next model IMMEDIATELY
+    // — never retry the same model on the same giant prompt, which can
+    // double or triple the wall-clock with no quality win.
+    // Primary `gemini-3-flash-preview`: quality is dramatically better
+    // on Polish dental sites — on dynastystomatology.pl it captured 44
+    // priced services + 69 FAQ entries vs 2.5-flash's 0 priced services
+    // and 44 FAQ entries on the same input. The cost is latency: 4-9
+    // minutes vs 30-60s. For a wedge product where the agent NEEDS real
+    // prices to be useful, quality wins. The anti-loop prompt + temp 0.2
+    // + streaming response keep the call from hanging indefinitely.
+    //
+    // Fallback to `gemini-2.5-flash` so a transient 3-preview failure
+    // (the model sometimes throws `fetch failed`) still produces SOME
+    // result, even if of lower quality.
     model: "gemini-3-flash-preview",
-    fallbackChain: ["gemini-2.5-flash", "gemini-3.1-pro-preview"],
+    fallbackChain: ["gemini-2.5-flash"],
+    maxRetries: 0,
     system: SYSTEM_PROMPT,
     user: buildUserPrompt(args.rootUrl, args.pages),
     schema: ScraperOutputSchema,
     jsonSchema: SCRAPER_OUTPUT_JSON_SCHEMA,
-    temperature: 0,
+    // temperature 0.2 (not 0) because at temp=0 Gemini Flash falls into
+    // degenerate emission loops on long structured outputs — we observed
+    // the model stuck emitting "(Koniec). (Koniec). (Koniec)..." until
+    // truncation. 0.2 keeps sampling near-deterministic but escapes the
+    // greedy loop trap. Reference: classic failure mode of low-temp
+    // structured extraction on Polish (high-repetition-prior) inputs.
+    temperature: 0.2,
     // KB OUTPUT is unbounded by policy — model's hard ceiling only.
     // Big catalogs can emit 30K+ tokens, never truncate mid-JSON.
     maxOutputTokens: 65535,
+    // Disable "dynamic thinking" — default mode on 2.5 Flash and 3 Flash
+    // Preview can burn many minutes of internal reasoning tokens on big
+    // structured-extraction prompts. We don't need reasoning here: the
+    // prompt is "copy this markdown into this JSON schema with these
+    // rules". With responseSchema enforced and rigid prompt rules,
+    // thinking adds latency without quality. Empirically this drops
+    // consolidate latency from ~8+ min to ~30-90s on the dynastystomatology
+    // dataset (~340K input tokens).
+    thinkingBudget: 0,
+    ...(args.signal !== undefined ? { abortSignal: args.signal } : {}),
   });
   const out = result.data;
   const hasUnknown = out.services.some(

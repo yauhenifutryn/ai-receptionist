@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Step = "input" | "preparing" | "review" | "provisioning";
 
@@ -82,7 +82,20 @@ interface ProgressLine {
 const STORAGE_KEYS = {
   draft: "ai-receptionist:provision:draft-v3",
   recent: "ai-receptionist:provision:recent",
+  /** Cached scrape-session slug surviving page reloads, so the user can
+   *  resume from the most recent server-side scrape without paying for
+   *  Firecrawl + rerank again. Stored as { slug, url, ts }. */
+  resumableSession: "ai-receptionist:provision:resumable-session",
 } as const;
+
+interface PersistedResumable {
+  slug: string;
+  url: string;
+  ts: number;
+}
+/** Stale-after window — older cached scrapes are silently dropped on load
+ *  so we don't offer to resume something the server may have GC'd. */
+const RESUMABLE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const RECENT_LIMIT = 10;
 
@@ -105,6 +118,13 @@ export default function ProvisionPage() {
    *  slug. Cleared on a clean success. If prepare errors after the
    *  scrape phase, this is the slug we offer to resume from. */
   const [resumableSlug, setResumableSlug] = useState<string | null>(null);
+  /** URL the cached resumable slug was scraped for — used to auto-resume
+   *  when the user pastes the same URL again. */
+  const [resumableUrl, setResumableUrl] = useState<string | null>(null);
+  /** Lives for one prepare() call. .abort() on this kills the fetch
+   *  (and on the server, fires the ReadableStream cancel() handler,
+   *  which aborts the in-flight Gemini / Firecrawl calls). */
+  const prepareAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     try {
@@ -122,6 +142,26 @@ export default function ProvisionPage() {
       if (recentRaw) {
         const list = JSON.parse(recentRaw) as RecentAgent[];
         if (Array.isArray(list)) setRecent(list);
+      }
+      // Restore resumable scrape session if it's within TTL. We don't
+      // require URL match — that's intentional: if the user pasted a
+      // different URL but the previous session is still on disk, the
+      // server's resume path validates the cached pages so a mismatch
+      // just shows "No cached pages found" rather than misleading data.
+      const resumableRaw = window.localStorage.getItem(STORAGE_KEYS.resumableSession);
+      if (resumableRaw) {
+        const r = JSON.parse(resumableRaw) as PersistedResumable;
+        if (
+          r &&
+          typeof r.slug === "string" &&
+          typeof r.ts === "number" &&
+          Date.now() - r.ts < RESUMABLE_TTL_MS
+        ) {
+          setResumableSlug(r.slug);
+          if (typeof r.url === "string") setResumableUrl(r.url);
+        } else {
+          window.localStorage.removeItem(STORAGE_KEYS.resumableSession);
+        }
       }
     } catch {
       // ignore corrupt storage
@@ -162,6 +202,10 @@ export default function ProvisionPage() {
     }
   }
 
+  function cancelPrepare() {
+    prepareAbortRef.current?.abort();
+  }
+
   async function handlePrepare(
     e: React.FormEvent | null,
     opts: { resumeSlug?: string } = {},
@@ -170,14 +214,30 @@ export default function ProvisionPage() {
     setError(null);
     setProgress([]);
     setDraft((d) => ({ ...d, step: "preparing" }));
+    // Replace any previous controller (a stale one shouldn't exist, but
+    // guard anyway so a double-click can't leak two in-flight runs).
+    prepareAbortRef.current?.abort();
+    const controller = new AbortController();
+    prepareAbortRef.current = controller;
+
+    // Auto-resume: if the user pasted a URL that exactly matches the
+    // cached scrape's URL, skip Firecrawl + rerank and reuse the on-disk
+    // pages. Explicit Resume button click bypasses this (it already passes
+    // opts.resumeSlug). Mismatch URL = fresh scrape.
+    const effectiveResumeSlug =
+      opts.resumeSlug ??
+      (resumableSlug && resumableUrl && resumableUrl === draft.url
+        ? resumableSlug
+        : undefined);
 
     try {
       const body: Record<string, unknown> = { url: draft.url };
-      if (opts.resumeSlug) body.resumeSessionSlug = opts.resumeSlug;
+      if (effectiveResumeSlug) body.resumeSessionSlug = effectiveResumeSlug;
       const res = await fetch("/api/prepare", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
 
       if (!res.ok || !res.body) {
@@ -210,7 +270,23 @@ export default function ProvisionPage() {
           }
           if (evt.type === "session") {
             liveSlug = String(evt.slug ?? "") || null;
-            if (liveSlug) setResumableSlug(liveSlug);
+            if (liveSlug) {
+              setResumableSlug(liveSlug);
+              setResumableUrl(draft.url);
+              try {
+                const payload: PersistedResumable = {
+                  slug: liveSlug,
+                  url: draft.url,
+                  ts: Date.now(),
+                };
+                window.localStorage.setItem(
+                  STORAGE_KEYS.resumableSession,
+                  JSON.stringify(payload),
+                );
+              } catch {
+                // localStorage quota / disabled — UI-only fallback is fine
+              }
+            }
           } else if (evt.type === "log") {
             const entry: ProgressLine = {
               phase: String(evt.phase ?? ""),
@@ -241,6 +317,12 @@ export default function ProvisionPage() {
       // Clean success — wipe the resume-slug so we don't offer to resume
       // from a session that already completed.
       setResumableSlug(null);
+      setResumableUrl(null);
+      try {
+        window.localStorage.removeItem(STORAGE_KEYS.resumableSession);
+      } catch {
+        // ignore
+      }
       setDraft((d) => ({
         ...d,
         step: "review",
@@ -252,8 +334,17 @@ export default function ProvisionPage() {
         ...(doneResult.sessionSlug ? { sessionSlug: doneResult.sessionSlug } : {}),
       }));
     } catch (err) {
-      setError((err as Error).message);
+      // User-initiated cancel: drop silently back to input, no scary error.
+      const e = err as Error;
+      const isAbort = e.name === "AbortError" || controller.signal.aborted;
+      if (!isAbort) setError(e.message);
       setDraft((d) => ({ ...d, step: "input" }));
+    } finally {
+      // Only clear the ref if this run's controller is still the current one;
+      // a concurrent restart would have already replaced it.
+      if (prepareAbortRef.current === controller) {
+        prepareAbortRef.current = null;
+      }
     }
   }
 
@@ -323,6 +414,7 @@ export default function ProvisionPage() {
           progress={progress}
           resumableSlug={resumableSlug}
           onResume={() => handlePrepare(null, { resumeSlug: resumableSlug! })}
+          onCancel={cancelPrepare}
         />
       )}
 
@@ -435,8 +527,9 @@ function InputCard(props: {
   progress: ProgressLine[];
   resumableSlug: string | null;
   onResume: () => void;
+  onCancel: () => void;
 }) {
-  const { url, submitting, restoredFromDraft, onChangeUrl, onSubmit, onClearDraft, error, progress, resumableSlug, onResume } = props;
+  const { url, submitting, restoredFromDraft, onChangeUrl, onSubmit, onClearDraft, error, progress, resumableSlug, onResume, onCancel } = props;
   return (
     <form
       onSubmit={onSubmit}
@@ -473,26 +566,36 @@ function InputCard(props: {
       </Field>
 
       {error ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           <div className="break-words">{error}</div>
-          {resumableSlug && !submitting ? (
-            <div className="flex items-center justify-between gap-3 rounded-md border border-rose-300 bg-white/60 px-3 py-2">
-              <div className="text-xs text-rose-900">
-                Scrape data is cached for this session. You can retry without re-running Firecrawl.
-              </div>
-              <button
-                type="button"
-                onClick={onResume}
-                className="shrink-0 rounded-full bg-rose-900 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-rose-800"
-              >
-                Retry from cached scrape →
-              </button>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
-      <div className="flex items-center justify-end gap-4 border-t border-neutral-100 pt-6">
+      {resumableSlug && !submitting ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+          <span>
+            Cached scrape from last run available — skip Firecrawl + rerank and re-run just consolidation.
+          </span>
+          <button
+            type="button"
+            onClick={onResume}
+            className="shrink-0 rounded-full bg-amber-900 px-3 py-1.5 font-medium text-white shadow-sm transition hover:bg-amber-800"
+          >
+            Resume from cached scrape →
+          </button>
+        </div>
+      ) : null}
+
+      <div className="flex items-center justify-end gap-3 border-t border-neutral-100 pt-6">
+        {submitting ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex items-center gap-2 rounded-full border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:border-neutral-400 hover:bg-neutral-50"
+          >
+            Cancel
+          </button>
+        ) : null}
         <button
           type="submit"
           disabled={submitting || !url}

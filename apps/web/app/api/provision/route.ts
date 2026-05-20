@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { ElevenLabsConvAIProvider } from "@ai-receptionist/backend/orchestration";
-import { getServiceRoleSupabase } from "@/lib/supabase-server";
+import { getOperatorOrJsonError } from "@/lib/supabase-server";
 import { openExistingSession, openTestSession } from "@/lib/test-session-logger";
 
 export const runtime = "nodejs";
@@ -27,6 +27,14 @@ interface ProvisionResponse {
 }
 
 export async function POST(req: NextRequest) {
+  // Operator-only. Clients never reach this route — sales reps provision on
+  // their behalf and ship them a phone number. See
+  // docs/plans/2026-05-19-chat1-prod-auth.md.
+  const operator = await getOperatorOrJsonError();
+  if (!operator.ok) {
+    return NextResponse.json(operator.body, { status: operator.status });
+  }
+
   const raw = await req.json().catch(() => null);
   const parsed = BodySchema.safeParse(raw);
   if (!parsed.success) {
@@ -93,10 +101,12 @@ export async function POST(req: NextRequest) {
   const serverToolBaseUrl = `${baseUrl.value}/api`;
   const postCallWebhookUrl = `${baseUrl.value}/api/post-call`;
 
-  const supabase = getServiceRoleSupabase();
+  // User-scoped client. RLS fires; operator policies must allow insert (see
+  // migration 20260519120000_operator_role_and_phone.sql).
+  const supabase = operator.supabase;
   const provider = new ElevenLabsConvAIProvider({ apiKey });
 
-  // 1. Insert tenant.
+  // 1. Insert tenant — stamp provisioner for audit.
   const { data: tenantRow, error: tenantErr } = await supabase
     .from("tenants")
     .insert({
@@ -104,6 +114,7 @@ export async function POST(req: NextRequest) {
       display_name: input.tenantName,
       owner_email: input.ownerEmail ?? null,
       source_url: input.sourceUrl ?? null,
+      provisioned_by_user_id: operator.user.id,
     })
     .select("id")
     .single();
@@ -119,6 +130,23 @@ export async function POST(req: NextRequest) {
   }
   const tenantId = tenantRow.id as string;
   await session?.event("supabase:tenant_inserted", { tenantId });
+
+  // 1b. Link the operator to the new tenant so subsequent reads via RLS
+  // also work via the tenant_member path (defense-in-depth on top of the
+  // operator bypass). Best-effort: a failure here doesn't block the rest
+  // of provisioning since the operator bypass already grants access.
+  const { error: memberErr } = await supabase.from("tenant_members").insert({
+    tenant_id: tenantId,
+    user_id: operator.user.id,
+    role: "operator",
+  });
+  if (memberErr) {
+    await session?.event("provision:warning", {
+      code: "tenant_member_insert_failed",
+      message: memberErr.message,
+      tenantId,
+    });
+  }
 
   // 2. Upload knowledge document.
   let knowledgeDocumentId: string;
@@ -164,6 +192,7 @@ export async function POST(req: NextRequest) {
       message: (e as Error).message,
       tenantId,
       knowledgeDocumentId,
+      cleanupRequired: true,
     });
     return NextResponse.json(
       {
@@ -171,6 +200,11 @@ export async function POST(req: NextRequest) {
         message: (e as Error).message,
         tenantId,
         knowledgeDocumentId,
+        partialResources: {
+          knowledgeDocumentId,
+          cleanupRequired: true,
+          reason: "agent creation failed after knowledge document upload",
+        },
       },
       { status: 502 },
     );
@@ -184,6 +218,7 @@ export async function POST(req: NextRequest) {
     voice_id: null,
     default_language: "pl",
     status: "live",
+    provisioned_by_user_id: operator.user.id,
   });
   if (agentErr) {
     // Roll back the cloud agent so we don't leave a billable orphan with

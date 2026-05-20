@@ -1,0 +1,82 @@
+# Supabase config mirror — managed by `supabase config push`.
+# Schema is owned by supabase/migrations/*. This file owns auth URL allowlist.
+# Other auth fields explicitly mirror the current remote values; only changes
+# from this file should be site_url + additional_redirect_urls.
+
+project_id = "isctdelatfyrzcpynkuq"
+
+[auth]
+enabled = true
+site_url = "https://ai-receptionist-seven-sigma.vercel.app"
+additional_redirect_urls = [
+  "https://ai-receptionist-seven-sigma.vercel.app/auth/callback",
+  "http://localhost:3000/auth/callback",
+]
+# JWT access-token lifetime. 7 days. The access-token cookie's Max-Age
+# matches this value, so closing/reopening the browser within 7 days keeps
+# the operator signed in without a refresh round-trip. Refresh-token cookie
+# still has its own (longer) TTL set by Supabase platform.
+# Industry-standard for "remember me" sessions on internal tools.
+jwt_expiry = 604800
+enable_signup = true
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+minimum_password_length = 6
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = false
+# Per-email OTP request cooldown. Kept at 1s (the prior remote value) so
+# operator sign-out → sign-in works immediately during testing. Tighten
+# only if abuse becomes an issue post-pilot.
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.rate_limit]
+# Workspace-wide OTP/magic-link send budget. Default 30/hour is too tight
+# for a 3-person sales team that retries during demos. 200/hour is still
+# well below abuse thresholds and lets us iterate freely.
+email_sent = 200
+sign_in_sign_ups = 200
+token_verifications = 200
+
+# Custom SMTP via Resend. Replaces Supabase's hosted email service (which
+# was capped at ~4/hour on free tier, hard-blocking operator sign-ins).
+# Resend free tier = 100 emails/day, plenty for an operator console.
+#
+# Unverified-domain caveat: with no custom domain on Resend, sends only
+# succeed to the email used to create the Resend account. Yauheni signed up
+# with yauheni.futryn@gmail.com, so magic links to that address work. For
+# Sebastian/Rem we'll need to verify a sending domain (10 min DNS work).
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+# Secret comes from env at push time; never committed to the toml.
+pass = "env(SUPABASE_AUTH_EMAIL_SMTP_PASS)"
+admin_email = "onboarding@resend.dev"
+sender_name = "AI Receptionist"
+
+# Custom magic-link template — code-prominent, no link button. The Supabase
+# default template only includes {{ .ConfirmationURL }} (the magic-link
+# button) and not {{ .Token }} (the 6-digit code). For OTP code sign-in to
+# work, we need a template with {{ .Token }} prominently displayed.
+# See supabase/templates/magic-link.html for the rendered HTML.
+[auth.email.template.magic_link]
+subject = "Your AI Receptionist sign-in code"
+content_path = "./supabase/templates/magic-link.html"

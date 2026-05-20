@@ -54,6 +54,7 @@ function buildRouter() {
         tenantId: "tenant-1",
         clinicName: "ABC Stomatologia",
         contactPhone: null,
+        smsConfirmationsEnabled: true,
       };
     },
   });

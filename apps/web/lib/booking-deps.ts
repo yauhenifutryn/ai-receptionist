@@ -79,16 +79,27 @@ export function getBookingDeps(): BookingDeps {
       const sb = getServiceRoleSupabase();
       const { data, error } = await sb
         .from("agents")
-        .select("tenant_id, tenants(display_name, contact_phone)")
+        .select(
+          "tenant_id, tenants(display_name, contact_phone, sms_confirmations_enabled)",
+        )
         .eq("provider_agent_id", providerAgentId)
         .maybeSingle();
       if (error || !data) return null;
       const tenants = Array.isArray(data.tenants) ? data.tenants[0] : data.tenants;
       if (!tenants?.display_name) return null;
+      // Default to `true` when the column read back as null/undefined — same
+      // behavior the migration's column default enforces at write time, but
+      // we belt-and-braces it here so any pre-migration tenant row that
+      // somehow lacks the column never silently drops SMS.
+      const smsConfirmationsEnabled =
+        typeof tenants.sms_confirmations_enabled === "boolean"
+          ? tenants.sms_confirmations_enabled
+          : true;
       return {
         tenantId: data.tenant_id,
         clinicName: tenants.display_name,
         contactPhone: tenants.contact_phone ?? null,
+        smsConfirmationsEnabled,
       };
     },
   };

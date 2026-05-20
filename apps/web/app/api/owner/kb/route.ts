@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { getUserSupabase } from "@/lib/supabase-server";
+import { resolveOwnerAgent } from "@/lib/owner-agent-context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,41 +17,10 @@ export const dynamic = "force-dynamic";
  * operator route — keeps the auth surface obvious (operator routes stay
  * operator-only; owner routes stay tenant-member-only) and avoids field-
  * level allow-listing inside a shared handler.
+ *
+ * The owner-agent resolver lives in @/lib/owner-agent-context — shared with
+ * /api/owner/voice and /api/owner/settings.
  */
-
-interface OwnerAgentContext {
-  providerAgentId: string;
-}
-
-async function resolveOwnerAgent(): Promise<
-  { ok: true; ctx: OwnerAgentContext } | { ok: false; status: number; body: { error: string } }
-> {
-  const supabase = await getUserSupabase();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return { ok: false, status: 401, body: { error: "unauthenticated" } };
-  }
-  // RLS scopes tenant_members to the signed-in user.
-  const { data: membership } = await supabase
-    .from("tenant_members")
-    .select("tenant_id")
-    .limit(1)
-    .maybeSingle();
-  if (!membership) {
-    return { ok: false, status: 403, body: { error: "no_tenant_membership" } };
-  }
-  // Pick the first agent for the tenant. Sprint model: one agent per tenant.
-  const { data: agent } = await supabase
-    .from("agents")
-    .select("provider_agent_id")
-    .eq("tenant_id", membership.tenant_id)
-    .limit(1)
-    .maybeSingle();
-  if (!agent?.provider_agent_id) {
-    return { ok: false, status: 404, body: { error: "no_agent_for_tenant" } };
-  }
-  return { ok: true, ctx: { providerAgentId: agent.provider_agent_id as string } };
-}
 
 export async function GET(_req: NextRequest) {
   const ctx = await resolveOwnerAgent();

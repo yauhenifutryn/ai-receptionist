@@ -31,6 +31,14 @@ export interface CreateBookingDeps {
   clinicName?: string;
   /** Clinic's contact phone for cancellation; null in sales-demo phase. */
   contactPhone?: string | null;
+  /**
+   * Owner-controlled toggle from /owner/settings (item 7). When false, skip
+   * the SMS side-effect even if smsClient/logger/clinicName are all present.
+   * Defaults to true at the call site if the caller didn't plumb it through
+   * — preserves the pre-toggle behavior for any test code that hasn't been
+   * updated.
+   */
+  smsConfirmationsEnabled?: boolean;
   /** Optional conversationId pulled from the webhook envelope. Falls back to requestId. */
   conversationId?: string;
 }
@@ -149,8 +157,21 @@ export async function handleCreateBooking(
   });
 
   // Side-effect: SMS confirmation. Non-blocking — failure logged, booking
-  // still committed (we already inserted above). Skipped when SMS deps absent.
-  if (deps.smsClient && deps.smsFailureLogger && deps.clinicName) {
+  // still committed (we already inserted above). Skipped when SMS deps absent
+  // OR when the owner has toggled SMS off via /owner/settings (item 7).
+  const smsToggleOn = deps.smsConfirmationsEnabled !== false;
+  if (!smsToggleOn) {
+    // Structured info log only — no PII. Tenant id is opaque; no patient data.
+    console.log(
+      JSON.stringify({
+        level: "info",
+        event: "sms_skipped_tenant_toggle_off",
+        tenantId: tenant.tenantId,
+        bookingId: row.id,
+      }),
+    );
+  }
+  if (smsToggleOn && deps.smsClient && deps.smsFailureLogger && deps.clinicName) {
     const smsBody = formatConfirmationSms({
       clinicName: deps.clinicName,
       startsAt: providerResult.startsAt,

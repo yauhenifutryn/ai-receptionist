@@ -67,6 +67,12 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
             >
               Voice
             </Link>
+            <Link
+              href={"/owner/settings" as Route}
+              className="text-neutral-700 hover:text-neutral-900"
+            >
+              Settings
+            </Link>
             <form method="post" action="/auth/sign-out">
               <button
                 type="submit"

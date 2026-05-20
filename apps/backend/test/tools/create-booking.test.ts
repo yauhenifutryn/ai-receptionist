@@ -200,6 +200,46 @@ describe("handleCreateBooking (W2.3, CalendarProvider DI)", () => {
     expect(logFailure.mock.calls[0]![0]!.errorCode).toBe("internal_error");
   });
 
+  it("skips SMS when smsConfirmationsEnabled=false (item 7 owner toggle)", async () => {
+    const sendSpy = vi.fn(async () => ({ messageId: "msg_should_not_fire" }));
+    const smsClient: SmsClient = { send: sendSpy };
+    const logFailure = vi.fn(async () => {});
+    const smsFailureLogger: SmsFailureLogger = { logFailure };
+    const out = await handleCreateBooking(baseRequest, {
+      provider,
+      repo: buildRepo(),
+      smsShortUrlBase: "https://abcclinic.app",
+      smsClient,
+      smsFailureLogger,
+      clinicName: "ABC Stomatologia",
+      contactPhone: null,
+      smsConfirmationsEnabled: false,
+    });
+    expect(out.ok).toBe(true);
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(logFailure).not.toHaveBeenCalled();
+  });
+
+  it("sends SMS when smsConfirmationsEnabled=true (explicit toggle on)", async () => {
+    const sendSpy = vi.fn(async () => ({ messageId: "msg_ok" }));
+    const smsClient: SmsClient = { send: sendSpy };
+    const logFailure = vi.fn(async () => {});
+    const smsFailureLogger: SmsFailureLogger = { logFailure };
+    const out = await handleCreateBooking(baseRequest, {
+      provider,
+      repo: buildRepo(),
+      smsShortUrlBase: "https://abcclinic.app",
+      smsClient,
+      smsFailureLogger,
+      clinicName: "ABC Stomatologia",
+      contactPhone: null,
+      smsConfirmationsEnabled: true,
+    });
+    expect(out.ok).toBe(true);
+    expect(sendSpy).toHaveBeenCalledOnce();
+    expect(logFailure).not.toHaveBeenCalled();
+  });
+
   it("conversationId from the envelope is preferred over the requestId fallback", async () => {
     const insertSpy = vi.fn().mockImplementation(
       async (args: InsertBookingArgs): Promise<BookingRow> => ({

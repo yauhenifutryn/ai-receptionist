@@ -10,6 +10,13 @@ export interface TenantConfig {
   tenantId: string;
   clinicName: string;
   contactPhone: string | null;
+  /**
+   * Owner-controlled toggle from /owner/settings. When false, the post-booking
+   * SMS side-effect is skipped silently inside handleCreateBooking. Default
+   * true — preserves the pre-toggle behavior for clinics that never visit
+   * the settings page.
+   */
+  smsConfirmationsEnabled: boolean;
 }
 
 export interface CreateToolsRouterArgs {
@@ -89,6 +96,7 @@ export function createToolsRouter(args: CreateToolsRouterArgs): Hono {
       ...(args.smsFailureLogger ? { smsFailureLogger: args.smsFailureLogger } : {}),
       clinicName: cfg.clinicName,
       contactPhone: cfg.contactPhone,
+      smsConfirmationsEnabled: cfg.smsConfirmationsEnabled,
       ...(conversationId ? { conversationId } : {}),
     });
     if (result.ok) {

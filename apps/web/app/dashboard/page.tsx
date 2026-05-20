@@ -124,21 +124,28 @@ export default async function DashboardPage() {
                   <th className="px-4 py-3 font-medium">Demo access</th>
                   <th className="px-4 py-3 font-medium">Lang</th>
                   <th className="px-4 py-3 font-medium">Provisioned</th>
-                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {rows.map((a) => (
                   <tr key={a.id} className="transition hover:bg-neutral-50">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-neutral-900">
-                        {a.tenant?.display_name ?? a.tenant?.name ?? "—"}
-                      </div>
-                      {a.tenant?.source_url ? (
-                        <div className="truncate font-mono text-xs text-neutral-400">
-                          {a.tenant.source_url}
+                      <div className="flex items-start gap-2">
+                        <HealthDot status={a.status} />
+                        <div className="min-w-0">
+                          <Link
+                            href={`/test/${a.provider_agent_id}` as Route}
+                            className="font-medium text-neutral-900 transition hover:text-neutral-600 hover:underline"
+                          >
+                            {a.tenant?.display_name ?? a.tenant?.name ?? "—"}
+                          </Link>
+                          {a.tenant?.source_url ? (
+                            <div className="truncate font-mono text-xs text-neutral-400">
+                              {a.tenant.source_url}
+                            </div>
+                          ) : null}
                         </div>
-                      ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-neutral-700">
                       {a.provisioned_by_user_id ? (
@@ -154,7 +161,9 @@ export default async function DashboardPage() {
                       />
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">
-                      {a.phone_number ?? <span className="text-neutral-300">— unset</span>}
+                      {a.phone_number ?? (
+                        <span className="text-neutral-300">— unset</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <AgentDemoActions
@@ -169,15 +178,6 @@ export default async function DashboardPage() {
                     <td className="px-4 py-3 text-xs text-neutral-500">
                       {formatDate(a.created_at)}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/test/${a.provider_agent_id}` as Route}
-                        className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:border-neutral-300 hover:bg-neutral-50"
-                      >
-                        Edit
-                        <span aria-hidden>→</span>
-                      </Link>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -191,15 +191,21 @@ export default async function DashboardPage() {
                 className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-neutral-900">
-                      {a.tenant?.display_name ?? a.tenant?.name ?? "—"}
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
+                    <HealthDot status={a.status} />
+                    <div className="min-w-0">
+                      <Link
+                        href={`/test/${a.provider_agent_id}` as Route}
+                        className="block truncate font-medium text-neutral-900 active:underline"
+                      >
+                        {a.tenant?.display_name ?? a.tenant?.name ?? "—"}
+                      </Link>
+                      {a.tenant?.source_url ? (
+                        <div className="truncate font-mono text-xs text-neutral-400">
+                          {a.tenant.source_url}
+                        </div>
+                      ) : null}
                     </div>
-                    {a.tenant?.source_url ? (
-                      <div className="truncate font-mono text-xs text-neutral-400">
-                        {a.tenant.source_url}
-                      </div>
-                    ) : null}
                   </div>
                   <OutreachStatusSelect
                     providerAgentId={a.provider_agent_id}
@@ -225,12 +231,6 @@ export default async function DashboardPage() {
                     origin={origin}
                   />
                 </div>
-                <Link
-                  href={`/test/${a.provider_agent_id}` as Route}
-                  className="self-start rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition active:bg-neutral-50"
-                >
-                  Edit agent →
-                </Link>
               </div>
             ))}
           </section>
@@ -256,6 +256,30 @@ function EmptyState() {
         <span aria-hidden>→</span>
       </Link>
     </section>
+  );
+}
+
+function HealthDot({ status }: { status: string }) {
+  // Maps the existing agents.status enum to a traffic-light indicator.
+  // 'live' = green (provisioned successfully, ready to take calls).
+  // 'provisioning' = amber (transient — should resolve in seconds).
+  // Anything else (paused / archived / unknown) = red.
+  const map: Record<string, { color: string; label: string }> = {
+    live: { color: "bg-emerald-500", label: "Live" },
+    provisioning: {
+      color: "bg-amber-500 animate-pulse",
+      label: "Provisioning",
+    },
+    paused: { color: "bg-rose-500", label: "Paused" },
+    archived: { color: "bg-rose-500", label: "Archived" },
+  };
+  const m = map[status] ?? { color: "bg-rose-500", label: status };
+  return (
+    <span
+      title={m.label}
+      className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${m.color}`}
+      aria-label={m.label}
+    />
   );
 }
 

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { requireOperator } from "@/lib/supabase-server";
 import AgentSettingsPanel from "./agent-settings-panel";
+import AgentManagementPanel from "./agent-management-panel";
 import DemoAccessPanel from "./demo-access-panel";
 import PhoneNumberPanel from "./phone-number-panel";
 import TestAgentClient from "./test-client";
@@ -12,12 +13,19 @@ interface PageProps {
 export default async function TestAgentPage({ params }: PageProps) {
   const { agentId } = await params;
 
-  const { supabase } = await requireOperator({ redirectPath: `/test/${agentId}` });
+  const { supabase } = await requireOperator({
+    redirectPath: `/test/${agentId}`,
+  });
   const { data: agentRow } = await supabase
     .from("agents")
-    .select("phone_number, pin_code")
+    .select("phone_number, pin_code, tenant:tenants(display_name)")
     .eq("provider_agent_id", agentId)
     .maybeSingle();
+
+  const tenants = Array.isArray(agentRow?.tenant)
+    ? agentRow?.tenant[0]
+    : agentRow?.tenant;
+  const tenantDisplayName: string = tenants?.display_name ?? "—";
 
   const h = await headers();
   const host = h.get("host") ?? "localhost:3000";
@@ -35,6 +43,10 @@ export default async function TestAgentPage({ params }: PageProps) {
       <PhoneNumberPanel
         providerAgentId={agentId}
         existingPhoneNumber={agentRow?.phone_number ?? null}
+      />
+      <AgentManagementPanel
+        providerAgentId={agentId}
+        tenantDisplayName={tenantDisplayName}
       />
       <TestAgentClient agentId={agentId} />
     </div>

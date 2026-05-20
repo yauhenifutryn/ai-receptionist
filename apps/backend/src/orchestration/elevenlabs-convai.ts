@@ -257,6 +257,90 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
     await this.request("DELETE", `/v1/convai/agents/${input.agentId}`);
   }
 
+  /**
+   * Refresh the tools[] block on an existing agent without re-provisioning.
+   * Used when the tool catalog changes (e.g. adding check_availability +
+   * create_booking to agents that were provisioned before those tools shipped).
+   */
+  async updateAgentTools(input: {
+    agentId: string;
+    serverToolBaseUrl: string;
+  }): Promise<void> {
+    await this.request("PATCH", `/v1/convai/agents/${input.agentId}`, {
+      conversation_config: {
+        agent: {
+          prompt: {
+            tools: [
+              {
+                type: "webhook",
+                name: "check_availability",
+                description:
+                  "List up to 5 appointment slots for a service category.",
+                api_schema: {
+                  url: `${input.serverToolBaseUrl}/tools/check-availability`,
+                  method: "POST",
+                  content_type: "application/json",
+                  request_body_schema: {
+                    type: "object",
+                    properties: {
+                      serviceCategory: {
+                        type: "string",
+                        enum: [
+                          "consultation",
+                          "routine_service",
+                          "complex_service",
+                          "follow_up",
+                          "emergency_triage",
+                          "information_only",
+                          "other",
+                        ],
+                      },
+                      preferredWindow: {
+                        type: "object",
+                        properties: {
+                          from: { type: "string" },
+                          to: { type: "string" },
+                        },
+                      },
+                    },
+                    required: ["serviceCategory"],
+                  },
+                },
+              },
+              {
+                type: "webhook",
+                name: "create_booking",
+                description:
+                  "Create a booking after the caller confirms a slot.",
+                api_schema: {
+                  url: `${input.serverToolBaseUrl}/tools/create-booking`,
+                  method: "POST",
+                  content_type: "application/json",
+                  request_body_schema: {
+                    type: "object",
+                    properties: {
+                      slotId: { type: "string" },
+                      patientName: { type: "string" },
+                      patientPhone: { type: "string" },
+                      serviceCategory: { type: "string" },
+                      notes: { type: "string" },
+                    },
+                    required: [
+                      "slotId",
+                      "patientName",
+                      "patientPhone",
+                      "serviceCategory",
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+  }
+
   private async request<T = unknown>(
     method: "GET" | "POST" | "PATCH" | "DELETE",
     path: string,

@@ -95,8 +95,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "supabase_env_missing" }, { status: 500 });
   }
 
-  // Build response FIRST so setAll can attach session cookies onto it.
-  const response = NextResponse.json({ ok: true, redirectTo: next }, { status: 200 });
+  // Build a "cookie sink" response FIRST so the supabase cookie adapter can
+  // attach session cookies during verifyOtp. The final JSON body (with the
+  // role-appropriate redirectTo) is constructed at the end and the cookies
+  // are transferred onto it. We can't mutate the body of an already-created
+  // NextResponse, so this two-step dance is required.
+  const cookieSink = NextResponse.json({ ok: true }, { status: 200 });
 
   const supabase = createServerClient(supabaseUrl, anonKey, {
     cookies: {
@@ -106,7 +110,7 @@ export async function POST(req: NextRequest) {
       setAll(cookiesToSet: CookieToSet[]) {
         for (const { name, value, options } of cookiesToSet) {
           // Force path: "/" so cookies are sent on every route afterward.
-          response.cookies.set(name, value, { ...options, path: "/" });
+          cookieSink.cookies.set(name, value, { ...options, path: "/" });
         }
       },
     },
@@ -157,5 +161,40 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return response;
+  // Role-based redirect:
+  //   - operator (operator_emails) → next (defaults to /dashboard)
+  //   - tenant_member → /owner/conversations
+  //   - neither → /auth/access-pending
+  // Operator check runs against the original email; invitation materialization
+  // above may have created a tenant_members row that we read here.
+  let redirectTo: string;
+  const { data: operatorRow } = await service
+    .from("operator_emails")
+    .select("email")
+    .eq("email", verifiedEmail)
+    .maybeSingle();
+  if (operatorRow) {
+    redirectTo = next;
+  } else if (verifiedUid) {
+    const { data: membership } = await service
+      .from("tenant_members")
+      .select("tenant_id")
+      .eq("user_id", verifiedUid)
+      .limit(1)
+      .maybeSingle();
+    redirectTo = membership ? "/owner/conversations" : "/auth/access-pending";
+  } else {
+    redirectTo = "/auth/access-pending";
+  }
+
+  // Build the final JSON response, then port the session cookies that the
+  // supabase adapter attached to cookieSink during verifyOtp.
+  const finalResponse = NextResponse.json(
+    { ok: true, redirectTo },
+    { status: 200 },
+  );
+  for (const cookie of cookieSink.cookies.getAll()) {
+    finalResponse.cookies.set(cookie);
+  }
+  return finalResponse;
 }

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
+import { materializePendingInvitations } from "@/lib/auth-materialize-invitations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,7 +83,11 @@ export async function GET(req: NextRequest) {
         .maybeSingle();
       isOperator = !!operatorRow;
     }
-    if (!isOperator && verifiedUid) {
+    if (!isOperator && verifiedUid && verifiedEmail) {
+      // Materialize any pending tenant_invitations for this email into
+      // tenant_members rows BEFORE checking membership — magic-link path
+      // doesn't go through verify-otp where this normally happens.
+      await materializePendingInvitations(service, verifiedEmail, verifiedUid);
       const { data: membership } = await service
         .from("tenant_members")
         .select("tenant_id")

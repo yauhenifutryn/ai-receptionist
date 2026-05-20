@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
+import { materializePendingInvitations } from "@/lib/auth-materialize-invitations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,27 +139,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Materialize any pending owner invitations into tenant_members on first
-  // sign-in. The OTP verification has succeeded, so we trust the email/uid
-  // pair Supabase returned. Best-effort: a failure here shouldn't block the
-  // session response — the user can re-trigger materialization on next sign-in.
+  // sign-in. Shared helper — same logic runs in /auth/callback for the
+  // magic-link path. Best-effort: a failure here shouldn't block sign-in.
   const verifiedEmail = verifyData?.user?.email?.toLowerCase() ?? email;
   const verifiedUid = verifyData?.user?.id;
   if (verifiedUid && verifiedEmail) {
-    const { data: invites } = await service
-      .from("tenant_invitations")
-      .select("id, tenant_id, role")
-      .eq("email", verifiedEmail)
-      .is("consumed_at", null);
-    for (const inv of invites ?? []) {
-      await service.from("tenant_members").upsert(
-        { tenant_id: inv.tenant_id, user_id: verifiedUid, role: inv.role },
-        { onConflict: "tenant_id,user_id" },
-      );
-      await service
-        .from("tenant_invitations")
-        .update({ consumed_at: new Date().toISOString() })
-        .eq("id", inv.id);
-    }
+    await materializePendingInvitations(service, verifiedEmail, verifiedUid);
   }
 
   // Role-based redirect:

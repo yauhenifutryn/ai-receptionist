@@ -32,6 +32,30 @@ export interface ServiceValueLookupResult {
   showRate: number;
 }
 
+export interface UpsertConversationArgs {
+  conversationId: string;
+  tenantId: string;
+  agentId: string | null;
+  providerAgentId: string;
+  source: "pstn" | "browser_test" | "pin_demo";
+  direction?: "inbound" | "outbound" | null;
+  startedAt: string;
+  endedAt?: string | null;
+  durationSeconds?: number | null;
+  endReason?: string | null;
+  consentFlag?: boolean | null;
+  consentDecision?: string | null;
+  callerLanguage?: string | null;
+  appointmentCategory?: string | null;
+  escalated?: boolean;
+  escalationReason?: string | null;
+  bookedBookingId?: string | null;
+  toolCallCount?: number;
+  toolErrorCount?: number;
+  rawJsonb?: unknown;
+  finalizedAt?: string | null;
+}
+
 export interface PostCallRepository {
   resolveTenantByAgent(providerAgentId: string): Promise<TenantBinding | null>;
   upsertConsentLog(args: InsertConsentLogArgs): Promise<void>;
@@ -40,4 +64,8 @@ export interface PostCallRepository {
   lookupServiceValue(args: ServiceValueLookupArgs): Promise<ServiceValueLookupResult | null>;
   /** Updates the bookings row keyed by conversation_id with the computed revenue. */
   updateBookingRecoveredRevenue(args: UpdateBookingRevenueArgs): Promise<void>;
+  /** Writes/updates the canonical conversations row for any source (PSTN/browser/PIN). */
+  upsertConversation(args: UpsertConversationArgs): Promise<void>;
+  /** Returns the bookings.id linked to this conversation_id, or null. */
+  findBookingIdByConversation(conversationId: string): Promise<string | null>;
 }

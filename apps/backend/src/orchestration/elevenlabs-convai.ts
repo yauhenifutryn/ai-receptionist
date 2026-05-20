@@ -28,6 +28,114 @@ export const DEFAULT_AGENT_LLM = "qwen36-35b-a3b";
 export const DEFAULT_AGENT_TEMPERATURE = 0.3;
 export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 
+/**
+ * EL ConvAI validates every primitive property in a tool's
+ * request_body_schema and rejects (HTTP 400) any that doesn't declare one of:
+ * `description`, `dynamic_variable`, `is_system_provided`, `constant_value`.
+ * We use `description` everywhere — it's what the agent's LLM reads to pick
+ * the right value, so it has user-visible value beyond satisfying validation.
+ *
+ * Single source of truth: both provisionAgent (create) and updateAgentTools
+ * (PATCH retrofit) call this so the schemas can't drift.
+ */
+function buildToolsDefinition(serverToolBaseUrl: string) {
+  return [
+    {
+      type: "webhook",
+      name: "check_availability",
+      description: "List up to 5 appointment slots for a service category.",
+      api_schema: {
+        url: `${serverToolBaseUrl}/tools/check-availability`,
+        method: "POST",
+        content_type: "application/json",
+        request_body_schema: {
+          type: "object",
+          properties: {
+            serviceCategory: {
+              type: "string",
+              description:
+                "Type of appointment the caller is asking about. Pick the closest match from the enum.",
+              enum: [
+                "consultation",
+                "routine_service",
+                "complex_service",
+                "follow_up",
+                "emergency_triage",
+                "information_only",
+                "other",
+              ],
+            },
+            preferredWindow: {
+              type: "object",
+              description:
+                "Optional caller-stated time window. ISO 8601 datetimes (UTC).",
+              properties: {
+                from: {
+                  type: "string",
+                  description:
+                    "Earliest acceptable slot start (ISO 8601 UTC). Omit if caller has no preference.",
+                },
+                to: {
+                  type: "string",
+                  description:
+                    "Latest acceptable slot start (ISO 8601 UTC). Omit if caller has no preference.",
+                },
+              },
+            },
+          },
+          required: ["serviceCategory"],
+        },
+      },
+    },
+    {
+      type: "webhook",
+      name: "create_booking",
+      description: "Create a booking after the caller confirms a slot.",
+      api_schema: {
+        url: `${serverToolBaseUrl}/tools/create-booking`,
+        method: "POST",
+        content_type: "application/json",
+        request_body_schema: {
+          type: "object",
+          properties: {
+            slotId: {
+              type: "string",
+              description:
+                "Slot identifier returned by a prior check_availability call.",
+            },
+            patientName: {
+              type: "string",
+              description:
+                "Caller's full name as spelled by the caller. Polish diacritics preserved.",
+            },
+            patientPhone: {
+              type: "string",
+              description:
+                "Caller's callback phone number in E.164 (e.g. +48501234567). Confirm with the caller verbally before submitting.",
+            },
+            serviceCategory: {
+              type: "string",
+              description:
+                "Must match the serviceCategory used in check_availability for this slot.",
+            },
+            notes: {
+              type: "string",
+              description:
+                "Optional short note from the caller (chief complaint, preferred doctor, etc.).",
+            },
+          },
+          required: [
+            "slotId",
+            "patientName",
+            "patientPhone",
+            "serviceCategory",
+          ],
+        },
+      },
+    },
+  ];
+}
+
 export interface ElevenLabsConvAIProviderOptions {
   apiKey?: string;
   baseUrl?: string;
@@ -118,64 +226,7 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
               // at apps/backend/src/tools/{check-availability,create-booking}.ts
               // run against SimulatedCalendarProvider; real provider plugs in
               // post-pilot via the CalendarProvider interface.
-              tools: [
-                {
-                  type: "webhook",
-                  name: "check_availability",
-                  description: "List up to 5 appointment slots for a service category.",
-                  api_schema: {
-                    url: `${input.serverToolBaseUrl}/tools/check-availability`,
-                    method: "POST",
-                    content_type: "application/json",
-                    request_body_schema: {
-                      type: "object",
-                      properties: {
-                        serviceCategory: {
-                          type: "string",
-                          enum: [
-                            "consultation",
-                            "routine_service",
-                            "complex_service",
-                            "follow_up",
-                            "emergency_triage",
-                            "information_only",
-                            "other",
-                          ],
-                        },
-                        preferredWindow: {
-                          type: "object",
-                          properties: {
-                            from: { type: "string" },
-                            to: { type: "string" },
-                          },
-                        },
-                      },
-                      required: ["serviceCategory"],
-                    },
-                  },
-                },
-                {
-                  type: "webhook",
-                  name: "create_booking",
-                  description: "Create a booking after the caller confirms a slot.",
-                  api_schema: {
-                    url: `${input.serverToolBaseUrl}/tools/create-booking`,
-                    method: "POST",
-                    content_type: "application/json",
-                    request_body_schema: {
-                      type: "object",
-                      properties: {
-                        slotId: { type: "string" },
-                        patientName: { type: "string" },
-                        patientPhone: { type: "string" },
-                        serviceCategory: { type: "string" },
-                        notes: { type: "string" },
-                      },
-                      required: ["slotId", "patientName", "patientPhone", "serviceCategory"],
-                    },
-                  },
-                },
-              ],
+              tools: buildToolsDefinition(input.serverToolBaseUrl),
             },
             language,
           },
@@ -270,71 +321,7 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
       conversation_config: {
         agent: {
           prompt: {
-            tools: [
-              {
-                type: "webhook",
-                name: "check_availability",
-                description:
-                  "List up to 5 appointment slots for a service category.",
-                api_schema: {
-                  url: `${input.serverToolBaseUrl}/tools/check-availability`,
-                  method: "POST",
-                  content_type: "application/json",
-                  request_body_schema: {
-                    type: "object",
-                    properties: {
-                      serviceCategory: {
-                        type: "string",
-                        enum: [
-                          "consultation",
-                          "routine_service",
-                          "complex_service",
-                          "follow_up",
-                          "emergency_triage",
-                          "information_only",
-                          "other",
-                        ],
-                      },
-                      preferredWindow: {
-                        type: "object",
-                        properties: {
-                          from: { type: "string" },
-                          to: { type: "string" },
-                        },
-                      },
-                    },
-                    required: ["serviceCategory"],
-                  },
-                },
-              },
-              {
-                type: "webhook",
-                name: "create_booking",
-                description:
-                  "Create a booking after the caller confirms a slot.",
-                api_schema: {
-                  url: `${input.serverToolBaseUrl}/tools/create-booking`,
-                  method: "POST",
-                  content_type: "application/json",
-                  request_body_schema: {
-                    type: "object",
-                    properties: {
-                      slotId: { type: "string" },
-                      patientName: { type: "string" },
-                      patientPhone: { type: "string" },
-                      serviceCategory: { type: "string" },
-                      notes: { type: "string" },
-                    },
-                    required: [
-                      "slotId",
-                      "patientName",
-                      "patientPhone",
-                      "serviceCategory",
-                    ],
-                  },
-                },
-              },
-            ],
+            tools: buildToolsDefinition(input.serverToolBaseUrl),
           },
         },
       },

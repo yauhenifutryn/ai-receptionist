@@ -144,6 +144,75 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     });
   });
 
+  it("updateAgentTools PATCHes tools[] onto an existing agent", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });
+    await provider.updateAgentTools({
+      agentId: "agent-77",
+      serverToolBaseUrl: "https://backend.example.com",
+    });
+    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.elevenlabs.io/v1/convai/agents/agent-77");
+    expect(init.method).toBe("PATCH");
+    const body = parseBody(fetcher.mock.calls[0] as [unknown, RequestInit | undefined]);
+    const tools = (
+      body.conversation_config as Record<string, Record<string, Record<string, unknown>>>
+    ).agent.prompt.tools as Array<Record<string, unknown>>;
+    expect(tools).toHaveLength(2);
+    expect(tools.map((t) => t.name as string).sort()).toEqual([
+      "check_availability",
+      "create_booking",
+    ]);
+  });
+
+  it("tool schemas declare description on every primitive property (EL ConvAI 400 guard)", async () => {
+    // EL ConvAI rejects (HTTP 400, "Must set one of: description, ...") any
+    // string/number/boolean property in a tool's request_body_schema that
+    // lacks `description` (or one of the alternates). This test walks both
+    // tools' schemas and asserts every primitive has `description` set.
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ agent_id: "a" }));
+    const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });
+    await provider.provisionAgent({
+      tenantId: "t",
+      tenantDisplayName: "T",
+      knowledgeBaseDocumentIds: [],
+      serverToolBaseUrl: "https://x",
+      postCallWebhookUrl: "https://x/p",
+    });
+    const body = parseBody(fetcher.mock.calls[0] as [unknown, RequestInit | undefined]);
+    const tools = (
+      (body.conversation_config as Record<string, Record<string, Record<string, unknown>>>).agent
+        .prompt as Record<string, unknown>
+    ).tools as Array<Record<string, unknown>>;
+
+    function walk(obj: unknown, path: string): string[] {
+      if (!obj || typeof obj !== "object") return [];
+      const o = obj as Record<string, unknown>;
+      const failures: string[] = [];
+      if (
+        typeof o.type === "string" &&
+        ["string", "number", "boolean", "integer"].includes(o.type) &&
+        typeof o.description !== "string"
+      ) {
+        failures.push(`${path}.${o.type} missing description`);
+      }
+      if (o.properties && typeof o.properties === "object") {
+        for (const [k, v] of Object.entries(o.properties as Record<string, unknown>)) {
+          failures.push(...walk(v, `${path}.${k}`));
+        }
+      }
+      return failures;
+    }
+
+    const failures = tools.flatMap((t) =>
+      walk(
+        ((t.api_schema as Record<string, unknown>).request_body_schema as unknown),
+        `tools.${t.name as string}`,
+      ),
+    );
+    expect(failures).toEqual([]);
+  });
+
   it("deleteAgent DELETEs /v1/convai/agents/{id}", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });

@@ -23,9 +23,7 @@ export default function TestAgentClient({ agentId }: { agentId: string }) {
 function TestAgentInner({ agentId }: { agentId: string }) {
   const [mode, setMode] = useState<Mode>("voice");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
-  const [micPermission, setMicPermission] = useState<"unknown" | "granted" | "denied">(
-    "unknown",
-  );
+  const [micPermission, setMicPermission] = useState<"unknown" | "granted" | "denied">("unknown");
   const [chatInput, setChatInput] = useState("");
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
@@ -62,8 +60,7 @@ function TestAgentInner({ agentId }: { agentId: string }) {
 
   const status = conversation.status;
   const isSpeaking = conversation.isSpeaking;
-  const conversationId =
-    status === "connected" ? safeCall(() => conversation.getId()) : null;
+  const conversationId = status === "connected" ? safeCall(() => conversation.getId()) : null;
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -172,9 +169,9 @@ function TestAgentInner({ agentId }: { agentId: string }) {
         </span>
         <h1 className="text-3xl font-semibold tracking-tight">Talk to the agent</h1>
         <p className="text-neutral-600">
-          Test in voice (mic + speakers) or chat (text only). Chat mode is great
-          for scripted regression checks; voice mode tests the full Polish TTS
-          experience a real caller would hear.
+          Test in voice (mic + speakers) or chat (text only). Chat mode is great for scripted
+          regression checks; voice mode tests the full Polish TTS experience a real caller would
+          hear.
         </p>
       </header>
 
@@ -214,9 +211,7 @@ function TestAgentInner({ agentId }: { agentId: string }) {
           ) : (
             <Row label="Mode" value="Text only (no microphone)" />
           )}
-          {conversationId ? (
-            <Row label="Conversation ID" value={conversationId} mono />
-          ) : null}
+          {conversationId ? <Row label="Conversation ID" value={conversationId} mono /> : null}
         </dl>
 
         {mode === "voice" && micPermission === "denied" ? (
@@ -289,9 +284,7 @@ function TestAgentInner({ agentId }: { agentId: string }) {
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder={
-                status === "connected"
-                  ? "Napisz wiadomość po polsku…"
-                  : "Click Start chat to begin"
+                status === "connected" ? "Napisz wiadomość po polsku…" : "Click Start chat to begin"
               }
               disabled={status !== "connected"}
               className="flex-1 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm transition focus:border-neutral-400 focus:bg-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -330,9 +323,7 @@ function ModeToggle({
             onClick={() => onChange(m)}
             disabled={disabled}
             className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition ${
-              active
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:text-neutral-900"
+              active ? "bg-neutral-900 text-white" : "text-neutral-600 hover:text-neutral-900"
             } disabled:cursor-not-allowed disabled:opacity-50`}
           >
             <span aria-hidden>{m === "voice" ? "🎙" : "💬"}</span>

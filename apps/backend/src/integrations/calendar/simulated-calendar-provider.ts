@@ -32,9 +32,7 @@ export function createSimulatedCalendarProvider(
 ): CalendarProvider {
   const now = opts.now ?? (() => new Date());
   return {
-    async listAvailableSlots(
-      input: ListAvailableSlotsInput,
-    ): Promise<AvailableSlot[]> {
+    async listAvailableSlots(input: ListAvailableSlotsInput): Promise<AvailableSlot[]> {
       const durationMin = DURATION_BY_CATEGORY_MIN[input.category];
       const t = now().getTime();
       const baseHourMs = Math.ceil(t / ONE_HOUR_MS) * ONE_HOUR_MS + ONE_HOUR_MS;

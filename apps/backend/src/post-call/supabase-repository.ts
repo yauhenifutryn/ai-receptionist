@@ -9,9 +9,7 @@ import type {
 } from "./repository.js";
 import type { TenantBinding } from "../tools/repository.js";
 
-export function createSupabasePostCallRepository(
-  client: SupabaseClient,
-): PostCallRepository {
+export function createSupabasePostCallRepository(client: SupabaseClient): PostCallRepository {
   return {
     async resolveTenantByAgent(providerAgentId: string): Promise<TenantBinding | null> {
       const { data, error } = await client
@@ -25,20 +23,18 @@ export function createSupabasePostCallRepository(
     },
 
     async upsertConsentLog(args: InsertConsentLogArgs): Promise<void> {
-      const { error } = await client
-        .from("consent_log")
-        .upsert(
-          {
-            tenant_id: args.tenantId,
-            agent_id: args.agentRowId,
-            conversation_id: args.conversationId,
-            caller_language: args.callerLanguage,
-            decision: args.decision,
-            consent_flag: args.consentFlag,
-            classifier_confidence: args.classifierConfidence,
-          },
-          { onConflict: "conversation_id" },
-        );
+      const { error } = await client.from("consent_log").upsert(
+        {
+          tenant_id: args.tenantId,
+          agent_id: args.agentRowId,
+          conversation_id: args.conversationId,
+          caller_language: args.callerLanguage,
+          decision: args.decision,
+          consent_flag: args.consentFlag,
+          classifier_confidence: args.classifierConfidence,
+        },
+        { onConflict: "conversation_id" },
+      );
       if (error) throw new Error(`consent_log upsert failed: ${error.message}`);
     },
 
@@ -68,9 +64,7 @@ export function createSupabasePostCallRepository(
       };
     },
 
-    async updateBookingRecoveredRevenue(
-      args: UpdateBookingRevenueArgs,
-    ): Promise<void> {
+    async updateBookingRecoveredRevenue(args: UpdateBookingRevenueArgs): Promise<void> {
       const { error } = await client
         .from("bookings")
         .update({ recovered_revenue_pln: args.recoveredRevenuePln })

@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  generateShortToken,
-  SHORT_TOKEN_ALPHABET,
-} from "../../src/lib/short-token.js";
+import { generateShortToken, SHORT_TOKEN_ALPHABET } from "../../src/lib/short-token.js";
 
 describe("generateShortToken", () => {
   it("produces 8-character tokens by default", () => {

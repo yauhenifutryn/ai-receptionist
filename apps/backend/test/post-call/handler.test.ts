@@ -23,14 +23,12 @@ function buildRepo(overrides: Partial<PostCallRepository> = {}): {
   const upsertConsentLog = vi.fn(async (_args: InsertConsentLogArgs) => {});
   const insertTranscript = vi.fn(async (_args: InsertTranscriptArgs) => {});
   const lookupServiceValue = vi.fn(
-    async (_args: ServiceValueLookupArgs): Promise<ServiceValueLookupResult | null> =>
-      null,
+    async (_args: ServiceValueLookupArgs): Promise<ServiceValueLookupResult | null> => null,
   );
-  const updateBookingRecoveredRevenue = vi.fn(
-    async (_args: UpdateBookingRevenueArgs) => {},
-  );
-  const resolveTenantByAgent = vi.fn(async (id: string): Promise<TenantBinding | null> =>
-    id === "agent-77" ? { tenantId: "tenant-1", agentRowId: "agent-row-1" } : null,
+  const updateBookingRecoveredRevenue = vi.fn(async (_args: UpdateBookingRevenueArgs) => {});
+  const resolveTenantByAgent = vi.fn(
+    async (id: string): Promise<TenantBinding | null> =>
+      id === "agent-77" ? { tenantId: "tenant-1", agentRowId: "agent-row-1" } : null,
   );
 
   const repo: PostCallRepository = {
@@ -89,10 +87,9 @@ function makePayload(overrides: {
 describe("handlePostCall (W2.4)", () => {
   it("stores transcript when consent=yes", async () => {
     const { repo, spies } = buildRepo();
-    const out = await handlePostCall(
-      makePayload({ consentDecision: "yes", consentFlag: true }),
-      { repo },
-    );
+    const out = await handlePostCall(makePayload({ consentDecision: "yes", consentFlag: true }), {
+      repo,
+    });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.consentLogged).toBe(true);
@@ -106,10 +103,9 @@ describe("handlePostCall (W2.4)", () => {
 
   it("does NOT store transcript when consent=no", async () => {
     const { repo, spies } = buildRepo();
-    const out = await handlePostCall(
-      makePayload({ consentDecision: "no", consentFlag: false }),
-      { repo },
-    );
+    const out = await handlePostCall(makePayload({ consentDecision: "no", consentFlag: false }), {
+      repo,
+    });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.transcriptStored).toBe(false);
@@ -132,10 +128,7 @@ describe("handlePostCall (W2.4)", () => {
   it("ignores derived.consentFlag if it disagrees with derived.consentDecision (decision wins)", async () => {
     // Adversarial: classifier reported decision=no but consentFlag=true. Decision wins.
     const { repo, spies } = buildRepo();
-    await handlePostCall(
-      makePayload({ consentDecision: "no", consentFlag: true }),
-      { repo },
-    );
+    await handlePostCall(makePayload({ consentDecision: "no", consentFlag: true }), { repo });
     expect(spies.insertTranscript).not.toHaveBeenCalled();
     const consentArgs = spies.upsertConsentLog.mock.calls[0]![0] as InsertConsentLogArgs;
     expect(consentArgs.consentFlag).toBe(false);
@@ -158,7 +151,8 @@ describe("handlePostCall (W2.4)", () => {
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.recoveredRevenuePln).toBe(175);
-    const updateArgs = spies.updateBookingRecoveredRevenue.mock.calls[0]![0] as UpdateBookingRevenueArgs;
+    const updateArgs = spies.updateBookingRecoveredRevenue.mock
+      .calls[0]![0] as UpdateBookingRevenueArgs;
     expect(updateArgs.recoveredRevenuePln).toBe(175);
     expect(updateArgs.conversationId).toBe("conv-9");
   });

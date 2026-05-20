@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { ScraperOutputSchema } from "@ai-receptionist/contracts";
-import { consolidate, CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES } from "../../src/scraper/consolidate.js";
+import {
+  consolidate,
+  CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES,
+} from "../../src/scraper/consolidate.js";
 import { LLMClient, type LLMProvider, type GenerateJsonArgs } from "../../src/lib/llm.js";
 
 const noSleep = () => Promise.resolve();

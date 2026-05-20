@@ -58,17 +58,13 @@ export async function POST(req: NextRequest) {
     .eq("email", email)
     .maybeSingle();
   if (lookupErr) {
-    return NextResponse.json(
-      { error: "internal_lookup_failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
   }
   if (!allowed) {
     return NextResponse.json(
       {
         error: "not_authorized",
-        message:
-          "This email isn't on the operator allow-list. Ask the admin to add you.",
+        message: "This email isn't on the operator allow-list. Ask the admin to add you.",
       },
       { status: 403 },
     );
@@ -87,19 +83,13 @@ export async function POST(req: NextRequest) {
   }
   const otp = linkData?.properties?.email_otp;
   if (!otp) {
-    return NextResponse.json(
-      { error: "otp_missing_from_response" },
-      { status: 502 },
-    );
+    return NextResponse.json({ error: "otp_missing_from_response" }, { status: 502 });
   }
 
   // 3. Send via Resend API directly. Our own template, our own copy.
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
-    return NextResponse.json(
-      { error: "resend_key_missing" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "resend_key_missing" }, { status: 500 });
   }
   const resendRes = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -126,10 +116,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json(
-    { ok: true, message: `Code sent to ${email}.` },
-    { status: 200 },
-  );
+  return NextResponse.json({ ok: true, message: `Code sent to ${email}.` }, { status: 200 });
 }
 
 function buildEmailHtml(otp: string): string {

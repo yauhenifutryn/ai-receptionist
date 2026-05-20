@@ -52,12 +52,10 @@ export default function PhoneNumberPanel({
             <div className="font-mono text-xs uppercase tracking-wider text-emerald-700">
               PSTN ready
             </div>
-            <div className="mt-1 text-lg font-medium text-emerald-900">
-              {existingPhoneNumber}
-            </div>
+            <div className="mt-1 text-lg font-medium text-emerald-900">{existingPhoneNumber}</div>
             <div className="mt-1 text-sm text-emerald-800">
-              Send this number to the prospect — they call cold, hear the
-              Polish agent, sign the pilot.
+              Send this number to the prospect — they call cold, hear the Polish agent, sign the
+              pilot.
             </div>
           </div>
         </div>
@@ -84,9 +82,7 @@ export default function PhoneNumberPanel({
       const json = (await res.json()) as ImportNumberResponse | ErrorResponse;
       if (!res.ok) {
         const err = json as ErrorResponse;
-        setError(
-          err.message ?? err.body ?? err.error ?? `Failed (${res.status})`,
-        );
+        setError(err.message ?? err.body ?? err.error ?? `Failed (${res.status})`);
         return;
       }
       setSuccess(json as ImportNumberResponse);
@@ -104,9 +100,7 @@ export default function PhoneNumberPanel({
         <div className="font-mono text-xs uppercase tracking-wider text-emerald-700">
           Number bound
         </div>
-        <div className="mt-1 text-lg font-medium text-emerald-900">
-          {success.phoneNumber}
-        </div>
+        <div className="mt-1 text-lg font-medium text-emerald-900">{success.phoneNumber}</div>
         <div className="mt-2 text-sm text-emerald-800">{success.message}</div>
         <div className="mt-3 font-mono text-xs text-emerald-700">
           EL phone-number id: {success.elevenLabsPhoneNumberId}
@@ -124,8 +118,8 @@ export default function PhoneNumberPanel({
               Assign phone number
             </div>
             <div className="mt-1 text-sm text-neutral-600">
-              Bind a Twilio EU number so a prospect can call this agent cold.
-              Browser test is for our QA; phone is the prospect&apos;s wow.
+              Bind a Twilio EU number so a prospect can call this agent cold. Browser test is for
+              our QA; phone is the prospect&apos;s wow.
             </div>
           </div>
           <button
@@ -155,9 +149,8 @@ export default function PhoneNumberPanel({
         </button>
       </div>
       <p className="mt-2 text-xs text-neutral-500">
-        Credentials are forwarded to ElevenLabs once and not stored on our
-        servers. The number must be voice-capable and have the Polish
-        regulatory bundle attached before importing.
+        Credentials are forwarded to ElevenLabs once and not stored on our servers. The number must
+        be voice-capable and have the Polish regulatory bundle attached before importing.
       </p>
       <form onSubmit={submit} className="mt-5 flex flex-col gap-4">
         <Field id="phoneNumber" label="Phone number (E.164)">
@@ -216,13 +209,7 @@ export default function PhoneNumberPanel({
         <div className="flex items-center justify-end">
           <button
             type="submit"
-            disabled={
-              submitting ||
-              !phoneNumber ||
-              !label ||
-              !twilioAccountSid ||
-              !twilioAuthToken
-            }
+            disabled={submitting || !phoneNumber || !label || !twilioAccountSid || !twilioAuthToken}
             className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Importing…" : "Import number"}
@@ -233,15 +220,7 @@ export default function PhoneNumberPanel({
   );
 }
 
-function Field({
-  id,
-  label,
-  children,
-}: {
-  id: string;
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-sm font-medium text-neutral-800">

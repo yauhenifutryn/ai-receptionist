@@ -20,6 +20,7 @@ supabase db push
 Or paste `supabase/migrations/20260519120000_operator_role_and_phone.sql` into the Supabase SQL editor at https://supabase.com/dashboard/project/isctdelatfyrzcpynkuq/sql and run.
 
 The migration adds:
+
 - `operator_emails` whitelist table
 - `operators` table (auto-promoted on signup via `trg_promote_operator_on_signup`)
 - `is_operator(uuid)` RLS helper
@@ -93,6 +94,7 @@ Already mandatory per project rules. Confirm under Workspace → Privacy.
    select id, provider_agent_id, phone_number, provisioned_by_user_id from agents order by created_at desc limit 1;
    select * from tenant_members order by created_at desc limit 1;
    ```
+
    - Expect: `provisioned_by_user_id` populated, `tenant_members` row with role `operator`.
 
 ## 7. Twilio PL number (sales-rep wow path)

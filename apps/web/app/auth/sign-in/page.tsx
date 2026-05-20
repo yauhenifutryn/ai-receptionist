@@ -75,9 +75,7 @@ function SignInForm() {
       };
       if (!res.ok) {
         if (res.status === 410) {
-          setError(
-            "Code expired. Request a fresh one — codes are valid for one hour.",
-          );
+          setError("Code expired. Request a fresh one — codes are valid for one hour.");
         } else if (res.status === 401) {
           setError("Invalid code. Double-check the email and try again.");
         } else {
@@ -104,16 +102,15 @@ function SignInForm() {
         <p className="text-sm text-neutral-600">
           {step === "email" ? (
             <>
-              Enter your operator email. We&apos;ll send you a one-time 6-digit
-              code. Type the code on the next screen and you&apos;re in.
-              Session stays valid for ~7 days, then you do this again.
+              Enter your operator email. We&apos;ll send you a one-time 6-digit code. Type the code
+              on the next screen and you&apos;re in. Session stays valid for ~7 days, then you do
+              this again.
             </>
           ) : (
             <>
-              Check your inbox at <strong>{email}</strong>. The email contains
-              a 6-digit code — type it below. Ignore the &quot;magic link&quot;
-              in the same email; we&apos;ve switched to code entry for Safari
-              reliability.
+              Check your inbox at <strong>{email}</strong>. The email contains a 6-digit code — type
+              it below. Ignore the &quot;magic link&quot; in the same email; we&apos;ve switched to
+              code entry for Safari reliability.
             </>
           )}
         </p>

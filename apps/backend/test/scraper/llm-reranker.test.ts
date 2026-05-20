@@ -8,7 +8,11 @@ describe("pickByScore (dynamic cap)", () => {
 
   it("keeps all URLs above threshold", () => {
     const out = pickByScore(
-      mk([["/a", 0.9], ["/b", 0.8], ["/c", 0.7]]),
+      mk([
+        ["/a", 0.9],
+        ["/b", 0.8],
+        ["/c", 0.7],
+      ]),
       { threshold: 0.5, floor: 2, ceiling: 30 },
     );
     expect(out).toEqual(["/a", "/b", "/c"]);
@@ -16,7 +20,12 @@ describe("pickByScore (dynamic cap)", () => {
 
   it("falls back to floor when too few are above threshold", () => {
     const out = pickByScore(
-      mk([["/a", 0.9], ["/b", 0.3], ["/c", 0.2], ["/d", 0.1]]),
+      mk([
+        ["/a", 0.9],
+        ["/b", 0.3],
+        ["/c", 0.2],
+        ["/d", 0.1],
+      ]),
       { threshold: 0.5, floor: 3, ceiling: 30 },
     );
     expect(out).toEqual(["/a", "/b", "/c"]);

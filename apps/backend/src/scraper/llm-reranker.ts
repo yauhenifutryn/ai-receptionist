@@ -92,7 +92,7 @@ const SYSTEM_PROMPT =
   "\n\n" +
   "Return ONE entry per input URL, preserving the URL string exactly. " +
   "Keep each 'reason' to a brief phrase under 80 characters. " +
-  "Output JSON only matching: {\"ranked\": [{\"url\": string, \"score\": number, \"reason\": string}, ...]}.";
+  'Output JSON only matching: {"ranked": [{"url": string, "score": number, "reason": string}, ...]}.';
 
 function buildUserPrompt(args: RerankArgs): string {
   const useCase = args.useCaseDescription ?? DEFAULT_USE_CASE;
@@ -138,7 +138,8 @@ export async function rerankUrls(args: RerankArgs): Promise<RerankItem[]> {
     // junk the model implicitly rejected can't sneak past pickByScore.
     // pickByScore's floor will still backfill these if no scored URLs
     // qualify — but they will never outrank legitimately-scored URLs.
-    else out.push({ url: u, score: 0, reason: "model omitted this URL — defaulted below threshold" });
+    else
+      out.push({ url: u, score: 0, reason: "model omitted this URL — defaulted below threshold" });
   }
   out.sort((a, b) => b.score - a.score);
   return out;
@@ -161,10 +162,7 @@ export interface PickByScoreOptions {
  *
  * Result is the URL strings only, preserving rank order.
  */
-export function pickByScore(
-  ranked: RerankItem[],
-  opts: PickByScoreOptions = {},
-): string[] {
+export function pickByScore(ranked: RerankItem[], opts: PickByScoreOptions = {}): string[] {
   const threshold = opts.threshold ?? 0.5;
   const floor = opts.floor ?? 8;
   const ceiling = opts.ceiling ?? 30;

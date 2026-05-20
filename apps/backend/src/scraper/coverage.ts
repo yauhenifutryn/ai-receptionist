@@ -55,9 +55,7 @@ export function reportCoverage(out: ScraperOutput): CoverageReport {
     hasHours: hasAnyHours(out),
     servicesCount: out.services.length,
     servicesWithPrices: out.services.filter(
-      (s) =>
-        s.price &&
-        (typeof s.price.min === "number" || typeof s.price.max === "number"),
+      (s) => s.price && (typeof s.price.min === "number" || typeof s.price.max === "number"),
     ).length,
     staffCount: out.staff.length,
     faqCount: out.faq.length,
@@ -103,8 +101,7 @@ export function reportCoverage(out: ScraperOutput): CoverageReport {
       severity: "high",
       code: "most_services_without_prices",
       message: `Only ${details.servicesWithPrices} of ${details.servicesCount} services have prices.`,
-      suggestion:
-        "Likely missed deeper service pages. Consider re-running or filling in manually.",
+      suggestion: "Likely missed deeper service pages. Consider re-running or filling in manually.",
     });
   }
   if (!details.hasHours) {
@@ -122,8 +119,7 @@ export function reportCoverage(out: ScraperOutput): CoverageReport {
     warnings.push({
       severity: "high",
       code: "no_services",
-      message:
-        "No services captured — the agent will only handle generic booking requests.",
+      message: "No services captured — the agent will only handle generic booking requests.",
       suggestion: "Add services manually if this clinic offers specific treatments.",
     });
   }
@@ -131,8 +127,7 @@ export function reportCoverage(out: ScraperOutput): CoverageReport {
     warnings.push({
       severity: "medium",
       code: "no_staff",
-      message:
-        "No staff/doctors captured. Callers asking for a specific person won't get a match.",
+      message: "No staff/doctors captured. Callers asking for a specific person won't get a match.",
     });
   }
   if (details.faqCount === 0) {
@@ -147,8 +142,7 @@ export function reportCoverage(out: ScraperOutput): CoverageReport {
   // Score: start at 1.0, subtract per warning by severity weight.
   let score = 1.0;
   for (const w of warnings) {
-    score -=
-      w.severity === "critical" ? 0.3 : w.severity === "high" ? 0.15 : 0.05;
+    score -= w.severity === "critical" ? 0.3 : w.severity === "high" ? 0.15 : 0.05;
   }
   score = Math.max(0, Math.min(1, score));
 
@@ -159,14 +153,8 @@ function hasAnyHours(out: ScraperOutput): boolean {
   const h = out.tenant.hours;
   if (!h) return false;
   return (
-    [
-      h.monday,
-      h.tuesday,
-      h.wednesday,
-      h.thursday,
-      h.friday,
-      h.saturday,
-      h.sunday,
-    ].some((d) => !!d && d.trim().length > 0) || !!h.notes
+    [h.monday, h.tuesday, h.wednesday, h.thursday, h.friday, h.saturday, h.sunday].some(
+      (d) => !!d && d.trim().length > 0,
+    ) || !!h.notes
   );
 }

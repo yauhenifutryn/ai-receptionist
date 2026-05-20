@@ -108,11 +108,7 @@ describe("detectLanguagePrefixes (semantic, ISO-gated)", () => {
   });
 
   it("detects a language with 3+ URLs even without unprefixed overlap", () => {
-    const urls = [
-      "https://klinika.pl/en/a",
-      "https://klinika.pl/en/b",
-      "https://klinika.pl/en/c",
-    ];
+    const urls = ["https://klinika.pl/en/a", "https://klinika.pl/en/b", "https://klinika.pl/en/c"];
     expect(detectLanguagePrefixes(urls).has("en")).toBe(true);
   });
 
@@ -148,10 +144,7 @@ describe("detectLanguagePrefixes (semantic, ISO-gated)", () => {
   });
 
   it("F9: ISO singleton with transliterated tail is detected (no overlap needed)", () => {
-    const urls = [
-      "https://klinika.pl/doctors/oleh-vus",
-      "https://klinika.pl/en/doctors/oleg-vus",
-    ];
+    const urls = ["https://klinika.pl/doctors/oleh-vus", "https://klinika.pl/en/doctors/oleg-vus"];
     expect(detectLanguagePrefixes(urls).has("en")).toBe(true);
   });
 });
@@ -212,7 +205,9 @@ describe("filterCandidates (top-level)", () => {
     expect(r.kept).toContain("https://dynastystomatology.pl/service-category/wybielanie-zebow");
     // Polish unprefixed doctor page survives, translations dropped.
     expect(r.kept).toContain("https://dynastystomatology.pl/doctors/oleg-vus");
-    expect(r.kept.some((u) => u.includes("/en/") || u.includes("/uk/") || u.includes("/ru/"))).toBe(false);
+    expect(r.kept.some((u) => u.includes("/en/") || u.includes("/uk/") || u.includes("/ru/"))).toBe(
+      false,
+    );
     // Mechanical noise dropped.
     expect(r.kept).not.toContain("https://dynastystomatology.pl/sitemap.xml");
     expect(r.kept).not.toContain("https://dynastystomatology.pl/wp-admin/index.php");

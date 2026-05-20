@@ -34,14 +34,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         code: "tenant_not_found",
-        callerSafeMessage:
-          "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
+        callerSafeMessage: "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
       },
       { status: 404 },
     );
   }
-  const conversationId =
-    typeof body.conversationId === "string" ? body.conversationId : undefined;
+  const conversationId = typeof body.conversationId === "string" ? body.conversationId : undefined;
   const result = await handleCreateBooking(body, {
     provider: deps.provider,
     repo: deps.repo,

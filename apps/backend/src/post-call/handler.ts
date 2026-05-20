@@ -1,7 +1,4 @@
-import {
-  PostCallWebhookSchema,
-  type PostCallWebhook,
-} from "@ai-receptionist/contracts";
+import { PostCallWebhookSchema, type PostCallWebhook } from "@ai-receptionist/contracts";
 import type { PostCallRepository } from "./repository.js";
 
 export interface HandlePostCallDeps {
@@ -64,9 +61,7 @@ export async function handlePostCall(
       category: payload.derived.appointmentCategory,
     });
     if (matrix) {
-      recoveredRevenuePln = Number(
-        (matrix.expectedRevenuePln * matrix.showRate).toFixed(2),
-      );
+      recoveredRevenuePln = Number((matrix.expectedRevenuePln * matrix.showRate).toFixed(2));
       await deps.repo.updateBookingRecoveredRevenue({
         conversationId: payload.conversationId,
         recoveredRevenuePln,

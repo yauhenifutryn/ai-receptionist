@@ -51,9 +51,7 @@ function buildSystemPrompt(language: ConsentLanguage): string {
   ].join("\n");
 }
 
-export async function classifyConsent(
-  args: ClassifyConsentArgs,
-): Promise<ConsentClassification> {
+export async function classifyConsent(args: ClassifyConsentArgs): Promise<ConsentClassification> {
   const { utterance, language, llm } = args;
   try {
     const result = await llm.generateStructured({

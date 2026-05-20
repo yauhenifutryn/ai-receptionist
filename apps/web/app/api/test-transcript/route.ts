@@ -107,13 +107,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!supabaseOk && !fsOk) {
-    return NextResponse.json(
-      { error: "persist_failed", supabaseError },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "persist_failed", supabaseError }, { status: 500 });
   }
-  return NextResponse.json(
-    { ok: true, supabase: supabaseOk, file: fsFile },
-    { status: 200 },
-  );
+  return NextResponse.json({ ok: true, supabase: supabaseOk, file: fsFile }, { status: 200 });
 }

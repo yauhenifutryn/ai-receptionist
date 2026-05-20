@@ -1,7 +1,4 @@
-import {
-  ScraperOutputSchema,
-  type ScraperOutput,
-} from "@ai-receptionist/contracts";
+import { ScraperOutputSchema, type ScraperOutput } from "@ai-receptionist/contracts";
 import type { LLMClient } from "../lib/llm.js";
 import type { FirecrawlPage } from "./firecrawl.js";
 
@@ -107,7 +104,7 @@ const SCRAPER_OUTPUT_JSON_SCHEMA = {
 } as const;
 
 export const CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES =
-  "Hard rule: never invent prices. If NO price is in the source markdown, omit the price field entirely OR set qualifier=\"unknown\". But if a price IS in the source — including a RANGE like \"od 4 000 do 18 000 PLN\" or \"250-400 PLN\" or \"od 380 PLN\" — capture it. Mark hasUnknownPrices=true whenever at least one service has no concrete price.";
+  'Hard rule: never invent prices. If NO price is in the source markdown, omit the price field entirely OR set qualifier="unknown". But if a price IS in the source — including a RANGE like "od 4 000 do 18 000 PLN" or "250-400 PLN" or "od 380 PLN" — capture it. Mark hasUnknownPrices=true whenever at least one service has no concrete price.';
 
 const SYSTEM_PROMPT = [
   "You are a structured-data extractor for a multi-tenant voice receptionist.",
@@ -121,20 +118,20 @@ const SYSTEM_PROMPT = [
   "",
   "PRICE EXTRACTION RULES — read carefully, this is where you most often fail:",
   "Real clinic prices come in many shapes. Map them like this:",
-  "  - \"200 PLN\"                  → { currency:\"PLN\", display:\"200 PLN\", min:200, max:200, qualifier:\"exact\" }",
-  "  - \"250-400 PLN\"              → { currency:\"PLN\", display:\"250-400 PLN\", min:250, max:400, qualifier:\"range\" }",
-  "  - \"od 4 000 do 18 000 PLN\"   → { currency:\"PLN\", display:\"od 4 000 do 18 000 PLN\", min:4000, max:18000, qualifier:\"range\" }",
-  "  - \"od 380 PLN\"               → { currency:\"PLN\", display:\"od 380 PLN\", min:380, qualifier:\"from\" }",
-  "  - \"od 350 PLN\"               → { currency:\"PLN\", display:\"od 350 PLN\", min:350, qualifier:\"from\" }",
-  "  - \"od 3500 PLN\" (no spaces)  → { currency:\"PLN\", display:\"od 3500 PLN\", min:3500, qualifier:\"from\" }",
-  "  - variant like \"dzieci do 10 lat 150 PLN\" → set variant:\"dzieci do 10 lat\", min:150, max:150, qualifier:\"exact\"",
-  "  - \"na zapytanie\" / no number → { currency:\"PLN\", qualifier:\"unknown\" } OR omit price entirely",
+  '  - "200 PLN"                  → { currency:"PLN", display:"200 PLN", min:200, max:200, qualifier:"exact" }',
+  '  - "250-400 PLN"              → { currency:"PLN", display:"250-400 PLN", min:250, max:400, qualifier:"range" }',
+  '  - "od 4 000 do 18 000 PLN"   → { currency:"PLN", display:"od 4 000 do 18 000 PLN", min:4000, max:18000, qualifier:"range" }',
+  '  - "od 380 PLN"               → { currency:"PLN", display:"od 380 PLN", min:380, qualifier:"from" }',
+  '  - "od 350 PLN"               → { currency:"PLN", display:"od 350 PLN", min:350, qualifier:"from" }',
+  '  - "od 3500 PLN" (no spaces)  → { currency:"PLN", display:"od 3500 PLN", min:3500, qualifier:"from" }',
+  '  - variant like "dzieci do 10 lat 150 PLN" → set variant:"dzieci do 10 lat", min:150, max:150, qualifier:"exact"',
+  '  - "na zapytanie" / no number → { currency:"PLN", qualifier:"unknown" } OR omit price entirely',
   "STRICT RULES:",
-  "  - qualifier=\"range\" REQUIRES BOTH min AND max populated (e.g., \"500-900 PLN\" → min:500 AND max:900). Never set qualifier=\"range\" with only one of them — use \"from\" instead if only the lower bound is known.",
-  "  - qualifier=\"exact\" REQUIRES min=max (both the same number).",
-  "  - `variant` is for caller-segmenting qualifiers ONLY (e.g., \"dzieci\", \"dorośli\", \"z aparatem ortodontycznym\"). NEVER put the price text into variant. If there is no segmenting qualifier, omit variant.",
+  '  - qualifier="range" REQUIRES BOTH min AND max populated (e.g., "500-900 PLN" → min:500 AND max:900). Never set qualifier="range" with only one of them — use "from" instead if only the lower bound is known.',
+  '  - qualifier="exact" REQUIRES min=max (both the same number).',
+  '  - `variant` is for caller-segmenting qualifiers ONLY (e.g., "dzieci", "dorośli", "z aparatem ortodontycznym"). NEVER put the price text into variant. If there is no segmenting qualifier, omit variant.',
   "  - Always preserve the verbatim source text in `display` so the agent can quote it.",
-  "  - Strip thousands separators (\"4 000\" → 4000) when filling min/max.",
+  '  - Strip thousands separators ("4 000" → 4000) when filling min/max.',
   "If the same service appears at multiple price points across the source (e.g. /cennik page lists multiple variants), pick the most common shape or create ONE service entry whose price covers the full observed range.",
   "",
   "For each service emit { name, synonyms[], nfzCovered, price?, durationMinutes? }.",
@@ -174,15 +171,9 @@ const PER_PAGE_CHAR_CAP = 50000;
 
 function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
   const blocks = pages.map(
-    (p, i) =>
-      `--- Page ${i + 1}: ${p.url} ---\n${p.markdown.slice(0, PER_PAGE_CHAR_CAP)}`,
+    (p, i) => `--- Page ${i + 1}: ${p.url} ---\n${p.markdown.slice(0, PER_PAGE_CHAR_CAP)}`,
   );
-  return [
-    `Root URL: ${rootUrl}`,
-    `Pages: ${pages.length}`,
-    "",
-    ...blocks,
-  ].join("\n\n");
+  return [`Root URL: ${rootUrl}`, `Pages: ${pages.length}`, "", ...blocks].join("\n\n");
 }
 
 export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput> {

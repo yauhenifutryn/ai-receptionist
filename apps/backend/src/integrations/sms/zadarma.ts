@@ -1,10 +1,5 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
-import {
-  type SendSmsInput,
-  type SendSmsResult,
-  type SmsClient,
-  SmsSendError,
-} from "./types.js";
+import { type SendSmsInput, type SendSmsResult, type SmsClient, SmsSendError } from "./types.js";
 
 export interface ZadarmaSmsClientOptions {
   /** From https://my.zadarma.com/api/ */
@@ -22,28 +17,16 @@ const ENDPOINT_URL = `https://api.zadarma.com${ENDPOINT_PATH}`;
 
 function sortedFormBody(params: Record<string, string>): string {
   const keys = Object.keys(params).sort();
-  return keys
-    .map(
-      (k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k]!)}`,
-    )
-    .join("&");
+  return keys.map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k]!)}`).join("&");
 }
 
-function buildSignature(
-  methodPath: string,
-  paramsStr: string,
-  secretKey: string,
-): string {
+function buildSignature(methodPath: string, paramsStr: string, secretKey: string): string {
   const md5 = createHash("md5").update(paramsStr).digest("hex");
   const signingString = methodPath + paramsStr + md5;
-  return createHmac("sha1", secretKey)
-    .update(signingString)
-    .digest("base64");
+  return createHmac("sha1", secretKey).update(signingString).digest("base64");
 }
 
-export function createZadarmaSmsClient(
-  opts: ZadarmaSmsClientOptions,
-): SmsClient {
+export function createZadarmaSmsClient(opts: ZadarmaSmsClientOptions): SmsClient {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   return {
     async send(input: SendSmsInput): Promise<SendSmsResult> {
@@ -83,10 +66,7 @@ export function createZadarmaSmsClient(
       try {
         parsed = await res.json();
       } catch {
-        throw new SmsSendError(
-          `http_${res.status}`,
-          "non-json response from Zadarma",
-        );
+        throw new SmsSendError(`http_${res.status}`, "non-json response from Zadarma");
       }
       const obj = parsed as { status?: string; message?: string };
       if (!res.ok) {
@@ -94,10 +74,7 @@ export function createZadarmaSmsClient(
         throw new SmsSendError(`http_${res.status}`, msg);
       }
       if (obj.status === "error") {
-        throw new SmsSendError(
-          "zadarma_error",
-          obj.message ?? "unknown Zadarma SMS error",
-        );
+        throw new SmsSendError("zadarma_error", obj.message ?? "unknown Zadarma SMS error");
       }
       // Zadarma's success response doesn't include a per-message id — we
       // synthesize one so downstream logging has a stable handle.

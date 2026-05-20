@@ -4,15 +4,10 @@ import type {
   SmsFailureLogger,
   SmsFailureLogInput,
 } from "@ai-receptionist/backend/tools";
-import {
-  createSupabaseBookingsRepository,
-} from "@ai-receptionist/backend/tools";
+import { createSupabaseBookingsRepository } from "@ai-receptionist/backend/tools";
 import type { CalendarProvider } from "@ai-receptionist/contracts";
 import { createSimulatedCalendarProvider } from "@ai-receptionist/backend/integrations/calendar";
-import {
-  createZadarmaSmsClient,
-  type SmsClient,
-} from "@ai-receptionist/backend/integrations/sms";
+import { createZadarmaSmsClient, type SmsClient } from "@ai-receptionist/backend/integrations/sms";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
 
 /**

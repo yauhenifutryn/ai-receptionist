@@ -65,17 +65,13 @@ export async function POST(req: NextRequest) {
     .eq("email", email)
     .maybeSingle();
   if (lookupErr) {
-    return NextResponse.json(
-      { error: "internal_lookup_failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
   }
   if (!allowed) {
     return NextResponse.json(
       {
         error: "not_authorized",
-        message:
-          "This email isn't on the operator allow-list. Ask the admin to add you.",
+        message: "This email isn't on the operator allow-list. Ask the admin to add you.",
       },
       { status: 403 },
     );
@@ -84,17 +80,11 @@ export async function POST(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !anonKey) {
-    return NextResponse.json(
-      { error: "supabase_env_missing" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "supabase_env_missing" }, { status: 500 });
   }
 
   // Build response FIRST so setAll can attach session cookies onto it.
-  const response = NextResponse.json(
-    { ok: true, redirectTo: next },
-    { status: 200 },
-  );
+  const response = NextResponse.json({ ok: true, redirectTo: next }, { status: 200 });
 
   const supabase = createServerClient(supabaseUrl, anonKey, {
     cookies: {
@@ -117,10 +107,11 @@ export async function POST(req: NextRequest) {
   });
 
   if (verifyErr) {
-    const status =
-      verifyErr.message.toLowerCase().includes("expired") ? 410 :
-      verifyErr.message.toLowerCase().includes("invalid") ? 401 :
-      400;
+    const status = verifyErr.message.toLowerCase().includes("expired")
+      ? 410
+      : verifyErr.message.toLowerCase().includes("invalid")
+        ? 401
+        : 400;
     return NextResponse.json(
       {
         error: "verify_failed",

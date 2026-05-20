@@ -28,7 +28,15 @@ export const CONSENT_ACK_NO: Record<ConsentLanguage, string> = {
 };
 
 export const AFFIRMATIVE_EXAMPLES: Record<ConsentLanguage, string[]> = {
-  pl: ["tak", "tak, zgadzam się", "oczywiście", "nie mam nic przeciwko", "okej", "dobrze", "proszę bardzo"],
+  pl: [
+    "tak",
+    "tak, zgadzam się",
+    "oczywiście",
+    "nie mam nic przeciwko",
+    "okej",
+    "dobrze",
+    "proszę bardzo",
+  ],
   en: ["yes", "sure", "of course", "that's fine", "okay", "go ahead", "no problem"],
   ru: ["да", "согласен", "согласна", "конечно", "не возражаю", "хорошо"],
 };

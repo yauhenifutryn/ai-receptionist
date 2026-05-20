@@ -181,7 +181,7 @@ function provenanceBlock(out: ScraperOutput): string {
   ];
   if (out.hasUnknownPrices) {
     lines.push(
-      "- Uwaga: część cen oznaczona jako unknown — agent musi powiedzieć \"nie mam tej informacji\" zamiast zgadywać.",
+      '- Uwaga: część cen oznaczona jako unknown — agent musi powiedzieć "nie mam tej informacji" zamiast zgadywać.',
     );
   }
   return lines.join("\n");

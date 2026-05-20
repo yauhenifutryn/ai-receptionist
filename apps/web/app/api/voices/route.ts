@@ -42,10 +42,7 @@ export async function GET() {
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "elevenlabs_api_key_missing" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "elevenlabs_api_key_missing" }, { status: 500 });
   }
 
   const res = await fetch("https://api.elevenlabs.io/v1/voices", {

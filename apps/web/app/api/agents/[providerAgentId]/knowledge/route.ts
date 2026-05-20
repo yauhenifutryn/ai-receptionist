@@ -27,10 +27,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
   const { providerAgentId } = await params;
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "elevenlabs_api_key_missing" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "elevenlabs_api_key_missing" }, { status: 500 });
   }
 
   // 1. Fetch the agent to discover its first KB doc id.
@@ -100,24 +97,18 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
   }
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "elevenlabs_api_key_missing" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "elevenlabs_api_key_missing" }, { status: 500 });
   }
 
   // 1. Upload the new doc.
-  const uploadRes = await fetch(
-    "https://api.elevenlabs.io/v1/convai/knowledge-base/text",
-    {
-      method: "POST",
-      headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: parsed.data.documentName,
-        text: parsed.data.markdown,
-      }),
-    },
-  );
+  const uploadRes = await fetch("https://api.elevenlabs.io/v1/convai/knowledge-base/text", {
+    method: "POST",
+    headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: parsed.data.documentName,
+      text: parsed.data.markdown,
+    }),
+  });
   if (!uploadRes.ok) {
     const text = await uploadRes.text().catch(() => "");
     return NextResponse.json(

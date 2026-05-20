@@ -1,7 +1,4 @@
-import type {
-  AppointmentCategory,
-  PostCallTranscriptTurn,
-} from "@ai-receptionist/contracts";
+import type { AppointmentCategory, PostCallTranscriptTurn } from "@ai-receptionist/contracts";
 import type { TenantBinding } from "../tools/repository.js";
 
 export interface InsertConsentLogArgs {
@@ -40,9 +37,7 @@ export interface PostCallRepository {
   upsertConsentLog(args: InsertConsentLogArgs): Promise<void>;
   insertTranscript(args: InsertTranscriptArgs): Promise<void>;
   /** Returns null if the tenant has no matrix entry for this category. */
-  lookupServiceValue(
-    args: ServiceValueLookupArgs,
-  ): Promise<ServiceValueLookupResult | null>;
+  lookupServiceValue(args: ServiceValueLookupArgs): Promise<ServiceValueLookupResult | null>;
   /** Updates the bookings row keyed by conversation_id with the computed revenue. */
   updateBookingRecoveredRevenue(args: UpdateBookingRevenueArgs): Promise<void>;
 }

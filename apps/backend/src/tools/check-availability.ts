@@ -30,8 +30,7 @@ export async function handleCheckAvailability(
   raw: unknown,
   deps: CheckAvailabilityDeps,
 ): Promise<CheckAvailabilityResponse> {
-  const req: CheckAvailabilityRequest =
-    CheckAvailabilityRequestSchema.parse(raw);
+  const req: CheckAvailabilityRequest = CheckAvailabilityRequestSchema.parse(raw);
   const providerSlots = await deps.provider.listAvailableSlots({
     tenantId: deps.tenantId,
     category: req.serviceCategory,

@@ -9,13 +9,12 @@ export default function AccessPendingPage() {
           You&apos;re signed in, but not on the operator list yet.
         </h1>
         <p className="text-sm text-neutral-600">
-          This system is for sales reps and staff who provision agents on
-          behalf of clinics. Clients do not self-onboard — your dedicated rep
-          will provision your agent and send you a phone number to try it on.
+          This system is for sales reps and staff who provision agents on behalf of clinics. Clients
+          do not self-onboard — your dedicated rep will provision your agent and send you a phone
+          number to try it on.
         </p>
         <p className="text-sm text-neutral-600">
-          If you should be an operator, ask Jenya to add your email to the
-          allowlist.
+          If you should be an operator, ask Jenya to add your email to the allowlist.
         </p>
       </header>
       <form action="/auth/sign-out" method="POST">

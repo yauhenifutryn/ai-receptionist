@@ -46,28 +46,26 @@ describe("ZadarmaSmsClient", () => {
 
   it("throws SmsSendError on non-2xx", async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ status: "error", message: "auth failed" }),
-        { status: 401, headers: { "content-type": "application/json" } },
-      ),
+      new Response(JSON.stringify({ status: "error", message: "auth failed" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      }),
     );
     const client = createZadarmaSmsClient({ userKey: USER_KEY, secretKey: SECRET_KEY });
-    await expect(
-      client.send({ to: "+48500000000", body: "x" }),
-    ).rejects.toBeInstanceOf(SmsSendError);
+    await expect(client.send({ to: "+48500000000", body: "x" })).rejects.toBeInstanceOf(
+      SmsSendError,
+    );
   });
 
   it("throws SmsSendError when body status is 'error'", async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ status: "error", message: "low_balance" }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
+      new Response(JSON.stringify({ status: "error", message: "low_balance" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
     );
     const client = createZadarmaSmsClient({ userKey: USER_KEY, secretKey: SECRET_KEY });
-    await expect(
-      client.send({ to: "+48500000000", body: "x" }),
-    ).rejects.toThrow(/low_balance/);
+    await expect(client.send({ to: "+48500000000", body: "x" })).rejects.toThrow(/low_balance/);
   });
 
   it("aborts with SmsSendError after the configured timeout", async () => {
@@ -84,8 +82,8 @@ describe("ZadarmaSmsClient", () => {
       secretKey: SECRET_KEY,
       timeoutMs: 50,
     });
-    await expect(
-      client.send({ to: "+48500000000", body: "x" }),
-    ).rejects.toBeInstanceOf(SmsSendError);
+    await expect(client.send({ to: "+48500000000", body: "x" })).rejects.toBeInstanceOf(
+      SmsSendError,
+    );
   });
 });

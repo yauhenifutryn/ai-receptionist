@@ -120,9 +120,7 @@ export async function openTestSession(hint: string): Promise<TestSessionHandle> 
  * root. Anything else returns null instead of opening an attacker-
  * controlled directory.
  */
-export async function openExistingSession(
-  slug: string,
-): Promise<TestSessionHandle | null> {
+export async function openExistingSession(slug: string): Promise<TestSessionHandle | null> {
   if (!isSafeSlug(slug)) return null;
   const root = await resolveRoot();
   const dir = path.resolve(root, slug);

@@ -13,19 +13,13 @@ interface Props {
  * route at /demo/<agentId>?pin=X. Generates a fresh 4-digit PIN on demand
  * and gives the operator a copy-to-clipboard shareable URL.
  */
-export default function DemoAccessPanel({
-  providerAgentId,
-  initialPin,
-  origin,
-}: Props) {
+export default function DemoAccessPanel({ providerAgentId, initialPin, origin }: Props) {
   const [pin, setPin] = useState<string | null>(initialPin);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const demoUrl = pin
-    ? `${origin}/demo/${providerAgentId}?pin=${pin}`
-    : null;
+  const demoUrl = pin ? `${origin}/demo/${providerAgentId}?pin=${pin}` : null;
 
   async function generate() {
     setGenerating(true);
@@ -67,8 +61,8 @@ export default function DemoAccessPanel({
         <div>
           <h2 className="text-base font-semibold">Demo access</h2>
           <p className="mt-1 text-xs text-neutral-500">
-            PIN-gated public demo URL for cold outreach to prospects. No
-            operator login required for the prospect.
+            PIN-gated public demo URL for cold outreach to prospects. No operator login required for
+            the prospect.
           </p>
         </div>
       </header>
@@ -76,9 +70,7 @@ export default function DemoAccessPanel({
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
           <div>
-            <p className="text-xs uppercase tracking-wider text-neutral-500">
-              Current PIN
-            </p>
+            <p className="text-xs uppercase tracking-wider text-neutral-500">Current PIN</p>
             <p className="mt-1 font-mono text-2xl font-semibold text-neutral-900">
               {pin ?? "— not set —"}
             </p>
@@ -115,9 +107,7 @@ export default function DemoAccessPanel({
           </div>
         ) : null}
 
-        {error ? (
-          <p className="text-xs text-rose-600">{error}</p>
-        ) : null}
+        {error ? <p className="text-xs text-rose-600">{error}</p> : null}
       </div>
     </section>
   );

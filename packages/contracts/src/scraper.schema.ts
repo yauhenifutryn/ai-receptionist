@@ -31,9 +31,7 @@ const PolishLikeMoneySchema = z
     display: z.string().optional(),
     min: z.number().optional(),
     max: z.number().optional(),
-    qualifier: z
-      .enum(["exact", "from", "to", "range", "starting", "unknown"])
-      .optional(),
+    qualifier: z.enum(["exact", "from", "to", "range", "starting", "unknown"]).optional(),
     variant: z.string().optional(),
   })
   .strict();

@@ -41,9 +41,7 @@ function asciize(s: string): string {
 
 export function formatConfirmationSms(input: FormatConfirmationInput): string {
   const locale = { pl: "pl-PL", en: "en-GB", ru: "ru-RU" }[input.language];
-  const dayName = new Intl.DateTimeFormat(locale, { weekday: "long" }).format(
-    input.startsAt,
-  );
+  const dayName = new Intl.DateTimeFormat(locale, { weekday: "long" }).format(input.startsAt);
   const dayMonth = new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "long",
@@ -96,8 +94,7 @@ export async function sendBookingConfirmation(
     return { ok: true, messageId: r.messageId };
   } catch (e) {
     const code = e instanceof SmsSendError ? e.code : "internal_error";
-    const message =
-      e instanceof SmsSendError ? e.providerMessage : (e as Error).message;
+    const message = e instanceof SmsSendError ? e.providerMessage : (e as Error).message;
     await input.logger.logFailure({
       tenantId: input.tenantId,
       bookingId: input.bookingId,

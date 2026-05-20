@@ -23,9 +23,7 @@ export function encodeSlot(slot: DecodedSlot): string {
 export function decodeSlot(slotId: string): DecodedSlot | null {
   if (!slotId.startsWith(PREFIX)) return null;
   try {
-    const raw = Buffer.from(slotId.slice(PREFIX.length), "base64url").toString(
-      "utf-8",
-    );
+    const raw = Buffer.from(slotId.slice(PREFIX.length), "base64url").toString("utf-8");
     const parsed = JSON.parse(raw) as Partial<DecodedSlot>;
     if (
       typeof parsed.startsAt !== "string" ||

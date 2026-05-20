@@ -46,11 +46,7 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
  * privacy settings) is operator-locked in elevenlabs-convai.ts and not
  * exposed here.
  */
-export default function AgentSettingsPanel({
-  providerAgentId,
-}: {
-  providerAgentId: string;
-}) {
+export default function AgentSettingsPanel({ providerAgentId }: { providerAgentId: string }) {
   const [expanded, setExpanded] = useState(false);
   const [config, setConfig] = useState<AgentConfig | null>(null);
   const [voices, setVoices] = useState<Voice[]>([]);
@@ -101,8 +97,8 @@ export default function AgentSettingsPanel({
               Agent settings
             </div>
             <div className="mt-1 text-sm text-neutral-600">
-              Edit system prompt, voice, and knowledge base. Changes apply
-              immediately on the next call.
+              Edit system prompt, voice, and knowledge base. Changes apply immediately on the next
+              call.
             </div>
           </div>
           <button
@@ -145,17 +141,11 @@ export default function AgentSettingsPanel({
             initial={config.systemPrompt}
             initialFirstMessage={config.firstMessage}
           />
-          <VoiceEditor
-            providerAgentId={providerAgentId}
-            voices={voices}
-            initial={config.voiceId}
-          />
+          <VoiceEditor providerAgentId={providerAgentId} voices={voices} initial={config.voiceId} />
           <KnowledgeEditor
             providerAgentId={providerAgentId}
             initial={knowledge?.markdown ?? ""}
-            initialName={
-              knowledge?.documentName ?? `${config.providerAgentId} — knowledge`
-            }
+            initialName={knowledge?.documentName ?? `${config.providerAgentId} — knowledge`}
           />
         </div>
       ) : null}
@@ -177,8 +167,7 @@ function SystemPromptEditor({
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const dirty =
-    systemPrompt !== initial || firstMessage !== initialFirstMessage;
+  const dirty = systemPrompt !== initial || firstMessage !== initialFirstMessage;
 
   async function save() {
     setStatus("saving");
@@ -187,14 +176,11 @@ function SystemPromptEditor({
       const body: Record<string, string> = {};
       if (systemPrompt !== initial) body.systemPrompt = systemPrompt;
       if (firstMessage !== initialFirstMessage) body.firstMessage = firstMessage;
-      const res = await fetch(
-        `/api/agents/${encodeURIComponent(providerAgentId)}/config`,
-        {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
+      const res = await fetch(`/api/agents/${encodeURIComponent(providerAgentId)}/config`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(
@@ -265,14 +251,11 @@ function VoiceEditor({
     setStatus("saving");
     setErrorMsg(null);
     try {
-      const res = await fetch(
-        `/api/agents/${encodeURIComponent(providerAgentId)}/config`,
-        {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ voiceId }),
-        },
-      );
+      const res = await fetch(`/api/agents/${encodeURIComponent(providerAgentId)}/config`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ voiceId }),
+      });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(
@@ -333,26 +316,19 @@ function VoiceEditor({
             </div>
           ) : (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              This voice will speak Polish via the multilingual TTS model,
-              but its native accent is {currentVoice.accent ?? "non-Polish"}.
-              May sound foreign-accented to callers. Listen below before
-              committing.
+              This voice will speak Polish via the multilingual TTS model, but its native accent is{" "}
+              {currentVoice.accent ?? "non-Polish"}. May sound foreign-accented to callers. Listen
+              below before committing.
             </div>
           )}
           {currentVoice.previewUrl ? (
             <div>
-              <audio
-                controls
-                preload="none"
-                src={currentVoice.previewUrl}
-                className="w-full"
-              >
+              <audio controls preload="none" src={currentVoice.previewUrl} className="w-full">
                 Your browser doesn&apos;t support audio playback.
               </audio>
               <p className="mt-1 text-xs text-neutral-500">
-                Preview from ElevenLabs. Note: the sample may be in English
-                even though the voice can speak Polish via our multilingual
-                TTS model.
+                Preview from ElevenLabs. Note: the sample may be in English even though the voice
+                can speak Polish via our multilingual TTS model.
               </p>
             </div>
           ) : null}
@@ -381,17 +357,14 @@ function KnowledgeEditor({
     setStatus("saving");
     setErrorMsg(null);
     try {
-      const res = await fetch(
-        `/api/agents/${encodeURIComponent(providerAgentId)}/knowledge`,
-        {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            markdown,
-            documentName: initialName || "knowledge",
-          }),
-        },
-      );
+      const res = await fetch(`/api/agents/${encodeURIComponent(providerAgentId)}/knowledge`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          markdown,
+          documentName: initialName || "knowledge",
+        }),
+      });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(
@@ -456,9 +429,7 @@ function SubSection({
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-sm font-semibold text-neutral-900">{title}</h3>
         <div className="flex items-center gap-3">
-          {status === "saved" ? (
-            <span className="text-xs text-emerald-700">Saved</span>
-          ) : null}
+          {status === "saved" ? <span className="text-xs text-emerald-700">Saved</span> : null}
           <button
             type="button"
             onClick={onSave}
@@ -480,15 +451,7 @@ function SubSection({
   );
 }
 
-function Field({
-  id,
-  label,
-  children,
-}: {
-  id: string;
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-xs font-medium text-neutral-700">

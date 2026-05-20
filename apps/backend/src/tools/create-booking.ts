@@ -39,10 +39,7 @@ export type CreateBookingOutcome =
   | { ok: true; response: CreateBookingResponse }
   | { ok: false; error: ServerToolError; status: number };
 
-function buildConfirmation(
-  startsAtIso: string,
-  language: "pl" | "en" | "ru",
-): string {
+function buildConfirmation(startsAtIso: string, language: "pl" | "en" | "ru"): string {
   const date = new Date(startsAtIso);
   const fmt: Record<string, string> = {
     pl: "pl-PL",
@@ -78,8 +75,7 @@ export async function handleCreateBooking(
       status: 400,
       error: {
         code: "validation_failed",
-        callerSafeMessage:
-          "Nie udało mi się zarejestrować wizyty. Łączę z kimś z zespołu.",
+        callerSafeMessage: "Nie udało mi się zarejestrować wizyty. Łączę z kimś z zespołu.",
       },
     };
   }
@@ -93,8 +89,7 @@ export async function handleCreateBooking(
       error: {
         requestId: req.requestId,
         code: "tenant_not_found",
-        callerSafeMessage:
-          "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
+        callerSafeMessage: "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
       },
     };
   }
@@ -131,8 +126,7 @@ export async function handleCreateBooking(
       error: {
         requestId: req.requestId,
         code: "slot_no_longer_available",
-        callerSafeMessage:
-          "Ten termin właśnie się zajął. Mam też kilka innych propozycji.",
+        callerSafeMessage: "Ten termin właśnie się zajął. Mam też kilka innych propozycji.",
       },
     };
   }

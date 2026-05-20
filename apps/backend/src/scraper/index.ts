@@ -41,12 +41,12 @@ export interface ScrapeAndConsolidateArgs {
   concurrency?: number;
 }
 
-export async function scrapeAndConsolidate(
-  args: ScrapeAndConsolidateArgs,
-): Promise<ScraperOutput> {
+export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Promise<ScraperOutput> {
   const links = await args.firecrawl.map(args.url);
-  const candidates = [args.url, ...links.filter((l) => l !== args.url)]
-    .slice(0, args.maxPages ?? DEFAULT_MAX_PAGES);
+  const candidates = [args.url, ...links.filter((l) => l !== args.url)].slice(
+    0,
+    args.maxPages ?? DEFAULT_MAX_PAGES,
+  );
 
   const pages = await runWithConcurrency(
     candidates,

@@ -69,9 +69,7 @@ describe("handleCheckAvailability (W2.3, CalendarProvider DI)", () => {
   });
 
   it("throws when request body is invalid", async () => {
-    await expect(
-      handleCheckAvailability({ wrong: "shape" }, deps),
-    ).rejects.toThrow();
+    await expect(handleCheckAvailability({ wrong: "shape" }, deps)).rejects.toThrow();
   });
 
   it("duration is category-dependent (complex_service longer than information_only)", async () => {
@@ -94,11 +92,9 @@ describe("handleCheckAvailability (W2.3, CalendarProvider DI)", () => {
       deps,
     );
     const complexDur =
-      new Date(complex.slots[0]!.endsAt).getTime() -
-      new Date(complex.slots[0]!.startsAt).getTime();
+      new Date(complex.slots[0]!.endsAt).getTime() - new Date(complex.slots[0]!.startsAt).getTime();
     const infoDur =
-      new Date(info.slots[0]!.endsAt).getTime() -
-      new Date(info.slots[0]!.startsAt).getTime();
+      new Date(info.slots[0]!.endsAt).getTime() - new Date(info.slots[0]!.startsAt).getTime();
     expect(complexDur).toBeGreaterThan(infoDur);
   });
 });

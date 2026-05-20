@@ -132,9 +132,7 @@ export default function ProvisionPage() {
       if (raw) {
         const parsed = JSON.parse(raw) as DraftState;
         const step: Step =
-          parsed.step === "review" || parsed.step === "input"
-            ? parsed.step
-            : "input";
+          parsed.step === "review" || parsed.step === "input" ? parsed.step : "input";
         setDraft({ ...EMPTY_DRAFT, ...parsed, step });
         setRestoredFromDraft(true);
       }
@@ -206,10 +204,7 @@ export default function ProvisionPage() {
     prepareAbortRef.current?.abort();
   }
 
-  async function handlePrepare(
-    e: React.FormEvent | null,
-    opts: { resumeSlug?: string } = {},
-  ) {
+  async function handlePrepare(e: React.FormEvent | null, opts: { resumeSlug?: string } = {}) {
     if (e) e.preventDefault();
     setError(null);
     setProgress([]);
@@ -226,9 +221,7 @@ export default function ProvisionPage() {
     // opts.resumeSlug). Mismatch URL = fresh scrape.
     const effectiveResumeSlug =
       opts.resumeSlug ??
-      (resumableSlug && resumableUrl && resumableUrl === draft.url
-        ? resumableSlug
-        : undefined);
+      (resumableSlug && resumableUrl && resumableUrl === draft.url ? resumableSlug : undefined);
 
     try {
       const body: Record<string, unknown> = { url: draft.url };
@@ -279,10 +272,7 @@ export default function ProvisionPage() {
                   url: draft.url,
                   ts: Date.now(),
                 };
-                window.localStorage.setItem(
-                  STORAGE_KEYS.resumableSession,
-                  JSON.stringify(payload),
-                );
+                window.localStorage.setItem(STORAGE_KEYS.resumableSession, JSON.stringify(payload));
               } catch {
                 // localStorage quota / disabled — UI-only fallback is fine
               }
@@ -423,12 +413,8 @@ export default function ProvisionPage() {
           draft={draft}
           submitting={draft.step === "provisioning"}
           onChangeTenantName={(tenantName) => setDraft((d) => ({ ...d, tenantName }))}
-          onChangeKnowledge={(knowledgeMarkdown) =>
-            setDraft((d) => ({ ...d, knowledgeMarkdown }))
-          }
-          onChangeSystemPrompt={(systemPrompt) =>
-            setDraft((d) => ({ ...d, systemPrompt }))
-          }
+          onChangeKnowledge={(knowledgeMarkdown) => setDraft((d) => ({ ...d, knowledgeMarkdown }))}
+          onChangeSystemPrompt={(systemPrompt) => setDraft((d) => ({ ...d, systemPrompt }))}
           onBack={() => setDraft((d) => ({ ...d, step: "input" }))}
           onProvision={handleProvision}
           error={error}
@@ -529,7 +515,19 @@ function InputCard(props: {
   onResume: () => void;
   onCancel: () => void;
 }) {
-  const { url, submitting, restoredFromDraft, onChangeUrl, onSubmit, onClearDraft, error, progress, resumableSlug, onResume, onCancel } = props;
+  const {
+    url,
+    submitting,
+    restoredFromDraft,
+    onChangeUrl,
+    onSubmit,
+    onClearDraft,
+    error,
+    progress,
+    resumableSlug,
+    onResume,
+    onCancel,
+  } = props;
   return (
     <form
       onSubmit={onSubmit}
@@ -574,7 +572,8 @@ function InputCard(props: {
       {resumableSlug && !submitting ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
           <span>
-            Cached scrape from last run available — skip Firecrawl + rerank and re-run just consolidation.
+            Cached scrape from last run available — skip Firecrawl + rerank and re-run just
+            consolidation.
           </span>
           <button
             type="button"
@@ -635,7 +634,9 @@ function ProgressPanel({ progress }: { progress: ProgressLine[] }) {
           {progress.map((line, i) => (
             <div key={i} className="flex items-baseline gap-2">
               <span className="shrink-0 text-neutral-400">{formatClock(line.timestamp)}</span>
-              <span className="shrink-0 uppercase tracking-wider text-neutral-400">[{line.phase}]</span>
+              <span className="shrink-0 uppercase tracking-wider text-neutral-400">
+                [{line.phase}]
+              </span>
               <span className="text-neutral-700">{line.message}</span>
             </div>
           ))}
@@ -661,7 +662,16 @@ function ReviewCard(props: {
   onProvision: () => void;
   error: string | null;
 }) {
-  const { draft, submitting, onChangeTenantName, onChangeKnowledge, onChangeSystemPrompt, onBack, onProvision, error } = props;
+  const {
+    draft,
+    submitting,
+    onChangeTenantName,
+    onChangeKnowledge,
+    onChangeSystemPrompt,
+    onBack,
+    onProvision,
+    error,
+  } = props;
   const summary = draft.scraperSummary;
   return (
     <div className="flex flex-col gap-6">
@@ -681,7 +691,9 @@ function ReviewCard(props: {
             <Row label="FAQ entries" value={String(summary.faqCount)} />
             <Row
               label="Price honesty"
-              value={summary.hasUnknownPrices ? "Some unknown — agent will defer" : "All prices present"}
+              value={
+                summary.hasUnknownPrices ? "Some unknown — agent will defer" : "All prices present"
+              }
             />
           </dl>
           {summary.hasUnknownPrices ? (
@@ -766,7 +778,9 @@ function ReviewCard(props: {
           <button
             type="button"
             onClick={onProvision}
-            disabled={submitting || !draft.tenantName || !draft.knowledgeMarkdown || !draft.systemPrompt}
+            disabled={
+              submitting || !draft.tenantName || !draft.knowledgeMarkdown || !draft.systemPrompt
+            }
             className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Provisioning…" : "Provision agent"}
@@ -826,7 +840,8 @@ function CoverageBanner({ coverage }: { coverage: CoverageReport }) {
             Coverage 100% — agent has everything it needs to handle calls
           </div>
           <div className="text-xs text-emerald-700">
-            Phone, address, hours, and {coverage.details.servicesWithPrices} of {coverage.details.servicesCount} services with prices.
+            Phone, address, hours, and {coverage.details.servicesWithPrices} of{" "}
+            {coverage.details.servicesCount} services with prices.
           </div>
         </div>
       </section>
@@ -837,35 +852,71 @@ function CoverageBanner({ coverage }: { coverage: CoverageReport }) {
   const medium = coverage.warnings.filter((w) => w.severity === "medium");
   const tone = critical.length > 0 ? "rose" : high.length > 0 ? "amber" : "neutral";
   const palette = {
-    rose: { border: "border-rose-200", bg: "bg-rose-50", chip: "bg-rose-500", title: "text-rose-900", body: "text-rose-800" },
-    amber: { border: "border-amber-200", bg: "bg-amber-50", chip: "bg-amber-500", title: "text-amber-900", body: "text-amber-800" },
-    neutral: { border: "border-neutral-200", bg: "bg-neutral-50", chip: "bg-neutral-500", title: "text-neutral-900", body: "text-neutral-700" },
+    rose: {
+      border: "border-rose-200",
+      bg: "bg-rose-50",
+      chip: "bg-rose-500",
+      title: "text-rose-900",
+      body: "text-rose-800",
+    },
+    amber: {
+      border: "border-amber-200",
+      bg: "bg-amber-50",
+      chip: "bg-amber-500",
+      title: "text-amber-900",
+      body: "text-amber-800",
+    },
+    neutral: {
+      border: "border-neutral-200",
+      bg: "bg-neutral-50",
+      chip: "bg-neutral-500",
+      title: "text-neutral-900",
+      body: "text-neutral-700",
+    },
   }[tone];
   return (
-    <section className={`flex flex-col gap-3 rounded-2xl border ${palette.border} ${palette.bg} p-4`}>
+    <section
+      className={`flex flex-col gap-3 rounded-2xl border ${palette.border} ${palette.bg} p-4`}
+    >
       <div className="flex items-center gap-3">
-        <span className={`grid h-8 w-8 place-items-center rounded-full ${palette.chip} text-sm font-semibold text-white`}>
+        <span
+          className={`grid h-8 w-8 place-items-center rounded-full ${palette.chip} text-sm font-semibold text-white`}
+        >
           !
         </span>
         <div className="flex-1">
           <div className={`text-sm font-medium ${palette.title}`}>
-            Coverage {Math.round(coverage.score * 100)}% — {critical.length > 0 ? `${critical.length} critical · ` : ""}{high.length > 0 ? `${high.length} high · ` : ""}{medium.length > 0 ? `${medium.length} medium` : ""}
+            Coverage {Math.round(coverage.score * 100)}% —{" "}
+            {critical.length > 0 ? `${critical.length} critical · ` : ""}
+            {high.length > 0 ? `${high.length} high · ` : ""}
+            {medium.length > 0 ? `${medium.length} medium` : ""}
           </div>
           <div className={`text-xs ${palette.body}`}>
-            The scrape missed information the agent will need. Review below and either re-run with a fresh URL or add the missing details by editing the knowledge document.
+            The scrape missed information the agent will need. Review below and either re-run with a
+            fresh URL or add the missing details by editing the knowledge document.
           </div>
         </div>
       </div>
       <ul className="flex flex-col gap-2 pl-11">
         {coverage.warnings.map((w) => (
           <li key={w.code} className="text-xs">
-            <span className={`mr-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-              w.severity === "critical" ? "bg-rose-200 text-rose-900" :
-              w.severity === "high" ? "bg-amber-200 text-amber-900" :
-              "bg-neutral-200 text-neutral-700"
-            }`}>{w.severity}</span>
+            <span
+              className={`mr-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                w.severity === "critical"
+                  ? "bg-rose-200 text-rose-900"
+                  : w.severity === "high"
+                    ? "bg-amber-200 text-amber-900"
+                    : "bg-neutral-200 text-neutral-700"
+              }`}
+            >
+              {w.severity}
+            </span>
             <span className={palette.body}>{w.message}</span>
-            {w.suggestion ? <div className={`mt-0.5 pl-2 italic ${palette.body} opacity-80`}>→ {w.suggestion}</div> : null}
+            {w.suggestion ? (
+              <div className={`mt-0.5 pl-2 italic ${palette.body} opacity-80`}>
+                → {w.suggestion}
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>

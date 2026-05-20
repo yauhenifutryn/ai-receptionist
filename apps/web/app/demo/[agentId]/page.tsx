@@ -18,10 +18,7 @@ export const revalidate = 0;
  * No operator session required; the proxy.ts middleware whitelists /demo/*
  * (it's not in GATED_PREFIXES).
  */
-export default async function PublicDemoPage({
-  params,
-  searchParams,
-}: PageProps) {
+export default async function PublicDemoPage({ params, searchParams }: PageProps) {
   const { agentId } = await params;
   const { pin } = await searchParams;
 
@@ -48,21 +45,18 @@ export default async function PublicDemoPage({
   return (
     <main className="mx-auto max-w-md px-6 py-10 font-sans">
       <header className="mb-6 text-center">
-        <p className="text-sm uppercase tracking-wider text-neutral-500">
-          Demo
-        </p>
+        <p className="text-sm uppercase tracking-wider text-neutral-500">Demo</p>
         <h1 className="mt-2 text-2xl font-semibold">{clinicName}</h1>
         <p className="mt-3 text-sm text-neutral-600">
-          Kliknij niżej i porozmawiaj po polsku z asystentem AI.
-          Spróbuj umówić wizytę.
+          Kliknij niżej i porozmawiaj po polsku z asystentem AI. Spróbuj umówić wizytę.
         </p>
       </header>
       <div className="mb-6 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-600">
         <p className="font-semibold text-neutral-800">Wskazówka:</p>
         <p className="mt-1">
-          Asystent zapyta o Twój numer telefonu — podyktuj go, a po
-          zakończeniu rozmowy wyślemy Ci prawdziwe SMS-owe potwierdzenie.
-          Możesz też powiedzieć „bez SMS-a", żeby przetestować tylko głos.
+          Asystent zapyta o Twój numer telefonu — podyktuj go, a po zakończeniu rozmowy wyślemy Ci
+          prawdziwe SMS-owe potwierdzenie. Możesz też powiedzieć „bez SMS-a", żeby przetestować
+          tylko głos.
         </p>
       </div>
       <TestAgentClient agentId={agentId} />

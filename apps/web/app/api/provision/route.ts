@@ -57,13 +57,20 @@ export async function POST(req: NextRequest) {
     hasSystemPromptOverride: !!input.systemPrompt,
     knowledgeMarkdownLength: input.knowledgeMarkdown.length,
   });
-  await session?.write("07-provision-input.json", JSON.stringify({
-    tenantName: input.tenantName,
-    sourceUrl: input.sourceUrl,
-    ownerEmail: input.ownerEmail ?? null,
-    knowledgeMarkdownLength: input.knowledgeMarkdown.length,
-    systemPromptLength: input.systemPrompt?.length ?? null,
-  }, null, 2));
+  await session?.write(
+    "07-provision-input.json",
+    JSON.stringify(
+      {
+        tenantName: input.tenantName,
+        sourceUrl: input.sourceUrl,
+        ownerEmail: input.ownerEmail ?? null,
+        knowledgeMarkdownLength: input.knowledgeMarkdown.length,
+        systemPromptLength: input.systemPrompt?.length ?? null,
+      },
+      null,
+      2,
+    ),
+  );
   // Snapshot the EXACT reviewed-by-user prompt + KB that the wizard sent,
   // not just what /api/prepare initially generated.
   if (input.systemPrompt) {
@@ -74,10 +81,7 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     await session?.event("provision:error", { code: "elevenlabs_api_key_missing" });
-    return NextResponse.json(
-      { error: "elevenlabs_api_key_missing" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "elevenlabs_api_key_missing" }, { status: 500 });
   }
 
   // ElevenLabs cloud calls back to our webhooks (server tools + post-call).
@@ -284,9 +288,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(body, { status: 200 });
 }
 
-type BaseUrlResult =
-  | { ok: true; value: string }
-  | { ok: false; message: string };
+type BaseUrlResult = { ok: true; value: string } | { ok: false; message: string };
 
 /**
  * Pick the canonical public base URL ElevenLabs cloud should call back on:

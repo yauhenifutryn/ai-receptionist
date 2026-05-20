@@ -37,8 +37,7 @@ export function createToolsRouter(args: CreateToolsRouterArgs): Hono {
         return c.json(
           {
             code: "tenant_not_found",
-            callerSafeMessage:
-              "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
+            callerSafeMessage: "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
           },
           404,
         );
@@ -52,8 +51,7 @@ export function createToolsRouter(args: CreateToolsRouterArgs): Hono {
       return c.json(
         {
           code: "validation_failed",
-          callerSafeMessage:
-            "Nie mogę teraz sprawdzić wolnych terminów. Łączę z kimś z zespołu.",
+          callerSafeMessage: "Nie mogę teraz sprawdzić wolnych terminów. Łączę z kimś z zespołu.",
         },
         400,
       );
@@ -66,8 +64,7 @@ export function createToolsRouter(args: CreateToolsRouterArgs): Hono {
       return c.json(
         {
           code: "validation_failed",
-          callerSafeMessage:
-            "Nie udało mi się odczytać żądania. Łączę z zespołem.",
+          callerSafeMessage: "Nie udało mi się odczytać żądania. Łączę z zespołem.",
         },
         400,
       );
@@ -77,8 +74,7 @@ export function createToolsRouter(args: CreateToolsRouterArgs): Hono {
       return c.json(
         {
           code: "tenant_not_found",
-          callerSafeMessage:
-            "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
+          callerSafeMessage: "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
         },
         404,
       );

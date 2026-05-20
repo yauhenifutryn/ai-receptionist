@@ -7,10 +7,7 @@ export type LLMModel =
   | "gemini-2.5-flash"
   | "gemini-3.1-flash-lite";
 
-export const DEFAULT_PRO_FALLBACK_CHAIN: LLMModel[] = [
-  "gemini-2.5-pro",
-  "gemini-3-flash-preview",
-];
+export const DEFAULT_PRO_FALLBACK_CHAIN: LLMModel[] = ["gemini-2.5-pro", "gemini-3-flash-preview"];
 
 export interface GenerateJsonArgs {
   model: LLMModel;
@@ -62,7 +59,10 @@ export interface GenerateStructuredResult<Schema extends z.ZodTypeAny> {
 
 export class LLMClientError extends Error {
   override readonly name = "LLMClientError";
-  constructor(message: string, override readonly cause?: unknown) {
+  constructor(
+    message: string,
+    override readonly cause?: unknown,
+  ) {
     super(message);
   }
 }
@@ -72,8 +72,7 @@ export interface LLMClientOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-const defaultSleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export class LLMClient {
   private readonly maxRetries: number;
@@ -105,15 +104,9 @@ export class LLMClient {
             user: req.user,
             ...(req.jsonSchema !== undefined ? { jsonSchema: req.jsonSchema } : {}),
             ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-            ...(req.maxOutputTokens !== undefined
-              ? { maxOutputTokens: req.maxOutputTokens }
-              : {}),
-            ...(req.thinkingBudget !== undefined
-              ? { thinkingBudget: req.thinkingBudget }
-              : {}),
-            ...(req.abortSignal !== undefined
-              ? { abortSignal: req.abortSignal }
-              : {}),
+            ...(req.maxOutputTokens !== undefined ? { maxOutputTokens: req.maxOutputTokens } : {}),
+            ...(req.thinkingBudget !== undefined ? { thinkingBudget: req.thinkingBudget } : {}),
+            ...(req.abortSignal !== undefined ? { abortSignal: req.abortSignal } : {}),
           });
           const parsedJson = safeJsonParse(text);
           if (parsedJson.ok) {
@@ -142,9 +135,7 @@ export class LLMClient {
               `[LLMClient] attempt ${attempts} model=${model} retry=${retry} JSON_PARSE_FAIL ` +
                 `outputChars=${text.length} dumpedTo=${dumpPath} :: ${parsedJson.error.slice(0, 300)}`,
             );
-            console.warn(
-              `[LLMClient]   last 200 chars: ${JSON.stringify(text.slice(-200))}`,
-            );
+            console.warn(`[LLMClient]   last 200 chars: ${JSON.stringify(text.slice(-200))}`);
           }
         } catch (e) {
           lastError = e;
@@ -157,8 +148,7 @@ export class LLMClient {
       }
     }
 
-    const causeMsg =
-      lastError instanceof Error ? lastError.message : String(lastError);
+    const causeMsg = lastError instanceof Error ? lastError.message : String(lastError);
     throw new LLMClientError(
       `All ${models.length} model(s) [${models.join(", ")}] exhausted after ${attempts} attempt(s). Last error: ${causeMsg}`,
       lastError,

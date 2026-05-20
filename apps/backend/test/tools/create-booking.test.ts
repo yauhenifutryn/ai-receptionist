@@ -59,16 +59,16 @@ const baseRequest = {
 
 describe("handleCreateBooking (W2.3, CalendarProvider DI)", () => {
   it("happy path writes a booking with external_id + short_token, returns smsShortUrl", async () => {
-    const insertSpy = vi
-      .fn()
-      .mockImplementation(async (args: InsertBookingArgs): Promise<BookingRow> => ({
+    const insertSpy = vi.fn().mockImplementation(
+      async (args: InsertBookingArgs): Promise<BookingRow> => ({
         id: "booking-9",
         tenantId: args.tenantId,
         requestId: args.requestId,
         shortToken: args.shortToken,
         startsAt: args.startsAt,
         endsAt: args.endsAt,
-      }));
+      }),
+    );
     const repo = buildRepo({ insertBooking: insertSpy });
     const out = await handleCreateBooking(baseRequest, {
       provider,
@@ -78,9 +78,7 @@ describe("handleCreateBooking (W2.3, CalendarProvider DI)", () => {
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.response.bookingId).toBe("booking-9");
-    expect(out.response.smsShortUrl).toMatch(
-      /^https:\/\/app\.example\.com\/b\/[A-Za-z0-9]{8}$/,
-    );
+    expect(out.response.smsShortUrl).toMatch(/^https:\/\/app\.example\.com\/b\/[A-Za-z0-9]{8}$/);
     expect(out.response.confirmationLine).toMatch(/Potwierdzam/);
     expect(insertSpy).toHaveBeenCalledOnce();
     const insertedArgs = insertSpy.mock.calls[0]![0] as InsertBookingArgs;
@@ -203,16 +201,16 @@ describe("handleCreateBooking (W2.3, CalendarProvider DI)", () => {
   });
 
   it("conversationId from the envelope is preferred over the requestId fallback", async () => {
-    const insertSpy = vi
-      .fn()
-      .mockImplementation(async (args: InsertBookingArgs): Promise<BookingRow> => ({
+    const insertSpy = vi.fn().mockImplementation(
+      async (args: InsertBookingArgs): Promise<BookingRow> => ({
         id: "booking-11",
         tenantId: args.tenantId,
         requestId: args.requestId,
         shortToken: args.shortToken,
         startsAt: args.startsAt,
         endsAt: args.endsAt,
-      }));
+      }),
+    );
     const repo = buildRepo({ insertBooking: insertSpy });
     await handleCreateBooking(baseRequest, {
       provider,
@@ -220,8 +218,6 @@ describe("handleCreateBooking (W2.3, CalendarProvider DI)", () => {
       smsShortUrlBase: "https://app.example.com",
       conversationId: "conv-xyz",
     });
-    expect((insertSpy.mock.calls[0]![0] as InsertBookingArgs).conversationId).toBe(
-      "conv-xyz",
-    );
+    expect((insertSpy.mock.calls[0]![0] as InsertBookingArgs).conversationId).toBe("conv-xyz");
   });
 });

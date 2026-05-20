@@ -76,9 +76,7 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
     return { documentId };
   }
 
-  async provisionAgent(
-    input: ProvisionAgentInput,
-  ): Promise<ProvisionAgentResult> {
+  async provisionAgent(input: ProvisionAgentInput): Promise<ProvisionAgentResult> {
     const voiceId = input.voiceId ?? this.defaultVoiceId;
     const language = input.defaultLanguage ?? "pl";
     const systemPrompt =
@@ -124,8 +122,7 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
                 {
                   type: "webhook",
                   name: "check_availability",
-                  description:
-                    "List up to 5 appointment slots for a service category.",
+                  description: "List up to 5 appointment slots for a service category.",
                   api_schema: {
                     url: `${input.serverToolBaseUrl}/tools/check-availability`,
                     method: "POST",
@@ -160,8 +157,7 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
                 {
                   type: "webhook",
                   name: "create_booking",
-                  description:
-                    "Create a booking after the caller confirms a slot.",
+                  description: "Create a booking after the caller confirms a slot.",
                   api_schema: {
                     url: `${input.serverToolBaseUrl}/tools/create-booking`,
                     method: "POST",
@@ -175,12 +171,7 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
                         serviceCategory: { type: "string" },
                         notes: { type: "string" },
                       },
-                      required: [
-                        "slotId",
-                        "patientName",
-                        "patientPhone",
-                        "serviceCategory",
-                      ],
+                      required: ["slotId", "patientName", "patientPhone", "serviceCategory"],
                     },
                   },
                 },

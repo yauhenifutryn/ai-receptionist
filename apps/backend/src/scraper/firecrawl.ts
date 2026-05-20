@@ -71,9 +71,7 @@ const ACCORDION_REVEAL_SCRIPT = `
 })();
 `.trim();
 
-export function createFirecrawlClient(
-  opts: CreateFirecrawlClientOptions = {},
-): FirecrawlClient {
+export function createFirecrawlClient(opts: CreateFirecrawlClientOptions = {}): FirecrawlClient {
   const apiKey = opts.apiKey ?? process.env.FIRECRAWL_API_KEY;
   if (!apiKey) {
     throw new Error("createFirecrawlClient: FIRECRAWL_API_KEY missing");
@@ -99,17 +97,14 @@ export function createFirecrawlClient(
 
   return {
     async map(url: string, opts: MapOptions = {}): Promise<string[]> {
-      const body = await post<{ success?: boolean; links?: string[] }>(
-        "/v1/map",
-        {
-          url,
-          ...(opts.search !== undefined ? { search: opts.search } : {}),
-          ...(opts.limit !== undefined ? { limit: opts.limit } : {}),
-          ...(opts.includeSubdomains !== undefined
-            ? { includeSubdomains: opts.includeSubdomains }
-            : {}),
-        },
-      );
+      const body = await post<{ success?: boolean; links?: string[] }>("/v1/map", {
+        url,
+        ...(opts.search !== undefined ? { search: opts.search } : {}),
+        ...(opts.limit !== undefined ? { limit: opts.limit } : {}),
+        ...(opts.includeSubdomains !== undefined
+          ? { includeSubdomains: opts.includeSubdomains }
+          : {}),
+      });
       return body.links ?? [];
     },
 

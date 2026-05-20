@@ -31,10 +31,7 @@ describe("scrapeAndConsolidate (W2.1 orchestrator)", () => {
     const firecrawl: FirecrawlClient = {
       async map(url: string) {
         expect(url).toBe("https://example-vet.pl");
-        return [
-          "https://example-vet.pl/cennik",
-          "https://example-vet.pl/zespol",
-        ];
+        return ["https://example-vet.pl/cennik", "https://example-vet.pl/zespol"];
       },
       async scrape(url: string) {
         scraped.push(url);

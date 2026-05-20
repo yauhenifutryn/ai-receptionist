@@ -26,8 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         code: "validation_failed",
-        callerSafeMessage:
-          "Nie mogę teraz sprawdzić wolnych terminów. Łączę z kimś z zespołu.",
+        callerSafeMessage: "Nie mogę teraz sprawdzić wolnych terminów. Łączę z kimś z zespołu.",
       },
       { status: 400 },
     );
@@ -38,8 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         code: "tenant_not_found",
-        callerSafeMessage:
-          "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
+        callerSafeMessage: "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
       },
       { status: 404 },
     );
@@ -54,8 +52,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         code: "validation_failed",
-        callerSafeMessage:
-          "Nie mogę teraz sprawdzić wolnych terminów. Łączę z kimś z zespołu.",
+        callerSafeMessage: "Nie mogę teraz sprawdzić wolnych terminów. Łączę z kimś z zespołu.",
       },
       { status: 400 },
     );

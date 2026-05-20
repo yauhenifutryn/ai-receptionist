@@ -77,10 +77,7 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     // check_availability + create_booking, both webhook-typed.
     const tools = prompt.tools as Array<{ name: string; type: string }>;
     expect(tools).toHaveLength(2);
-    expect(tools.map((t) => t.name).sort()).toEqual([
-      "check_availability",
-      "create_booking",
-    ]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["check_availability", "create_booking"]);
     expect(tools.every((t) => t.type === "webhook")).toBe(true);
 
     // ElevenLabs ConvAI knowledge_base entry shape is
@@ -140,9 +137,7 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
       conversation_config: {
         agent: {
           prompt: {
-            knowledge_base: [
-              { type: "text", id: "doc-9", name: "doc-9", usage_mode: "auto" },
-            ],
+            knowledge_base: [{ type: "text", id: "doc-9", name: "doc-9", usage_mode: "auto" }],
           },
         },
       },

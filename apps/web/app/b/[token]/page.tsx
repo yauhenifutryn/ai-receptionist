@@ -30,9 +30,7 @@ export default async function ConfirmationPage({ params }: Params) {
   return (
     <main className="mx-auto max-w-md px-6 py-10 font-sans">
       <header className="mb-8 text-center">
-        <p className="text-sm uppercase tracking-wider text-neutral-500">
-          Potwierdzenie wizyty
-        </p>
+        <p className="text-sm uppercase tracking-wider text-neutral-500">Potwierdzenie wizyty</p>
         <h1 className="mt-2 text-2xl font-semibold">{clinicName}</h1>
       </header>
       <section className="mb-8 rounded-2xl border border-neutral-200 p-6 text-center">

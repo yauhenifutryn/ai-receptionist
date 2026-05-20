@@ -12,10 +12,7 @@ export type {
   BookingRow,
 } from "./repository.js";
 export { createSupabaseBookingsRepository } from "./supabase-repository.js";
-export {
-  formatConfirmationSms,
-  sendBookingConfirmation,
-} from "./sms-confirmation.js";
+export { formatConfirmationSms, sendBookingConfirmation } from "./sms-confirmation.js";
 export type {
   SmsFailureLogger,
   SmsFailureLogInput,

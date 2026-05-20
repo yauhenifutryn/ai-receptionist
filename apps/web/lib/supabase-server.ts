@@ -26,9 +26,7 @@ export function getServiceRoleSupabase(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
-    throw new Error(
-      "Supabase env missing: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
-    );
+    throw new Error("Supabase env missing: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   }
   cachedServiceRole = createClient(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -93,7 +91,9 @@ export interface OperatorContext {
  *
  * The redirect throw is intentional — callers should not catch it.
  */
-export async function requireOperator(opts: { redirectPath?: string } = {}): Promise<OperatorContext> {
+export async function requireOperator(
+  opts: { redirectPath?: string } = {},
+): Promise<OperatorContext> {
   const supabase = await getUserSupabase();
   const { data: userResult } = await supabase.auth.getUser();
   const user = userResult.user;

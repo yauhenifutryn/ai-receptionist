@@ -40,9 +40,7 @@ export async function verifyElevenLabsWebhook(
 ): Promise<VerifyResult> {
   const rawBody = await req.text();
   const secret =
-    opts.secret !== undefined
-      ? opts.secret
-      : process.env.ELEVENLABS_WEBHOOK_SECRET ?? null;
+    opts.secret !== undefined ? opts.secret : (process.env.ELEVENLABS_WEBHOOK_SECRET ?? null);
   const nodeEnv = opts.nodeEnv ?? process.env.NODE_ENV ?? "development";
   const now = opts.now ?? Date.now;
   const header = req.headers.get(SIGNATURE_HEADER);

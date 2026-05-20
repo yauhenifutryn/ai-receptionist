@@ -13,14 +13,13 @@ export default function HomePage() {
           A Polish-speaking receptionist that never sleeps.
         </h1>
         <p className="max-w-2xl text-lg leading-relaxed text-neutral-600">
-          Internal tool for the AI Receptionist sales team. Provision Polish
-          voice agents for Warsaw-area dental clinics, assign phone numbers,
-          and ship a live demo to the prospect within minutes.
+          Internal tool for the AI Receptionist sales team. Provision Polish voice agents for
+          Warsaw-area dental clinics, assign phone numbers, and ship a live demo to the prospect
+          within minutes.
         </p>
         <p className="max-w-2xl text-sm leading-relaxed text-neutral-500">
-          Clinics never see this page. The wow effect for them is a single
-          phone number that already knows their services, prices, and doctors
-          — not a self-onboarding wizard.
+          Clinics never see this page. The wow effect for them is a single phone number that already
+          knows their services, prices, and doctors — not a self-onboarding wizard.
         </p>
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <Link

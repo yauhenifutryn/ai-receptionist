@@ -22,18 +22,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-neutral-50 font-sans text-neutral-900 antialiased">
         <header className="border-b border-neutral-200/80 bg-white/70 backdrop-blur">
           <nav className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-sm font-semibold tracking-tight"
-            >
+            <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
               <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
               AI Receptionist
             </Link>
             <div className="flex items-center gap-6 text-sm text-neutral-600">
-              <Link
-                href={"/dashboard" as Route}
-                className="transition hover:text-neutral-900"
-              >
+              <Link href={"/dashboard" as Route} className="transition hover:text-neutral-900">
                 Dashboard
               </Link>
             </div>

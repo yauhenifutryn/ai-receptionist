@@ -16,19 +16,13 @@ interface Props {
  *
  * Designed for inline use inside a table row — compact, no modal.
  */
-export default function AgentDemoActions({
-  providerAgentId,
-  initialPin,
-  origin,
-}: Props) {
+export default function AgentDemoActions({ providerAgentId, initialPin, origin }: Props) {
   const [pin, setPin] = useState<string | null>(initialPin);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const demoUrl = pin
-    ? `${origin}/demo/${providerAgentId}?pin=${pin}`
-    : null;
+  const demoUrl = pin ? `${origin}/demo/${providerAgentId}?pin=${pin}` : null;
 
   async function generate() {
     setGenerating(true);
@@ -65,9 +59,7 @@ export default function AgentDemoActions({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        <span className="font-mono text-xs text-neutral-600">
-          {pin ? `PIN ${pin}` : "no PIN"}
-        </span>
+        <span className="font-mono text-xs text-neutral-600">{pin ? `PIN ${pin}` : "no PIN"}</span>
         <button
           onClick={generate}
           disabled={generating}

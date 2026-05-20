@@ -1,8 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  getOperatorOrJsonError,
-  getServiceRoleSupabase,
-} from "@/lib/supabase-server";
+import { getOperatorOrJsonError, getServiceRoleSupabase } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,10 +33,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     .eq("provider_agent_id", providerAgentId)
     .maybeSingle();
   if (error) {
-    return NextResponse.json(
-      { error: "lookup_failed", message: error.message },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "lookup_failed", message: error.message }, { status: 500 });
   }
   if (!data) {
     return NextResponse.json({ error: "agent_not_found" }, { status: 404 });
@@ -80,8 +74,5 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "agent_not_found" }, { status: 404 });
     }
   }
-  return NextResponse.json(
-    { error: "pin_collision_exhausted" },
-    { status: 500 },
-  );
+  return NextResponse.json({ error: "pin_collision_exhausted" }, { status: 500 });
 }

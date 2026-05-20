@@ -18,13 +18,10 @@ import { getServiceRoleSupabase } from "@/lib/supabase-server";
 const ENABLED = process.env.TWILIO_INBOUND_ENABLED === "1";
 
 function xml(body: string): NextResponse {
-  return new NextResponse(
-    `<?xml version="1.0" encoding="UTF-8"?><Response>${body}</Response>`,
-    {
-      status: 200,
-      headers: { "content-type": "text/xml; charset=utf-8" },
-    },
-  );
+  return new NextResponse(`<?xml version="1.0" encoding="UTF-8"?><Response>${body}</Response>`, {
+    status: 200,
+    headers: { "content-type": "text/xml; charset=utf-8" },
+  });
 }
 
 export const runtime = "nodejs";
@@ -57,15 +54,11 @@ export async function POST(req: Request) {
     .eq("pin_code", digits)
     .maybeSingle();
   if (error || !data) {
-    return xml(
-      `<Say language="pl-PL">Nie znaleziono kliniki dla tego kodu.</Say><Hangup/>`,
-    );
+    return xml(`<Say language="pl-PL">Nie znaleziono kliniki dla tego kodu.</Say><Hangup/>`);
   }
   // Step 3: SIP-dial the EL agent.
   // Endpoint format per ElevenLabs docs: sip:<provider_agent_id>@sip.elevenlabs.io
   // Verify exact format on first real wiring.
   const sipUri = `sip:${data.provider_agent_id}@sip.elevenlabs.io`;
-  return xml(
-    `<Dial answerOnBridge="true"><Sip>${sipUri}</Sip></Dial>`,
-  );
+  return xml(`<Dial answerOnBridge="true"><Sip>${sipUri}</Sip></Dial>`);
 }

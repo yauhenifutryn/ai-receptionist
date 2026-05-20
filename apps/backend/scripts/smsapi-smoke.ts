@@ -22,16 +22,13 @@ if (!TOKEN) {
   process.exit(1);
 }
 if (!TO || !/^\+\d{8,15}$/.test(TO)) {
-  console.error(
-    "Usage: smoke:sms <E.164 phone>  e.g.  pnpm -F backend smoke:sms +48501234567",
-  );
+  console.error("Usage: smoke:sms <E.164 phone>  e.g.  pnpm -F backend smoke:sms +48501234567");
   process.exit(1);
 }
 
 const body = new URLSearchParams({
   to: TO,
-  message:
-    "Test SMSAPI: zażółć gęślą jaźń. Asystent AI Receptionist – probe.",
+  message: "Test SMSAPI: zażółć gęślą jaźń. Asystent AI Receptionist – probe.",
   from: "Asystent",
   encoding: "utf-8",
   format: "json",

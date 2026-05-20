@@ -13,10 +13,7 @@ import type { FirecrawlPage } from "./firecrawl.js";
 
 const MARKDOWN_LINK_RE = /\[(?:[^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
 
-export function extractInternalLinks(
-  pages: FirecrawlPage[],
-  rootUrl: string,
-): string[] {
+export function extractInternalLinks(pages: FirecrawlPage[], rootUrl: string): string[] {
   let rootHost: string;
   try {
     rootHost = new URL(rootUrl).hostname;

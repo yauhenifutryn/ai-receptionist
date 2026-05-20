@@ -77,9 +77,8 @@ export default async function DashboardPage() {
           </div>
         </div>
         <p className="max-w-2xl text-sm text-neutral-600">
-          Every agent provisioned by you, Sebastian, or Rem. Click an agent to
-          test it in the browser or assign a Polish phone number. Clients never
-          see this page.
+          Every agent provisioned by you, Sebastian, or Rem. Click an agent to test it in the
+          browser or assign a Polish phone number. Clients never see this page.
         </p>
       </header>
 
@@ -210,13 +209,10 @@ export default async function DashboardPage() {
 function EmptyState() {
   return (
     <section className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-neutral-300 bg-white px-6 py-16 text-center">
-      <div className="text-base font-medium text-neutral-800">
-        No agents yet.
-      </div>
+      <div className="text-base font-medium text-neutral-800">No agents yet.</div>
       <p className="max-w-md text-sm text-neutral-500">
-        Provision your first agent: paste a clinic URL, Firecrawl + Gemini
-        build the knowledge base, ElevenLabs spins up the Polish voice agent.
-        About 5 minutes.
+        Provision your first agent: paste a clinic URL, Firecrawl + Gemini build the knowledge base,
+        ElevenLabs spins up the Polish voice agent. About 5 minutes.
       </p>
       <Link
         href={"/provision" as Route}

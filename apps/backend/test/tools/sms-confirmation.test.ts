@@ -41,9 +41,7 @@ describe("formatConfirmationSms", () => {
       contactPhone: null,
       language: "pl",
     });
-    expect(body).toMatch(
-      /sobota|niedziela|poniedzialek|wtorek|sroda|czwartek|piatek/i,
-    );
+    expect(body).toMatch(/sobota|niedziela|poniedzialek|wtorek|sroda|czwartek|piatek/i);
   });
 
   it("ASCII-only output (no Polish accents)", () => {

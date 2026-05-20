@@ -27,13 +27,7 @@ function buildClient(table: Record<string, Canned>) {
 
 describe("consent classifier (W2.5)", () => {
   const polishYes = ["tak", "tak zgadzam się", "oczywiście", "okej", "dobrze"];
-  const polishNo = [
-    "nie",
-    "nie zgadzam się",
-    "wolałbym nie",
-    "nie chcę",
-    "proszę nie nagrywać",
-  ];
+  const polishNo = ["nie", "nie zgadzam się", "wolałbym nie", "nie chcę", "proszę nie nagrywać"];
   const polishAmbiguous = ["nie wiem", "może później"];
 
   const table: Record<string, Canned> = {};

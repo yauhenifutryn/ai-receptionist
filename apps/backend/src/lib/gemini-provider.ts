@@ -5,14 +5,10 @@ export interface CreateGeminiProviderOptions {
   apiKey?: string;
 }
 
-export function createGeminiProvider(
-  opts: CreateGeminiProviderOptions = {},
-): LLMProvider {
+export function createGeminiProvider(opts: CreateGeminiProviderOptions = {}): LLMProvider {
   const apiKey = opts.apiKey ?? process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error(
-      "createGeminiProvider: GEMINI_API_KEY missing (pass via opts.apiKey or env)",
-    );
+    throw new Error("createGeminiProvider: GEMINI_API_KEY missing (pass via opts.apiKey or env)");
   }
   // 5-minute hard SDK timeout so a stalled response surfaces as a real
   // error instead of an indefinite hang. Healthy consolidate calls finish
@@ -37,19 +33,13 @@ export function createGeminiProvider(
         config: {
           ...(args.system !== undefined ? { systemInstruction: args.system } : {}),
           ...(args.temperature !== undefined ? { temperature: args.temperature } : {}),
-          ...(args.maxOutputTokens !== undefined
-            ? { maxOutputTokens: args.maxOutputTokens }
-            : {}),
+          ...(args.maxOutputTokens !== undefined ? { maxOutputTokens: args.maxOutputTokens } : {}),
           responseMimeType: "application/json",
-          ...(args.jsonSchema !== undefined
-            ? { responseSchema: args.jsonSchema as never }
-            : {}),
+          ...(args.jsonSchema !== undefined ? { responseSchema: args.jsonSchema as never } : {}),
           ...(args.thinkingBudget !== undefined
             ? { thinkingConfig: { thinkingBudget: args.thinkingBudget } }
             : {}),
-          ...(args.abortSignal !== undefined
-            ? { abortSignal: args.abortSignal }
-            : {}),
+          ...(args.abortSignal !== undefined ? { abortSignal: args.abortSignal } : {}),
         },
       });
       let text = "";

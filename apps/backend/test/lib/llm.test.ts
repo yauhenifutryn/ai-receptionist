@@ -48,11 +48,7 @@ describe("LLMClient (W2 foundation)", () => {
       schema: RESULT_SCHEMA,
     });
 
-    expect(calls).toEqual([
-      "gemini-3.1-pro-preview",
-      "gemini-2.5-pro",
-      "gemini-3-flash-preview",
-    ]);
+    expect(calls).toEqual(["gemini-3.1-pro-preview", "gemini-2.5-pro", "gemini-3-flash-preview"]);
     expect(result.modelUsed).toBe("gemini-3-flash-preview");
     expect(result.data.decision).toBe("no");
   });

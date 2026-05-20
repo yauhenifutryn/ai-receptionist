@@ -34,10 +34,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
   const { providerAgentId } = await params;
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "elevenlabs_api_key_missing" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "elevenlabs_api_key_missing" }, { status: 500 });
   }
 
   const res = await fetch(
@@ -111,10 +108,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
   }
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "elevenlabs_api_key_missing" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "elevenlabs_api_key_missing" }, { status: 500 });
   }
 
   // Build the partial PATCH body. We only send fields the caller wants

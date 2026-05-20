@@ -50,16 +50,12 @@ const params: Record<string, string> = {
 // Sort params alphabetically by key, build URL-encoded string.
 const sortedKeys = Object.keys(params).sort();
 const paramsStr = sortedKeys
-  .map(
-    (k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k]!)}`,
-  )
+  .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k]!)}`)
   .join("&");
 
 const md5Hash = createHash("md5").update(paramsStr).digest("hex");
 const signingString = METHOD_PATH + paramsStr + md5Hash;
-const signature = createHmac("sha1", SECRET_KEY)
-  .update(signingString)
-  .digest("base64");
+const signature = createHmac("sha1", SECRET_KEY).update(signingString).digest("base64");
 
 const start = Date.now();
 const res = await fetch(`https://api.zadarma.com${METHOD_PATH}`, {

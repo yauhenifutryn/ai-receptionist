@@ -11,9 +11,7 @@ import type {
  * because tool webhooks operate outside the user session. Per CLAUDE.md: never
  * log PII; use the redacting logger on every error path.
  */
-export function createSupabaseBookingsRepository(
-  client: SupabaseClient,
-): BookingsRepository {
+export function createSupabaseBookingsRepository(client: SupabaseClient): BookingsRepository {
   return {
     async resolveTenantByAgent(providerAgentId: string): Promise<TenantBinding | null> {
       const { data, error } = await client

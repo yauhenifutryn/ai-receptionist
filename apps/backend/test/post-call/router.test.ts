@@ -4,9 +4,7 @@ import type { PostCallRepository } from "../../src/post-call/repository.js";
 
 const baseRepo: PostCallRepository = {
   async resolveTenantByAgent(id) {
-    return id === "agent-77"
-      ? { tenantId: "tenant-1", agentRowId: "agent-row-1" }
-      : null;
+    return id === "agent-77" ? { tenantId: "tenant-1", agentRowId: "agent-row-1" } : null;
   },
   async upsertConsentLog() {},
   async insertTranscript() {},

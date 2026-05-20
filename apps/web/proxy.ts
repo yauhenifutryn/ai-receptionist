@@ -28,9 +28,7 @@ const ALLOW_NONOPERATOR_AUTH_PATHS = ["/auth/access-pending", "/auth/sign-out"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const needsGate = GATED_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+  const needsGate = GATED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   const res = NextResponse.next({ request: { headers: req.headers } });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -87,7 +85,5 @@ export const config = {
   //   - static files (favicon, images, etc.)
   //   - /api/* (handlers do their own auth — webhooks use HMAC, operator
   //     routes use getOperatorOrJsonError, public probe routes are explicit)
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api|.*\\..*$).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api|.*\\..*$).*)"],
 };

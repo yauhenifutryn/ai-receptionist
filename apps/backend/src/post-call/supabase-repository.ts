@@ -97,6 +97,7 @@ export function createSupabasePostCallRepository(client: SupabaseClient): PostCa
           tool_error_count: args.toolErrorCount ?? 0,
           raw_jsonb: args.rawJsonb ?? null,
           finalized_at: args.finalizedAt ?? null,
+          caller_phone_e164: args.callerPhoneE164 ?? null,
         },
         { onConflict: "conversation_id" },
       );

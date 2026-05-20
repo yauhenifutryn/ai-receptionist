@@ -54,6 +54,11 @@ export interface UpsertConversationArgs {
   toolErrorCount?: number;
   rawJsonb?: unknown;
   finalizedAt?: string | null;
+  /**
+   * E.164 caller number, extracted from EL metadata.phone_call.from_phone_number.
+   * Set only for PSTN; null for browser_test / pin_demo (no caller line).
+   */
+  callerPhoneE164?: string | null;
 }
 
 export interface PostCallRepository {

@@ -67,6 +67,7 @@ describe("supabase post-call repository — conversations", () => {
       toolErrorCount: 0,
       rawJsonb: { transcript: [] },
       finalizedAt: "2026-05-21T10:01:00Z",
+      callerPhoneE164: "+48500111222",
     });
     expect(captured.table).toBe("conversations");
     expect(captured.upsertOpts).toEqual({ onConflict: "conversation_id" });
@@ -90,6 +91,22 @@ describe("supabase post-call repository — conversations", () => {
     expect(payload.tool_error_count).toBe(0);
     expect(payload.raw_jsonb).toEqual({ transcript: [] });
     expect(payload.finalized_at).toBe("2026-05-21T10:01:00Z");
+    expect(payload.caller_phone_e164).toBe("+48500111222");
+  });
+
+  it("upsertConversation maps caller_phone_e164 to null when arg omitted", async () => {
+    const captured: Record<string, unknown> = {};
+    const repo = createSupabasePostCallRepository(upsertCaptureClient(captured));
+    await repo.upsertConversation({
+      conversationId: "c2",
+      tenantId: "t-uuid",
+      agentId: "a-uuid",
+      providerAgentId: "agent_x",
+      source: "browser_test",
+      startedAt: "2026-05-21T10:00:00Z",
+    });
+    const payload = captured.upsertPayload as Record<string, unknown>;
+    expect(payload.caller_phone_e164).toBeNull();
   });
 
   it("findBookingIdByConversation returns null when not found", async () => {

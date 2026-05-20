@@ -115,6 +115,18 @@ export async function handleFinalizeConversation(
       (meta.language as string | undefined) ??
       null;
 
+    // EL exposes the PSTN caller line at metadata.phone_call.from_phone_number
+    // (E.164). Absent for browser/PIN sessions; we still extract opportunistically
+    // because the finalize endpoint hydrates *all* sources.
+    const phoneCallMeta = (meta.phone_call ?? null) as
+      | { from_phone_number?: unknown }
+      | null;
+    const callerPhoneCandidate = phoneCallMeta?.from_phone_number;
+    const callerPhoneE164 =
+      typeof callerPhoneCandidate === "string" && callerPhoneCandidate.length > 0
+        ? callerPhoneCandidate
+        : null;
+
     const bookedBookingId = await deps.repo.findBookingIdByConversation(req.conversationId);
 
     await deps.repo.upsertConversation({
@@ -138,6 +150,7 @@ export async function handleFinalizeConversation(
       // for UI symmetry with PSTN's PostCallWebhookSchema.toolInvocations.
       rawJsonb: { ...body, toolInvocations: flatToolCalls },
       finalizedAt: new Date().toISOString(),
+      callerPhoneE164,
     });
     return { ok: true };
   }

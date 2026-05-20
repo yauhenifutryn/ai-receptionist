@@ -280,6 +280,34 @@ describe("handlePostCall (W2.5) — conversations write", () => {
     expect((args.rawJsonb as { transcript?: unknown[] }).transcript).toBeUndefined();
   });
 
+  it("PSTN extracts caller_phone_e164 from payload.raw.phone_call.from_phone_number", async () => {
+    const { repo, spies } = buildRepo();
+    const w = basePayload() as ReturnType<typeof basePayload> & {
+      raw?: Record<string, unknown>;
+    };
+    w.raw = { phone_call: { from_phone_number: "+48500111222" } };
+    await handlePostCall(w, { repo });
+    const args = spies.upsertConversation.mock.calls[0]![0] as UpsertConversationArgs;
+    expect(args.callerPhoneE164).toBe("+48500111222");
+
+    // Adversarial: when only metadata.phone_call.from_phone_number is set
+    // (alternate EL shape), we still pick it up.
+    spies.upsertConversation.mockClear();
+    const w2 = basePayload() as ReturnType<typeof basePayload> & {
+      raw?: Record<string, unknown>;
+    };
+    w2.raw = { metadata: { phone_call: { from_phone_number: "+48700333444" } } };
+    await handlePostCall(w2, { repo });
+    const args2 = spies.upsertConversation.mock.calls[0]![0] as UpsertConversationArgs;
+    expect(args2.callerPhoneE164).toBe("+48700333444");
+
+    // No phone in raw → null.
+    spies.upsertConversation.mockClear();
+    await handlePostCall(basePayload(), { repo });
+    const args3 = spies.upsertConversation.mock.calls[0]![0] as UpsertConversationArgs;
+    expect(args3.callerPhoneE164).toBeNull();
+  });
+
   it("tool_error_count counts succeeded=false entries", async () => {
     const { repo, spies } = buildRepo();
     const w = basePayload();

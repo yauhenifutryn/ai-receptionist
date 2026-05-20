@@ -119,6 +119,25 @@ describe("handleFinalizeConversation", () => {
     expect(fetchEl).not.toHaveBeenCalled();
   });
 
+  it("extracts caller_phone_e164 from EL metadata.phone_call.from_phone_number", async () => {
+    const bodyWithPhone = {
+      ...okElBody,
+      metadata: {
+        ...okElBody.metadata,
+        phone_call: { from_phone_number: "+48555000111" },
+      },
+    };
+    const fetchEl = vi.fn().mockResolvedValue({ ok: true, body: bodyWithPhone });
+    const r = await handleFinalizeConversation(
+      { conversationId: "c1", agentId: "agent_x", source: "browser_test" },
+      { isOperator: true, pinMatchAgentId: null, fetchEl, repo },
+    );
+    expect(r.ok).toBe(true);
+    const upsertMock = repo.upsertConversation as unknown as ReturnType<typeof vi.fn>;
+    const args = upsertMock.mock.calls.at(-1)![0];
+    expect(args.callerPhoneE164).toBe("+48555000111");
+  });
+
   it("EL 404 still writes a stub row and returns ok=true", async () => {
     const fetchEl = vi
       .fn()

@@ -76,6 +76,22 @@ export async function handlePostCall(
   // (DB CHECK also enforces this; belt + suspenders).
   const bookedBookingId = await deps.repo.findBookingIdByConversation(payload.conversationId);
   const transcriptForJsonb = consentFlag ? payload.transcript : undefined;
+
+  // EL shape varies depending on which webhook variant fired; check both
+  // payload.raw.phone_call.from_phone_number and the nested
+  // payload.raw.metadata.phone_call.from_phone_number. PSTN-only field.
+  const rawRecord = (payload.raw ?? {}) as Record<string, unknown>;
+  const rawPhoneCall = (rawRecord.phone_call ?? null) as
+    | { from_phone_number?: unknown }
+    | null;
+  const rawMetadata = (rawRecord.metadata ?? null) as
+    | { phone_call?: { from_phone_number?: unknown } }
+    | null;
+  const phoneCandidate =
+    rawPhoneCall?.from_phone_number ?? rawMetadata?.phone_call?.from_phone_number ?? null;
+  const callerPhoneE164 =
+    typeof phoneCandidate === "string" && phoneCandidate.length > 0 ? phoneCandidate : null;
+
   await deps.repo.upsertConversation({
     conversationId: payload.conversationId,
     tenantId: tenant.tenantId,
@@ -103,6 +119,7 @@ export async function handlePostCall(
       raw: payload.raw,
     },
     finalizedAt: new Date().toISOString(),
+    callerPhoneE164,
   });
 
   return {

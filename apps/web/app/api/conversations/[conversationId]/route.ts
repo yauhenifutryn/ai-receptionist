@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceRoleSupabase, getUserSupabase } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -49,7 +50,12 @@ export async function GET(
       .eq("source", "pin_demo")
       .maybeSingle();
     if (!data) return NextResponse.json({ error: "not_found" }, { status: 404 });
-    return NextResponse.json({ row: data });
+    const enriched = await ensureTranscript(
+      service,
+      data as unknown as Record<string, unknown>,
+      conversationId,
+    );
+    return NextResponse.json({ row: enriched });
   }
 
   const userSupabase = await getUserSupabase();
@@ -64,5 +70,48 @@ export async function GET(
     .eq("conversation_id", conversationId)
     .maybeSingle();
   if (!data) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  return NextResponse.json({ row: data });
+  const enriched = await ensureTranscript(
+    userSupabase,
+    data as unknown as Record<string, unknown>,
+    conversationId,
+  );
+  return NextResponse.json({ row: enriched });
+}
+
+/**
+ * Fallback for sessions where the finalize POST never reached EL (browser
+ * closed too fast, lazy retry not yet run, or EL hasn't ingested the call
+ * yet). If raw_jsonb.transcript is empty, synthesize one from the live
+ * turn-stream we captured in test_transcripts. The same row shape the
+ * drill-down UI expects.
+ */
+async function ensureTranscript(
+  supabase: SupabaseClient,
+  row: Record<string, unknown>,
+  conversationId: string,
+): Promise<Record<string, unknown>> {
+  const raw = (row.raw_jsonb ?? null) as { transcript?: unknown[] } | null;
+  if (raw && Array.isArray(raw.transcript) && raw.transcript.length > 0) return row;
+
+  const { data: turnsRaw } = await supabase
+    .from("test_transcripts")
+    .select("role, text, recorded_at")
+    .eq("conversation_id", conversationId)
+    .order("recorded_at", { ascending: true })
+    .limit(500);
+  const turns = (turnsRaw ?? []) as Array<{ role: string; text: string; recorded_at: string }>;
+  const first = turns[0];
+  if (!first) return row;
+
+  const startedAt = (row.started_at as string | undefined) ?? first.recorded_at;
+  const startMs = new Date(startedAt).getTime();
+  const synthesized = turns.map((t) => ({
+    role: t.role,
+    message: t.text,
+    time_in_call_secs: Math.max(0, Math.round((new Date(t.recorded_at).getTime() - startMs) / 1000)),
+  }));
+  return {
+    ...row,
+    raw_jsonb: { ...(raw ?? {}), transcript: synthesized, _fallback: "test_transcripts" },
+  };
 }

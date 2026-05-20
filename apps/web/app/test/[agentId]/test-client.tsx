@@ -25,6 +25,9 @@ function TestAgentInner({ agentId }: { agentId: string }) {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [micPermission, setMicPermission] = useState<"unknown" | "granted" | "denied">("unknown");
   const [chatInput, setChatInput] = useState("");
+  // 1s warmup window after Start so the agent's first_message has time to
+  // land before the user feels they should speak. Mirrors demo client.
+  const [warmingUp, setWarmingUp] = useState(false);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   const conversation = useConversation({
@@ -108,6 +111,11 @@ function TestAgentInner({ agentId }: { agentId: string }) {
   }
 
   async function startSession() {
+    // Clear stale transcript so a previous test's turns don't visually mix
+    // with the new session's stream. Past sessions remain in the operator
+    // conversations list.
+    setTranscript([]);
+    setWarmingUp(true);
     if (mode === "voice" && micPermission !== "granted") await requestMic();
     if (mode === "voice") {
       // Pin to WebSocket. The SDK now defaults to WebRTC (via LiveKit),
@@ -123,6 +131,7 @@ function TestAgentInner({ agentId }: { agentId: string }) {
     } else {
       conversation.startSession({ agentId, textOnly: true });
     }
+    window.setTimeout(() => setWarmingUp(false), 1000);
   }
 
   function endSession() {
@@ -158,6 +167,7 @@ function TestAgentInner({ agentId }: { agentId: string }) {
   }
 
   const statusLabel = useMemo(() => {
+    if (warmingUp && status !== "disconnected") return "Agent greeting…";
     switch (status) {
       case "connected":
         return mode === "voice"
@@ -170,13 +180,13 @@ function TestAgentInner({ agentId }: { agentId: string }) {
       default:
         return "Ready";
     }
-  }, [status, isSpeaking, mode]);
+  }, [status, isSpeaking, mode, warmingUp]);
 
   const statusColor =
-    status === "connected"
-      ? "bg-emerald-500"
-      : status === "connecting"
-        ? "bg-amber-500 animate-pulse"
+    warmingUp || status === "connecting"
+      ? "bg-amber-500 animate-pulse"
+      : status === "connected"
+        ? "bg-emerald-500"
         : "bg-neutral-300";
 
   return (

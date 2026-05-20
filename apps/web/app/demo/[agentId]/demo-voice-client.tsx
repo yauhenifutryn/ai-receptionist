@@ -42,6 +42,9 @@ function Inner({ agentId, strings, pin }: Props) {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [micPermission, setMicPermission] = useState<"unknown" | "granted" | "denied">("unknown");
   const [chatInput, setChatInput] = useState("");
+  // 1s "warming up" window after startSession so the agent's first_message
+  // lands before the user feels the urge to speak. See startSession().
+  const [warmingUp, setWarmingUp] = useState(false);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   const conversation = useConversation({
@@ -133,6 +136,12 @@ function Inner({ agentId, strings, pin }: Props) {
   }
 
   async function startSession() {
+    // Issue 3: clear stale transcript on fresh start so old turns don't
+    // visually fluctuate with new ones. Past sessions remain accessible via
+    // the "Your sessions" pane below. Also give the agent a brief warmup
+    // window so first_message lands before the user feels the urge to speak.
+    setTranscript([]);
+    setWarmingUp(true);
     if (mode === "voice" && micPermission !== "granted") await requestMic();
     if (mode === "voice") {
       conversation.startSession({
@@ -142,6 +151,9 @@ function Inner({ agentId, strings, pin }: Props) {
     } else {
       conversation.startSession({ agentId, textOnly: true });
     }
+    // 1s cooldown — keeps the UI in "Agent is greeting you…" state so the
+    // user waits for the agent's first message instead of fighting it.
+    window.setTimeout(() => setWarmingUp(false), 1000);
   }
 
   function endSession() {
@@ -172,6 +184,10 @@ function Inner({ agentId, strings, pin }: Props) {
   }
 
   const statusLabel = useMemo(() => {
+    if (warmingUp && status !== "disconnected") {
+      // strings.statusConnecting reads like "Łączę…" in PL — fine as the warmup label.
+      return strings.statusConnecting;
+    }
     switch (status) {
       case "connected":
         return mode === "voice"
@@ -184,13 +200,13 @@ function Inner({ agentId, strings, pin }: Props) {
       default:
         return strings.statusReady;
     }
-  }, [status, isSpeaking, mode, strings]);
+  }, [status, isSpeaking, mode, strings, warmingUp]);
 
   const statusColor =
-    status === "connected"
-      ? "bg-emerald-500"
-      : status === "connecting"
-        ? "bg-amber-500 animate-pulse"
+    warmingUp || status === "connecting"
+      ? "bg-amber-500 animate-pulse"
+      : status === "connected"
+        ? "bg-emerald-500"
         : "bg-neutral-300";
 
   return (

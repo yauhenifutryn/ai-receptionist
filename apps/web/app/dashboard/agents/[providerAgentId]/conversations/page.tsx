@@ -77,20 +77,14 @@ export default async function Page({ params, searchParams }: PageProps) {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link
-            href={"/dashboard" as Route}
+            href={`/test/${providerAgentId}` as Route}
             className="text-sm text-neutral-500 hover:text-neutral-800"
           >
-            ← Dashboard
+            ← {clinic}
           </Link>
-          <h1 className="mt-1 text-2xl font-semibold">{clinic} · Conversations</h1>
+          <h1 className="mt-1 text-2xl font-semibold">Conversations</h1>
           <p className="font-mono text-xs text-neutral-400">{providerAgentId}</p>
         </div>
-        <Link
-          href={`/test/${providerAgentId}` as Route}
-          className="rounded-full border border-neutral-200 px-4 py-2 text-sm hover:bg-neutral-50"
-        >
-          Open test page →
-        </Link>
       </header>
 
       <ConversationsFilters />

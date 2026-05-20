@@ -50,9 +50,10 @@ HANDOFF.json
 .continue-here.md
 .claude/sessions/
 
-# Project-internal decision history + informal team-comms drafts
-# (per CLAUDE.md "Repository privacy guardrails" — only the operational
-# CLAUDE.md itself is committed so Rem can read it; everything else stays local)
+# Project-internal decision history + operator brief + informal team-comms drafts
+# Per CLAUDE.md "Repository privacy guardrails". The repo is public, so the
+# operator brief itself must not be tracked.
+CLAUDE.md
 PROJECT_LOG.md
 AGENTS.md
 vertical_pivot_brief.md

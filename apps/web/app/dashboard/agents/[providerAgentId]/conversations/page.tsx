@@ -85,6 +85,12 @@ export default async function Page({ params, searchParams }: PageProps) {
           <h1 className="mt-1 text-2xl font-semibold">Conversations</h1>
           <p className="font-mono text-xs text-neutral-400">{providerAgentId}</p>
         </div>
+        <Link
+          href={`/dashboard/agents/${providerAgentId}/analytics` as Route}
+          className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+        >
+          View analytics →
+        </Link>
       </header>
 
       <ConversationsFilters />

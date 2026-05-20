@@ -33,12 +33,20 @@ export default async function ConversationStatsStrip({ agentId }: { agentId: str
       <Stat label="Avg dur" value={`${Math.floor(avgDur / 60)}m${avgDur % 60}s`} />
       <Stat label="Booked" value={String(booked)} />
       <Stat label="Conv %" value={`${conv}%`} />
-      <Link
-        href={`/dashboard/agents/${agentId}/conversations` as Route}
-        className="ml-auto rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
-      >
-        View all conversations →
-      </Link>
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        <Link
+          href={`/dashboard/agents/${agentId}/conversations` as Route}
+          className="rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+        >
+          View conversations →
+        </Link>
+        <Link
+          href={`/dashboard/agents/${agentId}/analytics` as Route}
+          className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+        >
+          Open analytics →
+        </Link>
+      </div>
     </section>
   );
 }

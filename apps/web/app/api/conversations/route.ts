@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ListConversationsQuerySchema } from "@ai-receptionist/contracts";
-import { handleListConversations } from "@ai-receptionist/backend/conversations";
+import {
+  handleListConversations,
+  lazyFinalizeMissing,
+  type ListAudience,
+} from "@ai-receptionist/backend/conversations";
+import { fetchElevenLabsConversation } from "@ai-receptionist/backend/integrations/elevenlabs";
+import { createSupabasePostCallRepository } from "@ai-receptionist/backend/post-call/supabase-repository";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceRoleSupabase, getUserSupabase } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -65,12 +72,7 @@ export async function GET(req: NextRequest) {
     .eq("email", userData.user.email)
     .maybeSingle();
   if (op) {
-    const r = await handleListConversations(q, {
-      audience: "operator",
-      supabase: userSupabase,
-    });
-    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
-    return NextResponse.json({ rows: r.rows });
+    return withLazyRetry(q, "operator", undefined, userSupabase);
   }
 
   // Tenant member path: derive tenant from the first membership row.
@@ -83,11 +85,47 @@ export async function GET(req: NextRequest) {
   if (!membership) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
-  const r = await handleListConversations(q, {
-    audience: "owner",
-    tenantId: membership.tenant_id,
-    supabase: userSupabase,
-  });
-  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
-  return NextResponse.json({ rows: r.rows });
+  return withLazyRetry(q, "owner", membership.tenant_id, userSupabase);
+}
+
+/**
+ * Run the list handler, then opportunistically hydrate any sessions that
+ * streamed turns to test_transcripts but never reached /finalize. After
+ * hydration, re-run the list so the response includes the freshly-written
+ * rows. Skipped for the PIN/prospect path — prospects shouldn't trigger
+ * EL fetches at scale.
+ */
+async function withLazyRetry(
+  q: ReturnType<typeof ListConversationsQuerySchema.parse>,
+  audience: Exclude<ListAudience, "prospect">,
+  tenantId: string | undefined,
+  userSupabase: SupabaseClient,
+): Promise<NextResponse> {
+  const deps = { audience, tenantId, supabase: userSupabase } as const;
+  const first = await handleListConversations(q, deps);
+  if (!first.ok) return NextResponse.json({ error: first.error }, { status: first.status });
+
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  // Lazy retry only fires when we have an agentId scope (otherwise the
+  // diff over test_transcripts is unbounded across all agents) AND an EL
+  // API key (otherwise the finalize call would only write stub rows).
+  if (q.agentId && apiKey) {
+    const known = new Set(
+      (first.rows as Array<{ conversation_id: string }>).map((r) => r.conversation_id),
+    );
+    const service = getServiceRoleSupabase();
+    const hydrated = await lazyFinalizeMissing({
+      providerAgentId: q.agentId,
+      knownConversationIds: known,
+      service,
+      apiKey,
+      fetchEl: ({ conversationId }) => fetchElevenLabsConversation({ conversationId, apiKey }),
+      repo: createSupabasePostCallRepository(service),
+    });
+    if (hydrated > 0) {
+      const refreshed = await handleListConversations(q, deps);
+      if (refreshed.ok) return NextResponse.json({ rows: refreshed.rows, hydrated });
+    }
+  }
+  return NextResponse.json({ rows: first.rows });
 }

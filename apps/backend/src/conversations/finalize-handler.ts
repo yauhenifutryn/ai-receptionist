@@ -32,6 +32,12 @@ export interface FinalizeDeps {
    * to defend against tampered requests.
    */
   pinMatchAgentId: string | null;
+  /**
+   * When true, skip the auth gates (PIN match, operator session). Reserved for
+   * server-side lazy-retry paths that already authenticated upstream. Never
+   * pass true based on user input.
+   */
+  bypassAuthCheck?: boolean;
   fetchEl: (args: { conversationId: string }) => Promise<FetchConversationResult>;
   repo: Pick<
     PostCallRepository,
@@ -48,20 +54,22 @@ export async function handleFinalizeConversation(
   req: FinalizeConversationRequest,
   deps: FinalizeDeps,
 ): Promise<FinalizeResult> {
-  // 1. Auth gate.
-  if (req.source === "pin_demo") {
-    if (!req.pin) return { ok: false, status: 400, error: "pin_required" };
-    const expected = await deps.repo.resolveAgentPin(req.agentId);
-    if (!expected || expected !== req.pin) {
-      return { ok: false, status: 403, error: "pin_mismatch" };
+  // 1. Auth gate (bypassable for server-side lazy retry; see FinalizeDeps).
+  if (!deps.bypassAuthCheck) {
+    if (req.source === "pin_demo") {
+      if (!req.pin) return { ok: false, status: 400, error: "pin_required" };
+      const expected = await deps.repo.resolveAgentPin(req.agentId);
+      if (!expected || expected !== req.pin) {
+        return { ok: false, status: 403, error: "pin_mismatch" };
+      }
+    } else if (req.source === "browser_test") {
+      if (!deps.isOperator) {
+        return { ok: false, status: 401, error: "operator_required" };
+      }
+    } else {
+      // PSTN is handled by the post-call webhook, never via this route.
+      return { ok: false, status: 400, error: "invalid_source" };
     }
-  } else if (req.source === "browser_test") {
-    if (!deps.isOperator) {
-      return { ok: false, status: 401, error: "operator_required" };
-    }
-  } else {
-    // PSTN is handled by the post-call webhook, never via this route.
-    return { ok: false, status: 400, error: "invalid_source" };
   }
 
   // 2. Resolve tenant.

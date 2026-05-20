@@ -24,6 +24,18 @@
       "types": "./dist/post-call/index.d.ts",
       "default": "./dist/post-call/index.js"
     },
+    "./post-call/supabase-repository": {
+      "types": "./dist/post-call/supabase-repository.d.ts",
+      "default": "./dist/post-call/supabase-repository.js"
+    },
+    "./conversations": {
+      "types": "./dist/conversations/index.d.ts",
+      "default": "./dist/conversations/index.js"
+    },
+    "./integrations/elevenlabs": {
+      "types": "./dist/integrations/elevenlabs/index.d.ts",
+      "default": "./dist/integrations/elevenlabs/index.js"
+    },
     "./scraper": {
       "types": "./dist/scraper/index.d.ts",
       "default": "./dist/scraper/index.js"

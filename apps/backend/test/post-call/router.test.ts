@@ -16,6 +16,9 @@ const baseRepo: PostCallRepository = {
   async findBookingIdByConversation() {
     return null;
   },
+  async resolveAgentPin() {
+    return null;
+  },
 };
 
 const validPayload = {

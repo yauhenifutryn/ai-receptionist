@@ -35,6 +35,7 @@ function buildRepo(overrides: Partial<PostCallRepository> = {}): {
   );
   const upsertConversation = vi.fn(async (_args: UpsertConversationArgs) => {});
   const findBookingIdByConversation = vi.fn(async (_id: string): Promise<string | null> => null);
+  const resolveAgentPin = vi.fn(async (_id: string): Promise<string | null> => null);
 
   const repo: PostCallRepository = {
     resolveTenantByAgent,
@@ -44,6 +45,7 @@ function buildRepo(overrides: Partial<PostCallRepository> = {}): {
     updateBookingRecoveredRevenue,
     upsertConversation,
     findBookingIdByConversation,
+    resolveAgentPin,
     ...overrides,
   };
   return {

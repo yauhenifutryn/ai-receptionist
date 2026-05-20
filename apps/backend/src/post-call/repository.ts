@@ -68,4 +68,6 @@ export interface PostCallRepository {
   upsertConversation(args: UpsertConversationArgs): Promise<void>;
   /** Returns the bookings.id linked to this conversation_id, or null. */
   findBookingIdByConversation(conversationId: string): Promise<string | null>;
+  /** Returns the agents.pin_code for a provider_agent_id, or null. Used by finalize-handler PIN gate. */
+  resolveAgentPin(providerAgentId: string): Promise<string | null>;
 }

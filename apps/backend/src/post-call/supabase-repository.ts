@@ -112,5 +112,15 @@ export function createSupabasePostCallRepository(client: SupabaseClient): PostCa
       if (error) throw new Error(`bookings lookup failed: ${error.message}`);
       return (data?.id as string | undefined) ?? null;
     },
+
+    async resolveAgentPin(providerAgentId: string): Promise<string | null> {
+      const { data, error } = await client
+        .from("agents")
+        .select("pin_code")
+        .eq("provider_agent_id", providerAgentId)
+        .maybeSingle();
+      if (error) throw new Error(`agents pin lookup failed: ${error.message}`);
+      return (data?.pin_code as string | null | undefined) ?? null;
+    },
   };
 }

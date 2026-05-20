@@ -57,6 +57,9 @@ PROJECT_LOG.md
 AGENTS.md
 vertical_pivot_brief.md
 docs/research/
+docs/superpowers/
+docs/handover-*.md
+docs/plans/
 
 # IDE
 .idea/

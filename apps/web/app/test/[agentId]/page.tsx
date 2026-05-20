@@ -2,7 +2,9 @@ import { headers } from "next/headers";
 import { requireOperator } from "@/lib/supabase-server";
 import AgentSettingsPanel from "./agent-settings-panel";
 import AgentManagementPanel from "./agent-management-panel";
+import ConversationStatsStrip from "./conversation-stats-strip";
 import DemoAccessPanel from "./demo-access-panel";
+import OwnerInvitePanel from "./owner-invite-panel";
 import PhoneNumberPanel from "./phone-number-panel";
 import TestAgentClient from "./test-client";
 
@@ -34,6 +36,7 @@ export default async function TestAgentPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col gap-8">
+      <ConversationStatsStrip agentId={agentId} />
       <AgentSettingsPanel providerAgentId={agentId} />
       <DemoAccessPanel
         providerAgentId={agentId}
@@ -44,6 +47,7 @@ export default async function TestAgentPage({ params }: PageProps) {
         providerAgentId={agentId}
         existingPhoneNumber={agentRow?.phone_number ?? null}
       />
+      <OwnerInvitePanel agentId={agentId} />
       <AgentManagementPanel
         providerAgentId={agentId}
         tenantDisplayName={tenantDisplayName}

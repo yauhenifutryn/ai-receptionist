@@ -7,12 +7,30 @@ import {
 } from "@ai-receptionist/contracts";
 import type { BookingsRepository } from "./repository.js";
 import { generateShortToken } from "../lib/short-token.js";
+import type { SmsClient } from "../integrations/sms/index.js";
+import {
+  formatConfirmationSms,
+  sendBookingConfirmation,
+  type SmsFailureLogger,
+} from "./sms-confirmation.js";
 
 export interface CreateBookingDeps {
   provider: CalendarProvider;
   repo: BookingsRepository;
   /** Public base URL for the SMS short-URL landing page (no trailing slash). */
   smsShortUrlBase: string;
+  /**
+   * SMS dependencies. Both optional — when both present, a Polish SMS
+   * confirmation fires post-insert (failure logged, booking still completes).
+   * When either is missing, SMS step is skipped silently (useful for tests
+   * that don't care about SMS behavior).
+   */
+  smsClient?: SmsClient;
+  smsFailureLogger?: SmsFailureLogger;
+  /** Clinic display name for the SMS body. Required when smsClient is set. */
+  clinicName?: string;
+  /** Clinic's contact phone for cancellation; null in sales-demo phase. */
+  contactPhone?: string | null;
   /** Optional conversationId pulled from the webhook envelope. Falls back to requestId. */
   conversationId?: string;
 }
@@ -135,6 +153,26 @@ export async function handleCreateBooking(
     endsAt: providerResult.endsAt.toISOString(),
     ...(req.notes !== undefined ? { notes: req.notes } : {}),
   });
+
+  // Side-effect: SMS confirmation. Non-blocking — failure logged, booking
+  // still committed (we already inserted above). Skipped when SMS deps absent.
+  if (deps.smsClient && deps.smsFailureLogger && deps.clinicName) {
+    const smsBody = formatConfirmationSms({
+      clinicName: deps.clinicName,
+      startsAt: providerResult.startsAt,
+      shortUrl: `${deps.smsShortUrlBase}/b/${row.shortToken}`,
+      contactPhone: deps.contactPhone ?? null,
+      language: req.language,
+    });
+    await sendBookingConfirmation({
+      client: deps.smsClient,
+      logger: deps.smsFailureLogger,
+      to: req.patientPhone,
+      body: smsBody,
+      tenantId: tenant.tenantId,
+      bookingId: row.id,
+    });
+  }
 
   return {
     ok: true,

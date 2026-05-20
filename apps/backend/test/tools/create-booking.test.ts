@@ -7,6 +7,8 @@ import type {
   BookingRow,
 } from "../../src/tools/repository.js";
 import { createSimulatedCalendarProvider } from "../../src/integrations/calendar/simulated-calendar-provider.js";
+import type { SmsClient } from "../../src/integrations/sms/index.js";
+import type { SmsFailureLogger } from "../../src/tools/sms-confirmation.js";
 
 const provider = createSimulatedCalendarProvider({
   now: () => new Date("2026-05-16T13:23:45.000Z"),
@@ -149,6 +151,55 @@ describe("handleCreateBooking (W2.3, CalendarProvider DI)", () => {
     if (out.ok) return;
     expect(out.status).toBe(404);
     expect(out.error.code).toBe("tenant_not_found");
+  });
+
+  it("fires SMS confirmation when smsClient + logger + clinicName provided (happy path)", async () => {
+    const sent: Array<{ to: string; body: string }> = [];
+    const smsClient: SmsClient = {
+      send: async ({ to, body }) => {
+        sent.push({ to, body });
+        return { messageId: "msg_1" };
+      },
+    };
+    const logFailure = vi.fn(async () => {});
+    const smsFailureLogger: SmsFailureLogger = { logFailure };
+    const out = await handleCreateBooking(baseRequest, {
+      provider,
+      repo: buildRepo(),
+      smsShortUrlBase: "https://abcclinic.app",
+      smsClient,
+      smsFailureLogger,
+      clinicName: "ABC Stomatologia",
+      contactPhone: null,
+    });
+    expect(out.ok).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.to).toBe("+48 600 123 456");
+    expect(sent[0]!.body).toContain("ABC Stomatologia");
+    expect(sent[0]!.body).toContain("https://abcclinic.app/b/");
+    expect(logFailure).not.toHaveBeenCalled();
+  });
+
+  it("SMS failure does NOT fail the booking; logs to SmsFailureLogger", async () => {
+    const smsClient: SmsClient = {
+      send: async () => {
+        throw new Error("boom");
+      },
+    };
+    const logFailure = vi.fn(async () => {});
+    const smsFailureLogger: SmsFailureLogger = { logFailure };
+    const out = await handleCreateBooking(baseRequest, {
+      provider,
+      repo: buildRepo(),
+      smsShortUrlBase: "https://abcclinic.app",
+      smsClient,
+      smsFailureLogger,
+      clinicName: "ABC",
+      contactPhone: null,
+    });
+    expect(out.ok).toBe(true);
+    expect(logFailure).toHaveBeenCalledOnce();
+    expect(logFailure.mock.calls[0]![0]!.errorCode).toBe("internal_error");
   });
 
   it("conversationId from the envelope is preferred over the requestId fallback", async () => {

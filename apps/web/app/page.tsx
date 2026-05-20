@@ -1,17 +1,17 @@
 "use client";
 
-// Public landing page v2 — PL / EN / RU.
-// Editorial / letterpress visual register, layered with halftone density.
-// Audience: dental clinic owners (cold prospects) plus returning operators
-// who need an unobtrusive sign-in link in the header.
+// Public landing page v3 — PL / EN / RU.
+// Bright-white, neutral + emerald palette. Sibling to /dashboard, not an alien.
 //
-// Six animated layers, all reduced-motion-aware:
-//   1. Two-line halftone waveform (rAF, ~24fps).
-//   2. Typewriter Polish/English/Russian dialogue (rAF, deterministic).
-//   3. Fake live system status panel (interval, jittered).
-//   4. Calendar fill simulation (interval, oxblood-dim cells appear).
-//   5. Subtle dot-grid background pattern (static, 1% opacity).
-//   6. Oxblood band quote between status block and dialogue (static).
+// Sections:
+//   1. Header — wordmark + lang toggle + Klient / Operator sign-in links.
+//   2. Hero — ASCII halftone waveform, heavy sans headline, body intro.
+//   3. Live status + calendar duo — 60/40 cards on md+.
+//   4. Typewriter dialogue — subtle ruled-paper card, speaker pills.
+//   5. What it does — 2x3 numbered cards.
+//   6. CTA + footer — soft neutral-50 band, single CTA, single privacy line.
+//
+// All animations honor prefers-reduced-motion and pause on visibilitychange.
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
@@ -26,6 +26,7 @@ const LANGS: Lang[] = ["pl", "en", "ru"];
 interface DialogueLine {
   speaker: string;
   line: string;
+  side: "clinic" | "patient";
 }
 
 interface LangBundle {
@@ -36,7 +37,6 @@ interface LangBundle {
     title: string;
     body: string;
   };
-  band: string;
   statusPanel: {
     title: string;
     active: string;
@@ -44,6 +44,7 @@ interface LangBundle {
     bookings: string;
     languageRow: string;
     busy: string;
+    live: string;
   };
   calendar: {
     label: string;
@@ -51,9 +52,9 @@ interface LangBundle {
   };
   dialoguePanel: {
     eyebrow: string;
+    speakerClinic: string;
+    speakerPatient: string;
   };
-  dialogue: DialogueLine[];
-  observations: string[];
   whatItDoes: {
     eyebrow: string;
     items: string[];
@@ -71,42 +72,34 @@ interface LangBundle {
 const STRINGS: Record<Lang, LangBundle> = {
   pl: {
     htmlLang: "pl",
-    wordmark: "Recepcjonistka.",
+    wordmark: "Recepcjonistka",
     nav: { client: "Klient", operator: "Operator" },
     hero: {
       title: "Telefon dzwoni. Ktoś odbiera.",
-      body: "Twoja recepcjonistka, która nie chodzi na lunch, nie idzie spać i nie pomyli nazwiska pacjenta. Odpowiada po polsku, umawia wizyty, potwierdza SMSem. Działa w klinice stomatologicznej, którą prowadzisz.",
+      body: "Recepcjonistka, która nie chodzi na lunch, nie idzie spać i nie pomyli nazwiska pacjenta. Odpowiada po polsku, angielsku, rosyjsku. Umawia wizyty, potwierdza SMSem, działa w klinice stomatologicznej którą prowadzisz.",
     },
-    band: "Klinika zamknięta. Telefon nadal odbiera.",
     statusPanel: {
-      title: "System · operacyjny",
+      title: "Status · operacyjny",
       active: "Rozmowy w toku",
       response: "Czas odpowiedzi",
       bookings: "Dzisiaj rezerwacji",
       languageRow: "Język aktywny",
       busy: "zajęte",
+      live: "LIVE",
     },
     calendar: {
       label: "Kalendarz · ten miesiąc",
       counter: (n) => `${n} wizyt zarezerwowanych dzisiaj`,
     },
-    dialoguePanel: { eyebrow: "Przykładowa rozmowa · 19:23 · wieczorem" },
-    dialogue: [
-      { speaker: "Klinika", line: "Dzień dobry." },
-      { speaker: "Pacjent", line: "Dobry, chciałbym się umówić na konsultację." },
-      { speaker: "Klinika", line: "Oczywiście. Mam wolny termin w czwartek o dziesiątej, pasuje?" },
-      { speaker: "Pacjent", line: "Tak, świetnie." },
-      { speaker: "Klinika", line: "Potwierdzę SMSem. Do zobaczenia w czwartek." },
-    ],
-    observations: [
-      "Telefon dzwoni, gdy jesteś u pacjenta.",
-      "Wieczorem nikt nie odbiera. Pacjent dzwoni do innej kliniki.",
-      "Recepcja spędza godziny dziennie na potwierdzaniu wizyt.",
-    ],
+    dialoguePanel: {
+      eyebrow: "Przykładowa rozmowa · 19:23",
+      speakerClinic: "Klinika",
+      speakerPatient: "Pacjent",
+    },
     whatItDoes: {
       eyebrow: "Co robi",
       items: [
-        "Odbiera każdy telefon, w dzień i w nocy.",
+        "Odbiera każdy telefon, dzień i noc.",
         "Rozmawia po polsku, angielsku, rosyjsku.",
         "Umawia wizyty bezpośrednio w Twoim kalendarzu.",
         "Wysyła SMS z potwierdzeniem.",
@@ -119,44 +112,36 @@ const STRINGS: Record<Lang, LangBundle> = {
       button: "Umów rozmowę",
     },
     footer: {
-      privacy: "Dane przechowywane w UE. Nie nagrywamy rozmów.",
+      privacy: "Dane przechowywane w UE.",
       copyright: "Recepcjonistka",
     },
   },
   en: {
     htmlLang: "en",
-    wordmark: "Recepcjonistka.",
+    wordmark: "Recepcjonistka",
     nav: { client: "Client", operator: "Operator" },
     hero: {
       title: "The phone rings. Someone answers.",
-      body: "Your receptionist who never takes lunch, never goes to sleep, and never misspells a patient's name. Speaks Polish, books appointments, confirms by SMS. Works inside the dental practice you already run.",
+      body: "A receptionist who never takes lunch, never goes to sleep, and never misspells a patient's name. Speaks Polish, English, and Russian. Books appointments, confirms by SMS, works inside the dental practice you already run.",
     },
-    band: "The clinic is closed. The phone still answers.",
     statusPanel: {
-      title: "System · operational",
+      title: "Status · operational",
       active: "Calls in flight",
       response: "Response time",
       bookings: "Bookings today",
       languageRow: "Active language",
       busy: "busy",
+      live: "LIVE",
     },
     calendar: {
       label: "Calendar · this month",
       counter: (n) => `${n} appointments booked today`,
     },
-    dialoguePanel: { eyebrow: "Sample call · 19:23 · evening" },
-    dialogue: [
-      { speaker: "Clinic", line: "Good evening." },
-      { speaker: "Patient", line: "Hi, I'd like to book a consultation." },
-      { speaker: "Clinic", line: "Of course. I have Thursday at ten free, does that work?" },
-      { speaker: "Patient", line: "Yes, perfect." },
-      { speaker: "Clinic", line: "I'll confirm by SMS. See you Thursday." },
-    ],
-    observations: [
-      "The phone rings while you are with a patient.",
-      "Nobody answers in the evening. The patient calls another clinic.",
-      "Reception spends hours every day confirming appointments.",
-    ],
+    dialoguePanel: {
+      eyebrow: "Sample call · 19:23",
+      speakerClinic: "Clinic",
+      speakerPatient: "Patient",
+    },
     whatItDoes: {
       eyebrow: "What it does",
       items: [
@@ -173,19 +158,18 @@ const STRINGS: Record<Lang, LangBundle> = {
       button: "Book a call",
     },
     footer: {
-      privacy: "Data stored in the EU. We do not record calls.",
+      privacy: "EU-hosted data.",
       copyright: "Recepcjonistka",
     },
   },
   ru: {
     htmlLang: "ru",
-    wordmark: "Recepcjonistka.",
+    wordmark: "Recepcjonistka",
     nav: { client: "Клиент", operator: "Оператор" },
     hero: {
       title: "Телефон звонит. Кто-то отвечает.",
-      body: "Ваш администратор, который не уходит на обед, не ложится спать и не путает фамилию пациента. Говорит по-польски, записывает на приём, подтверждает SMS. Работает в стоматологической клинике, которой вы управляете.",
+      body: "Администратор, который не уходит на обед, не ложится спать и не путает фамилию пациента. Говорит по-польски, по-английски, по-русски. Записывает на приём, подтверждает SMS, работает в стоматологической клинике, которой вы управляете.",
     },
-    band: "Клиника закрыта. Телефон по-прежнему отвечает.",
     statusPanel: {
       title: "Система · в работе",
       active: "Активные звонки",
@@ -193,24 +177,17 @@ const STRINGS: Record<Lang, LangBundle> = {
       bookings: "Записей сегодня",
       languageRow: "Активный язык",
       busy: "занято",
+      live: "LIVE",
     },
     calendar: {
       label: "Календарь · этот месяц",
       counter: (n) => `${n} записей сегодня`,
     },
-    dialoguePanel: { eyebrow: "Пример разговора · 19:23 · вечер" },
-    dialogue: [
-      { speaker: "Клиника", line: "Добрый вечер." },
-      { speaker: "Пациент", line: "Здравствуйте, хочу записаться на консультацию." },
-      { speaker: "Клиника", line: "Конечно. Четверг в десять свободен, подходит?" },
-      { speaker: "Пациент", line: "Да, отлично." },
-      { speaker: "Клиника", line: "Подтвержу SMS. До встречи в четверг." },
-    ],
-    observations: [
-      "Телефон звонит, когда вы у пациента.",
-      "Вечером никто не отвечает. Пациент звонит в другую клинику.",
-      "Регистратура тратит часы в день на подтверждение записей.",
-    ],
+    dialoguePanel: {
+      eyebrow: "Пример разговора · 19:23",
+      speakerClinic: "Клиника",
+      speakerPatient: "Пациент",
+    },
     whatItDoes: {
       eyebrow: "Что делает",
       items: [
@@ -227,10 +204,44 @@ const STRINGS: Record<Lang, LangBundle> = {
       button: "Заказать звонок",
     },
     footer: {
-      privacy: "Данные хранятся в ЕС. Звонки не записываются.",
+      privacy: "Данные в ЕС.",
       copyright: "Recepcjonistka",
     },
   },
+};
+
+// Per-language dialogue scripts. Speaker label is derived from t.dialoguePanel
+// so that switching language reformats the speaker pill correctly.
+const DIALOGUES: Record<Lang, DialogueLine[]> = {
+  pl: [
+    { speaker: "Klinika", line: "Dzień dobry.", side: "clinic" },
+    { speaker: "Pacjent", line: "Dobry, chciałbym się umówić na konsultację.", side: "patient" },
+    {
+      speaker: "Klinika",
+      line: "Oczywiście. Mam wolny termin w czwartek o dziesiątej, pasuje?",
+      side: "clinic",
+    },
+    { speaker: "Pacjent", line: "Tak, świetnie.", side: "patient" },
+    { speaker: "Klinika", line: "Potwierdzę SMSem. Do zobaczenia w czwartek.", side: "clinic" },
+  ],
+  en: [
+    { speaker: "Clinic", line: "Good evening.", side: "clinic" },
+    { speaker: "Patient", line: "Hi, I'd like to book a consultation.", side: "patient" },
+    {
+      speaker: "Clinic",
+      line: "Of course. I have Thursday at ten free, does that work?",
+      side: "clinic",
+    },
+    { speaker: "Patient", line: "Yes, perfect.", side: "patient" },
+    { speaker: "Clinic", line: "I'll confirm by SMS. See you Thursday.", side: "clinic" },
+  ],
+  ru: [
+    { speaker: "Клиника", line: "Добрый вечер.", side: "clinic" },
+    { speaker: "Пациент", line: "Здравствуйте, хочу записаться на консультацию.", side: "patient" },
+    { speaker: "Клиника", line: "Конечно. Четверг в десять свободен, подходит?", side: "clinic" },
+    { speaker: "Пациент", line: "Да, отлично.", side: "patient" },
+    { speaker: "Клиника", line: "Подтвержу SMS. До встречи в четверг.", side: "clinic" },
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -305,11 +316,11 @@ function usePrefersReducedMotion(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Halftone waveform
+// Halftone waveform — preserved from v2. Recolored to emerald via currentColor.
 // ---------------------------------------------------------------------------
 
 const HALFTONE_GLYPHS = [" ", ".", ",", ":", ";", "o", "O", "0", "#", "@"];
-const HALFTONE_WIDTH = 68;
+const HALFTONE_WIDTH = 64;
 const HALFTONE_FPS = 24;
 const HALFTONE_FRAME_MS = 1000 / HALFTONE_FPS;
 
@@ -319,7 +330,6 @@ interface FlashPeak {
 }
 
 function densityChar(v: number): string {
-  // v expected in [0,1]; clamp + bucket.
   const clamped = Math.max(0, Math.min(1, v));
   const idx = Math.min(HALFTONE_GLYPHS.length - 1, Math.floor(clamped * HALFTONE_GLYPHS.length));
   return HALFTONE_GLYPHS[idx]!;
@@ -333,14 +343,11 @@ function buildHalftoneLine(t: number, phase: number, freq: number, peaks: FlashP
       Math.sin(x * freq + t * 0.0018 + phase) * 0.5 +
       Math.sin(x * (freq * 1.7) + t * 0.0011 + phase * 0.6) * 0.3 +
       Math.sin(x * (freq * 2.3) - t * 0.0007 + phase) * 0.2;
-    // Map [-1,1] → [0,1]
     let density = (v + 1) / 2;
-    // Edge fade so the signal reads as bracketed.
     const edge = Math.min(i, HALFTONE_WIDTH - 1 - i);
     const fade = Math.min(1, edge / 6);
     density *= fade;
 
-    // Apply flash peaks: each flash spikes a column for ~280ms then decays.
     for (const p of peaks) {
       if (p.col === i) {
         const age = t - p.birth;
@@ -381,11 +388,9 @@ function HalftoneWaveform() {
 
     const tick = (now: number) => {
       const t = now - startRef.current;
-      // Throttle to 24fps to keep the halftone reading "video terminal", not silky.
       if (t - lastDrawRef.current >= HALFTONE_FRAME_MS) {
         lastDrawRef.current = t;
 
-        // Maintain 3-5 active peaks. Drop expired ones, spawn new ones.
         peaksRef.current = peaksRef.current.filter((p) => t - p.birth < 280);
         if (t - lastPeakAtRef.current > 90 + Math.random() * 180) {
           const targetCount = 3 + Math.floor(Math.random() * 3);
@@ -428,18 +433,14 @@ function HalftoneWaveform() {
   return (
     <div
       aria-hidden="true"
-      className="select-none"
+      className="select-none whitespace-pre text-center font-mono text-emerald-600"
       style={{
-        fontFamily: "var(--font-mono)",
         fontSize: "0.85rem",
         letterSpacing: "0.04em",
-        color: "var(--oxblood)",
         lineHeight: "1.15",
-        // Reserve 2 lines (waveform A + B) so layout never shifts.
+        // Reserve 2 lines so layout never shifts.
         height: "2.3em",
-        opacity: 0.88,
-        textAlign: "center",
-        whiteSpace: "pre",
+        opacity: 0.85,
       }}
     >
       {frames.a}
@@ -450,7 +451,7 @@ function HalftoneWaveform() {
 }
 
 // ---------------------------------------------------------------------------
-// Typewriter dialogue — operates on whatever DIALOGUE matches the active lang.
+// Typewriter dialogue — ruled-paper card + emerald speaker pills.
 // ---------------------------------------------------------------------------
 
 const TYPE_MS_PER_CHAR = 30;
@@ -459,6 +460,7 @@ const RESTART_DELAY_MS = 5000;
 
 interface RenderedLine {
   speaker: string;
+  side: "clinic" | "patient";
   text: string;
   done: boolean;
 }
@@ -466,18 +468,18 @@ interface RenderedLine {
 function renderDialogue(elapsedMs: number, dialogue: DialogueLine[]): RenderedLine[] {
   let cursor = 0;
   const result: RenderedLine[] = [];
-  for (const { speaker, line } of dialogue) {
+  for (const { speaker, line, side } of dialogue) {
     const typeMs = line.length * TYPE_MS_PER_CHAR;
     const start = cursor;
     const end = cursor + typeMs;
     if (elapsedMs <= start) {
-      result.push({ speaker, text: "", done: false });
+      result.push({ speaker, side, text: "", done: false });
     } else if (elapsedMs >= end) {
-      result.push({ speaker, text: line, done: true });
+      result.push({ speaker, side, text: line, done: true });
     } else {
       const frac = (elapsedMs - start) / typeMs;
       const chars = Math.max(0, Math.floor(line.length * frac));
-      result.push({ speaker, text: line.slice(0, chars), done: false });
+      result.push({ speaker, side, text: line.slice(0, chars), done: false });
     }
     cursor = end + PAUSE_BETWEEN_LINES_MS;
   }
@@ -493,20 +495,21 @@ function totalDialogueMs(dialogue: DialogueLine[]): number {
 }
 
 function TypewriterDialogue() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const reduced = usePrefersReducedMotion();
-  const dialogue = t.dialogue;
+  const dialogue = DIALOGUES[lang];
   const [lines, setLines] = useState<RenderedLine[]>(() =>
-    dialogue.map((d) => ({ speaker: d.speaker, text: "", done: false })),
+    dialogue.map((d) => ({ speaker: d.speaker, side: d.side, text: "", done: false })),
   );
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Reset the rendered transcript whenever the language flips.
-    setLines(dialogue.map((d) => ({ speaker: d.speaker, text: "", done: false })));
+    setLines(dialogue.map((d) => ({ speaker: d.speaker, side: d.side, text: "", done: false })));
 
     if (reduced) {
-      setLines(dialogue.map((d) => ({ speaker: d.speaker, text: d.line, done: true })));
+      setLines(
+        dialogue.map((d) => ({ speaker: d.speaker, side: d.side, text: d.line, done: true })),
+      );
       return;
     }
     const fullCycleMs = totalDialogueMs(dialogue) + RESTART_DELAY_MS;
@@ -539,30 +542,38 @@ function TypewriterDialogue() {
   return (
     <div
       aria-hidden="true"
+      className="font-mono text-[15px] leading-8 text-neutral-800"
       style={{
-        fontFamily: "var(--font-mono)",
-        fontSize: "0.875rem",
-        lineHeight: "1.7",
-        color: "var(--ink)",
-        minHeight: `calc(${dialogue.length} * 1.7em)`,
+        // Reserve a stable minimum height — 5 lines * 32px (leading-8) + margin.
+        minHeight: `${dialogue.length * 32}px`,
       }}
     >
-      {lines.map((l, i) => (
-        <div key={i} style={{ whiteSpace: "pre-wrap" }}>
-          <span style={{ color: "var(--oxblood)" }}>{l.speaker}.</span>
-          <span style={{ color: "var(--ink-soft)" }}>{"  "}</span>
-          <span>{l.text}</span>
-          {!l.done && l.text.length > 0 && (
-            <span style={{ color: "var(--oxblood)", opacity: 0.7 }}>{"█"}</span>
-          )}
-        </div>
-      ))}
+      {lines.map((l, i) => {
+        const pillBg = l.side === "clinic" ? "bg-emerald-50" : "bg-neutral-100";
+        const pillText = l.side === "clinic" ? "text-emerald-700" : "text-neutral-600";
+        return (
+          <div key={i} className="flex items-start gap-3 py-0.5">
+            <span
+              className={`mt-1.5 inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${pillBg} ${pillText}`}
+              style={{ minWidth: "62px", justifyContent: "center" }}
+            >
+              {l.side === "clinic" ? t.dialoguePanel.speakerClinic : t.dialoguePanel.speakerPatient}
+            </span>
+            <span className="min-w-0 flex-1 break-words">
+              <span>{l.text}</span>
+              {!l.done && l.text.length > 0 && (
+                <span className="ml-[2px] inline-block h-[1em] w-[7px] translate-y-[2px] bg-emerald-600 align-middle animate-pulse" />
+              )}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Fake live system status panel
+// Live status panel — white card, neutral hairlines, emerald accent.
 // ---------------------------------------------------------------------------
 
 const BAR_WIDTH = 7;
@@ -575,7 +586,6 @@ function makeBar(value: number, max: number): string {
 }
 
 function makeResponseBar(ms: number): string {
-  // Render 380-820ms as a 3-cell shaded bar — heaviest cell = slowest response.
   const ratio = Math.max(0, Math.min(1, (ms - 380) / (820 - 380)));
   if (ratio < 0.33) return "░░░";
   if (ratio < 0.66) return "▒▒▒";
@@ -583,7 +593,6 @@ function makeResponseBar(ms: number): string {
 }
 
 function weightedActiveCalls(): number {
-  // 1-6 weighted toward 3.
   const r = Math.random();
   if (r < 0.08) return 1;
   if (r < 0.22) return 2;
@@ -597,7 +606,6 @@ function LiveStatusPanel() {
   const { t, lang } = useLang();
   const reduced = usePrefersReducedMotion();
 
-  // SSR-safe deterministic initial values (no Math.random on first render).
   const [active, setActive] = useState(3);
   const [responseMs, setResponseMs] = useState(580);
   const [bookings, setBookings] = useState(12);
@@ -605,7 +613,6 @@ function LiveStatusPanel() {
 
   useEffect(() => {
     if (reduced) {
-      // Static composed frame.
       setActive(3);
       setResponseMs(612);
       setBookings(12);
@@ -613,7 +620,6 @@ function LiveStatusPanel() {
       return;
     }
 
-    // Drift response time on a smooth oscillator plus jitter.
     let responseTimer: ReturnType<typeof setInterval> | null = null;
     let activeTimer: ReturnType<typeof setInterval> | null = null;
     let bookingsTimer: ReturnType<typeof setTimeout> | null = null;
@@ -624,7 +630,7 @@ function LiveStatusPanel() {
       let phase = 0;
       responseTimer = setInterval(() => {
         phase += 0.4;
-        const base = 600 + Math.sin(phase) * 160; // 440-760
+        const base = 600 + Math.sin(phase) * 160;
         const jitter = (Math.random() - 0.5) * 80;
         const next = Math.round(Math.max(380, Math.min(820, base + jitter)));
         setResponseMs(next);
@@ -685,159 +691,131 @@ function LiveStatusPanel() {
 
   const busy = active > 4;
   const busyLabel = busy ? ` · ${t.statusPanel.busy}` : "";
+  // Pulsing dot fallback: pure tailwind animate-pulse when motion is allowed.
 
   return (
     <div
-      className="rcp-hairline"
-      style={{
-        background: "var(--paper-cream)",
-        border: "1px solid",
-        borderRadius: "2px",
-        padding: "20px 22px",
-        fontFamily: "var(--font-mono)",
-        fontSize: "0.8125rem",
-        lineHeight: 1.7,
-        color: "var(--ink)",
-        // Reserve height so the panel cannot reflow as values change.
-        minHeight: "204px",
-      }}
+      className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-7"
+      style={{ minHeight: "240px" }}
       aria-label={t.statusPanel.title}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          textTransform: "uppercase",
-          letterSpacing: "0.16em",
-          fontSize: "0.6875rem",
-          color: "var(--ink-faint)",
-          paddingBottom: "12px",
-          borderBottom: "1px solid var(--hairline-softest)",
-          marginBottom: "14px",
-        }}
-      >
-        <span>{t.statusPanel.title}</span>
-        <span
-          aria-hidden="true"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-          }}
-        >
+      <div className="mb-4 flex items-baseline justify-between border-b border-neutral-100 pb-3">
+        <span className="font-mono text-[11px] uppercase tracking-wider text-neutral-500">
+          {t.statusPanel.title}
+        </span>
+        <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-emerald-600">
           <span
-            className="rcp-pulse"
-            style={{
-              width: "7px",
-              height: "7px",
-              borderRadius: "999px",
-              background: "var(--oxblood-pulse)",
-              display: "inline-block",
-            }}
+            aria-hidden="true"
+            className={`inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 ${reduced ? "" : "animate-pulse"}`}
           />
-          <span style={{ color: "var(--oxblood)" }}>LIVE</span>
+          {t.statusPanel.live}
         </span>
       </div>
 
-      <StatusRow
-        label={t.statusPanel.active}
-        valueDisplay={
-          <>
-            <span style={{ color: busy ? "var(--oxblood)" : "var(--ink-soft)" }}>
-              {makeBar(active, 6)}
-            </span>
-            <span style={{ marginLeft: "10px", color: busy ? "var(--oxblood)" : "var(--ink)" }}>
-              {active}
-              {busyLabel}
-            </span>
-          </>
-        }
-      />
-      <StatusRow
-        label={t.statusPanel.response}
-        valueDisplay={
-          <>
-            <span style={{ color: "var(--ink-soft)" }}>{makeResponseBar(responseMs)}</span>
-            <span style={{ marginLeft: "10px" }}>{responseMs} ms</span>
-          </>
-        }
-      />
-      <StatusRow
-        label={t.statusPanel.bookings}
-        valueDisplay={<span style={{ color: "var(--oxblood)" }}>+{bookings}</span>}
-      />
-      <StatusRow
-        label={t.statusPanel.languageRow}
-        valueDisplay={
-          <span aria-hidden="true">
-            {LANGS.map((l, i) => (
-              <span key={l}>
-                <span
-                  style={{
-                    color: l === langPulse ? "var(--oxblood)" : "var(--ink-faint)",
-                    fontWeight: l === langPulse ? 600 : 400,
-                  }}
-                >
-                  {l.toUpperCase()}
-                </span>
-                {i < LANGS.length - 1 && <span style={{ color: "var(--ink-faint)" }}> · </span>}
+      <div className="space-y-2 font-mono text-[13px] leading-7 text-neutral-700">
+        <StatusRow
+          label={t.statusPanel.active}
+          valueDisplay={
+            <>
+              <span className={busy ? "text-emerald-600" : "text-neutral-400"}>
+                {makeBar(active, 6)}
               </span>
-            ))}
-          </span>
-        }
-      />
+              <span className={`ml-2.5 ${busy ? "text-emerald-700" : "text-neutral-900"}`}>
+                {active}
+                {busyLabel}
+              </span>
+            </>
+          }
+        />
+        <StatusRow
+          label={t.statusPanel.response}
+          valueDisplay={
+            <>
+              <span className="text-neutral-400">{makeResponseBar(responseMs)}</span>
+              <span className="ml-2.5 text-neutral-900">{responseMs} ms</span>
+            </>
+          }
+        />
+        <StatusRow
+          label={t.statusPanel.bookings}
+          valueDisplay={<span className="text-emerald-700">+{bookings}</span>}
+        />
+        <StatusRow
+          label={t.statusPanel.languageRow}
+          valueDisplay={
+            <span aria-hidden="true">
+              {LANGS.map((l, i) => (
+                <span key={l}>
+                  <span
+                    className={
+                      l === langPulse
+                        ? "font-semibold text-emerald-700"
+                        : "text-neutral-400"
+                    }
+                  >
+                    {l.toUpperCase()}
+                  </span>
+                  {i < LANGS.length - 1 && <span className="text-neutral-300"> · </span>}
+                </span>
+              ))}
+            </span>
+          }
+        />
+      </div>
     </div>
   );
 }
 
 function StatusRow({ label, valueDisplay }: { label: string; valueDisplay: React.ReactNode }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) auto",
-        gap: "16px",
-        alignItems: "baseline",
-        padding: "4px 0",
-      }}
-    >
-      <span style={{ color: "var(--ink-soft)" }}>{label}</span>
-      <span style={{ whiteSpace: "nowrap" }}>{valueDisplay}</span>
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4 py-1">
+      <span className="text-neutral-500">{label}</span>
+      <span className="whitespace-nowrap">{valueDisplay}</span>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Calendar fills
+// Calendar — ported polish from CD HTML. Recolored to emerald.
+// 5 weeks × 7 days = 35 cells. Filled cells use emerald-200 bg, emerald-700 text.
 // ---------------------------------------------------------------------------
 
-const CAL_CELLS = 35;
+const CAL_ROWS = 5;
+const CAL_COLS = 7;
+const CAL_CELLS = CAL_ROWS * CAL_COLS;
 const CAL_FILL_THRESHOLD = 0.7;
+
+interface CalCell {
+  filled: boolean;
+  flashing: boolean;
+}
 
 function CalendarFills() {
   const { t } = useLang();
   const reduced = usePrefersReducedMotion();
 
-  // 0 = empty, 1 = filled. Start with a deterministic distribution so
-  // SSR + first client render agree.
-  const initialPattern: number[] = useMemo(() => {
-    // Seed: every 4th cell filled, biased toward the first 3 weeks (typical month-to-date).
-    const arr = new Array(CAL_CELLS).fill(0);
+  // Deterministic initial pattern so SSR + first client render agree.
+  const initialPattern: CalCell[] = useMemo(() => {
+    const arr: CalCell[] = new Array(CAL_CELLS).fill(null).map(() => ({
+      filled: false,
+      flashing: false,
+    }));
+    // Every 4th cell, biased toward early month.
     for (let i = 0; i < CAL_CELLS; i++) {
-      if (i % 4 === 0 && i < 24) arr[i] = 1;
+      if (i % 4 === 0 && i < 24) arr[i]!.filled = true;
     }
     return arr;
   }, []);
 
-  const [cells, setCells] = useState<number[]>(initialPattern);
+  const [cells, setCells] = useState<CalCell[]>(initialPattern);
   const [counter, setCounter] = useState(12);
 
   useEffect(() => {
     if (reduced) {
-      // ~50% filled static frame.
-      const half = new Array(CAL_CELLS).fill(0);
-      for (let i = 0; i < CAL_CELLS; i++) if (i % 2 === 0) half[i] = 1;
+      const half: CalCell[] = new Array(CAL_CELLS).fill(null).map((_, i) => ({
+        filled: i % 2 === 0,
+        flashing: false,
+      }));
       setCells(half);
       setCounter(12);
       return;
@@ -845,25 +823,34 @@ function CalendarFills() {
 
     let fillTimer: ReturnType<typeof setTimeout> | null = null;
     let counterTimer: ReturnType<typeof setInterval> | null = null;
+    const flashTimers: ReturnType<typeof setTimeout>[] = [];
     let stopped = false;
 
     const scheduleFill = () => {
-      const delay = 600 + Math.random() * 900;
+      const delay = 800 + Math.random() * 1400;
       fillTimer = setTimeout(() => {
         if (stopped) return;
         setCells((prev) => {
-          const filled = prev.filter((c) => c === 1).length;
-          if (filled / CAL_CELLS >= CAL_FILL_THRESHOLD) {
-            // Reset to the seed sparse pattern.
-            return initialPattern.slice();
+          const filledCount = prev.filter((c) => c.filled).length;
+          if (filledCount / CAL_CELLS >= CAL_FILL_THRESHOLD) {
+            // Reset to seed.
+            return initialPattern.map((c) => ({ ...c }));
           }
-          // Pick a random empty cell.
           const empties: number[] = [];
-          for (let i = 0; i < prev.length; i++) if (prev[i] === 0) empties.push(i);
-          if (empties.length === 0) return initialPattern.slice();
+          for (let i = 0; i < prev.length; i++) if (!prev[i]!.filled) empties.push(i);
+          if (empties.length === 0) return initialPattern.map((c) => ({ ...c }));
           const pick = empties[Math.floor(Math.random() * empties.length)]!;
-          const next = prev.slice();
-          next[pick] = 1;
+          const next = prev.map((c) => ({ ...c }));
+          next[pick] = { filled: true, flashing: true };
+
+          // Clear the flash after the CSS pulse window.
+          const tid = setTimeout(() => {
+            if (stopped) return;
+            setCells((curr) =>
+              curr.map((c, i) => (i === pick ? { ...c, flashing: false } : c)),
+            );
+          }, 900);
+          flashTimers.push(tid);
           return next;
         });
         scheduleFill();
@@ -885,9 +872,7 @@ function CalendarFills() {
       } else {
         if (!fillTimer) scheduleFill();
         if (!counterTimer) {
-          counterTimer = setInterval(() => {
-            setCounter((c) => c + 1);
-          }, 11000);
+          counterTimer = setInterval(() => setCounter((c) => c + 1), 11000);
         }
       }
     };
@@ -897,73 +882,47 @@ function CalendarFills() {
       stopped = true;
       if (fillTimer) clearTimeout(fillTimer);
       if (counterTimer) clearInterval(counterTimer);
+      flashTimers.forEach((t) => clearTimeout(t));
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [reduced, initialPattern]);
 
   return (
     <div
-      style={{
-        fontFamily: "var(--font-mono)",
-        fontSize: "0.75rem",
-        color: "var(--ink)",
-        // Reserve fixed height matching status panel.
-        minHeight: "204px",
-        display: "flex",
-        flexDirection: "column",
-      }}
+      className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-7"
+      style={{ minHeight: "240px" }}
       aria-label={t.calendar.label}
     >
-      <div
-        style={{
-          textTransform: "uppercase",
-          letterSpacing: "0.16em",
-          fontSize: "0.6875rem",
-          color: "var(--ink-faint)",
-          paddingBottom: "12px",
-          borderBottom: "1px solid var(--hairline-softest)",
-          marginBottom: "14px",
-        }}
-      >
-        {t.calendar.label}
+      <div className="mb-4 border-b border-neutral-100 pb-3">
+        <span className="font-mono text-[11px] uppercase tracking-wider text-neutral-500">
+          {t.calendar.label}
+        </span>
       </div>
       <div
         aria-hidden="true"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: "4px",
-          maxWidth: "220px",
-        }}
+        className="grid grid-cols-7 gap-1.5"
+        style={{ maxWidth: "260px" }}
       >
         {cells.map((c, i) => (
           <div
             key={i}
-            style={{
-              aspectRatio: "1 / 1",
-              background: c === 1 ? "var(--oxblood-dim)" : "var(--paper-deep)",
-              border: "1px solid var(--hairline-softest)",
-              borderRadius: "1px",
-              transition: "background 320ms cubic-bezier(0.16, 1, 0.3, 1)",
-            }}
+            className={[
+              "aspect-square rounded-sm border transition-colors duration-300 ease-out",
+              c.filled
+                ? "border-emerald-300 bg-emerald-200"
+                : "border-neutral-200 bg-neutral-100",
+              c.flashing ? "rcp-cal-flash" : "",
+            ].join(" ")}
           />
         ))}
       </div>
-      <div
-        style={{
-          marginTop: "14px",
-          fontSize: "0.75rem",
-          color: "var(--ink-soft)",
-        }}
-      >
-        {t.calendar.counter(counter)}
-      </div>
+      <div className="mt-4 font-mono text-xs text-neutral-500">{t.calendar.counter(counter)}</div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Language switcher button
+// Language switcher
 // ---------------------------------------------------------------------------
 
 function LangSwitcher() {
@@ -972,12 +931,8 @@ function LangSwitcher() {
     <span
       role="group"
       aria-label="Language"
-      className="rcp-mono"
-      style={{
-        fontSize: "0.75rem",
-        letterSpacing: "0.12em",
-        color: "var(--ink-faint)",
-      }}
+      className="font-mono text-xs"
+      style={{ letterSpacing: "0.12em" }}
     >
       {LANGS.map((l, i) => (
         <span key={l}>
@@ -985,23 +940,21 @@ function LangSwitcher() {
             type="button"
             onClick={() => setLang(l)}
             aria-pressed={lang === l}
-            className="rcp-lang-btn"
-            style={{
-              fontFamily: "inherit",
-              fontSize: "inherit",
-              letterSpacing: "inherit",
-              padding: "2px 4px",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: lang === l ? "var(--oxblood)" : "var(--ink-faint)",
-              fontWeight: lang === l ? 700 : 400,
-              textTransform: "uppercase",
-            }}
+            className={[
+              "px-1 py-0.5 uppercase transition-colors duration-200",
+              lang === l
+                ? "font-bold text-emerald-600"
+                : "text-neutral-400 hover:text-neutral-700",
+            ].join(" ")}
+            style={{ background: "transparent", border: "none", cursor: "pointer" }}
           >
             {l}
           </button>
-          {i < LANGS.length - 1 && <span aria-hidden="true"> · </span>}
+          {i < LANGS.length - 1 && (
+            <span aria-hidden="true" className="text-neutral-300">
+              {" · "}
+            </span>
+          )}
         </span>
       ))}
     </span>
@@ -1009,7 +962,7 @@ function LangSwitcher() {
 }
 
 // ---------------------------------------------------------------------------
-// Page (inner — uses lang context)
+// Page
 // ---------------------------------------------------------------------------
 
 const MAILTO_DEMO =
@@ -1019,450 +972,165 @@ function LandingInner() {
   const { t } = useLang();
 
   return (
-    <div className="recepcjonistka-root">
+    <div
+      className="min-h-screen bg-white text-neutral-900"
+      style={{ fontFamily: "var(--font-sans)" }}
+    >
       <style jsx global>{`
-        .recepcjonistka-root {
-          /* Page-scoped: applies only on /. */
-          background-color: var(--paper);
-          /* Very subtle dot grid for halftone density. 1% ink dots every 24px. */
-          background-image: radial-gradient(
-            circle at 1px 1px,
-            oklch(0.22 0.012 60 / 0.04) 1px,
-            transparent 0
-          );
-          background-size: 24px 24px;
-          color: var(--ink);
-          font-family: var(--font-sans);
-          min-height: 100vh;
-          font-size: 16px;
-          line-height: 1.55;
+        /* Selection — emerald wash, not the default browser blue. */
+        ::selection {
+          background: rgb(167 243 208); /* emerald-200 */
+          color: rgb(6 78 59); /* emerald-900 */
         }
-        .recepcjonistka-root ::selection {
-          background: var(--oxblood);
-          color: var(--oxblood-cream);
-        }
-        .rcp-serif {
-          font-family: var(--font-serif);
-          font-feature-settings: "kern" 1, "liga" 1, "onum" 1;
-        }
-        .rcp-mono {
-          font-family: var(--font-mono);
-        }
-        .rcp-hairline {
-          border-color: var(--hairline);
-        }
-        .rcp-link {
-          color: var(--ink);
-          text-decoration: none;
-          border-bottom: 1px solid var(--hairline);
-          transition: color 200ms cubic-bezier(0.16, 1, 0.3, 1),
-            border-color 200ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .rcp-link:hover {
-          color: var(--oxblood);
-          border-color: var(--oxblood);
-        }
-        .rcp-nav-link {
-          color: var(--ink-soft);
-          text-decoration: none;
-          font-size: 0.8125rem;
-          transition: color 200ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .rcp-nav-link:hover {
-          color: var(--oxblood);
-        }
-        .rcp-lang-btn:hover {
-          color: var(--oxblood) !important;
-        }
-        .rcp-cta {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          background: var(--oxblood);
-          color: var(--oxblood-cream);
-          padding: 14px 28px;
-          border-radius: 999px;
-          font-size: 0.95rem;
-          font-weight: 500;
-          text-decoration: none;
-          transition: background 200ms cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .rcp-cta:hover {
-          background: var(--oxblood-deep);
-        }
-        .rcp-cta:focus-visible {
-          outline: 2px solid var(--oxblood-deep);
-          outline-offset: 3px;
-        }
-        @keyframes rcp-pulse {
-          0%,
+        /* Calendar flash — box-shadow ring fade-out, no layout cost. */
+        @keyframes rcp-cal-flash {
+          0% {
+            box-shadow: 0 0 0 0 rgb(16 185 129 / 0.45);
+          }
           100% {
-            opacity: 0.45;
-          }
-          50% {
-            opacity: 1;
+            box-shadow: 0 0 0 8px rgb(16 185 129 / 0);
           }
         }
-        .rcp-pulse {
-          animation: rcp-pulse 1800ms cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        .rcp-cal-flash {
+          animation: rcp-cal-flash 900ms ease-out;
         }
         @media (prefers-reduced-motion: reduce) {
-          .rcp-pulse {
+          .rcp-cal-flash {
             animation: none;
-            opacity: 0.8;
           }
         }
-        .rcp-asym-grid {
-          display: grid;
-          gap: 32px;
-          grid-template-columns: 1fr;
-        }
-        @media (min-width: 768px) {
-          .rcp-asym-grid {
-            grid-template-columns: 3fr 2fr;
-            align-items: stretch;
-          }
-        }
-        .rcp-six-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 0;
-        }
-        @media (min-width: 768px) {
-          .rcp-six-grid {
-            grid-template-columns: 1fr 1fr;
-            column-gap: 56px;
-          }
-          .rcp-six-grid .rcp-six-last-row {
-            border-bottom: none !important;
-          }
+        /* Ruled-paper backdrop — very subtle 32px gridlines for the dialogue card. */
+        .rcp-ruled {
+          background-image: repeating-linear-gradient(
+            to bottom,
+            transparent 0,
+            transparent calc(2rem - 1px),
+            rgba(0, 0, 0, 0.04) calc(2rem - 1px),
+            rgba(0, 0, 0, 0.04) 2rem
+          );
+          background-position: 0 0.5rem;
         }
       `}</style>
 
       {/* HEADER */}
-      <header
-        className="rcp-hairline"
-        style={{
-          borderBottomWidth: 1,
-          borderBottomStyle: "solid",
-          background: "var(--paper)",
-          position: "relative",
-          zIndex: 2,
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "72rem",
-            margin: "0 auto",
-            padding: "18px 24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "20px",
-            flexWrap: "wrap",
-          }}
-        >
-          <span
-            className="rcp-serif"
-            style={{
-              fontStyle: "italic",
-              fontSize: "1.125rem",
-              color: "var(--ink)",
-              letterSpacing: "-0.005em",
-            }}
-          >
+      <header className="border-b border-neutral-200 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <span className="text-base font-semibold tracking-tight text-neutral-900">
             {t.wordmark}
           </span>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "20px",
-            }}
-          >
+          <div className="flex items-center gap-5">
             <LangSwitcher />
             <span
               aria-hidden="true"
-              style={{
-                width: "1px",
-                height: "14px",
-                background: "var(--hairline)",
-                display: "inline-block",
-              }}
+              className="inline-block h-3.5 w-px bg-neutral-200"
             />
-            <a href="/auth/sign-in" className="rcp-nav-link">
+            <a
+              href="/auth/sign-in"
+              className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
+            >
               {t.nav.client}
             </a>
-            <a href="/auth/sign-in" className="rcp-nav-link">
+            <a
+              href="/auth/sign-in"
+              className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
+            >
               {t.nav.operator}
             </a>
           </div>
         </div>
       </header>
 
-      {/* HERO */}
+      {/* HERO — bright white, faint dot grid only on this section. */}
       <section
+        className="bg-white"
         style={{
-          maxWidth: "44rem",
-          margin: "0 auto",
-          padding: "80px 24px 40px",
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgba(0,0,0,0.06) 1px, transparent 0)",
+          backgroundSize: "24px 24px",
         }}
       >
-        <HalftoneWaveform />
-        <h1
-          className="rcp-serif"
-          style={{
-            fontSize: "clamp(2.25rem, 4.5vw, 3.25rem)",
-            fontWeight: 600,
-            lineHeight: 1.1,
-            letterSpacing: "-0.015em",
-            marginTop: "36px",
-            marginBottom: "28px",
-            color: "var(--ink)",
-            fontStyle: "italic",
-          }}
-        >
-          {t.hero.title}
-        </h1>
-        <p
-          style={{
-            fontSize: "1.0625rem",
-            lineHeight: 1.65,
-            color: "var(--ink-soft)",
-            maxWidth: "60ch",
-          }}
-        >
-          {t.hero.body}
-        </p>
-      </section>
-
-      {/* LIVE STATUS + CALENDAR — 60/40 asymmetric row */}
-      <section
-        style={{
-          maxWidth: "56rem",
-          margin: "0 auto",
-          padding: "16px 24px 48px",
-        }}
-      >
-        <div className="rcp-asym-grid">
-          <LiveStatusPanel />
-          <CalendarFills />
+        <div className="mx-auto max-w-3xl px-6 py-20 sm:py-24">
+          <HalftoneWaveform />
+          <h1 className="mt-10 text-4xl font-bold leading-[1.1] tracking-tight text-neutral-900 sm:text-5xl">
+            {t.hero.title}
+          </h1>
+          <p className="mt-6 max-w-2xl text-base leading-relaxed text-neutral-700 sm:text-lg">
+            {t.hero.body}
+          </p>
         </div>
       </section>
 
-      {/* OXBLOOD BAND */}
-      <section
-        className="rcp-hairline"
-        style={{
-          borderTop: "1px solid var(--oxblood-deep)",
-          borderBottom: "1px solid var(--oxblood-deep)",
-          background: "var(--paper-cream)",
-          padding: "20px 24px",
-          textAlign: "center",
-          minHeight: "64px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <p
-          className="rcp-serif"
-          style={{
-            fontStyle: "italic",
-            fontSize: "1.0625rem",
-            lineHeight: 1.4,
-            color: "var(--oxblood-deep)",
-            margin: 0,
-            maxWidth: "44rem",
-          }}
-        >
-          {t.band}
-        </p>
-      </section>
-
-      {/* LIVE CONVERSATION PANEL */}
-      <section
-        style={{
-          maxWidth: "44rem",
-          margin: "0 auto",
-          padding: "48px 24px 64px",
-        }}
-      >
-        <div
-          className="rcp-hairline"
-          style={{
-            background: "var(--paper-deep)",
-            border: "1px solid",
-            borderRadius: "2px",
-            padding: "28px 32px",
-          }}
-        >
-          <div
-            className="rcp-mono"
-            style={{
-              fontSize: "0.6875rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.18em",
-              color: "var(--ink-faint)",
-              marginBottom: "20px",
-            }}
-          >
-            {t.dialoguePanel.eyebrow}
+      {/* LIVE STATUS + CALENDAR — neutral-50 band */}
+      <section className="bg-neutral-50">
+        <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
+            <div className="md:col-span-3">
+              <LiveStatusPanel />
+            </div>
+            <div className="md:col-span-2">
+              <CalendarFills />
+            </div>
           </div>
-          <TypewriterDialogue />
         </div>
       </section>
 
-      {/* WHY THIS EXISTS */}
-      <section
-        style={{
-          maxWidth: "44rem",
-          margin: "0 auto",
-          padding: "0 24px 64px",
-        }}
-      >
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {t.observations.map((line, i, arr) => (
-            <li
-              key={line}
-              className={i < arr.length - 1 ? "rcp-hairline" : ""}
-              style={{
-                borderBottomWidth: i < arr.length - 1 ? 1 : 0,
-                borderBottomStyle: "solid",
-                padding: "24px 0",
-              }}
-            >
-              <p
-                className="rcp-serif"
-                style={{
-                  fontStyle: "italic",
-                  fontSize: "1.25rem",
-                  lineHeight: 1.5,
-                  color: "var(--ink)",
-                  margin: 0,
-                }}
-              >
-                {line}
-              </p>
-            </li>
-          ))}
-        </ul>
+      {/* TYPEWRITER DIALOGUE — white band */}
+      <section className="bg-white">
+        <div className="mx-auto max-w-3xl px-6 py-16 sm:py-20">
+          <div className="rcp-ruled rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8">
+            <div className="mb-4 font-mono text-[11px] uppercase tracking-wider text-neutral-500">
+              {t.dialoguePanel.eyebrow}
+            </div>
+            <TypewriterDialogue />
+          </div>
+        </div>
       </section>
 
-      {/* WHAT IT DOES — 6 items, two columns */}
-      <section
-        style={{
-          maxWidth: "56rem",
-          margin: "0 auto",
-          padding: "0 24px 64px",
-        }}
-      >
-        <div
-          className="rcp-mono"
-          style={{
-            fontSize: "0.6875rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.18em",
-            color: "var(--ink-faint)",
-            marginBottom: "32px",
-          }}
-        >
-          {t.whatItDoes.eyebrow}
-        </div>
-        <ol className="rcp-six-grid" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {t.whatItDoes.items.map((line, i, arr) => {
-            // Hairline divider between rows. On 2-col layout each row spans 2 items,
-            // so the last 2 items skip their bottom border.
-            const isLastRowOnMd = i >= arr.length - 2;
-            return (
+      {/* WHAT IT DOES — neutral-50 band, 2x3 numbered cards */}
+      <section className="bg-neutral-50">
+        <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+          <div className="mb-8 font-mono text-[11px] uppercase tracking-wider text-neutral-500">
+            {t.whatItDoes.eyebrow}
+          </div>
+          <ol className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {t.whatItDoes.items.map((line, i) => (
               <li
                 key={line}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(60px, auto) minmax(0, 1fr)",
-                  gap: "16px",
-                  alignItems: "baseline",
-                  padding: "18px 0",
-                  borderBottom: "1px solid var(--hairline-faint)",
-                  // Strip the bottom hairline from the visually-last rows.
-                  ...(isLastRowOnMd ? { borderBottom: "1px solid var(--hairline-faint)" } : {}),
-                }}
-                className={isLastRowOnMd ? "rcp-six-last-row" : ""}
+                className="group rounded-2xl border border-neutral-200 bg-white p-6 transition-colors duration-200 hover:border-neutral-300 hover:bg-emerald-50/30"
               >
-                <span
-                  className="rcp-serif"
-                  style={{
-                    fontSize: "1.875rem",
-                    fontWeight: 500,
-                    color: "var(--oxblood)",
-                    fontVariantNumeric: "lining-nums",
-                  }}
-                >
+                <div className="font-mono text-xs font-semibold text-emerald-600">
                   {String(i + 1).padStart(2, "0")}
-                </span>
-                <span
-                  style={{
-                    fontSize: "1rem",
-                    lineHeight: 1.55,
-                    color: "var(--ink)",
-                  }}
-                >
+                </div>
+                <p className="mt-3 text-[15px] font-medium leading-relaxed text-neutral-900">
                   {line}
-                </span>
+                </p>
               </li>
-            );
-          })}
-        </ol>
+            ))}
+          </ol>
+        </div>
       </section>
 
-      {/* CTA */}
-      <section
-        style={{
-          maxWidth: "44rem",
-          margin: "0 auto",
-          padding: "16px 24px 80px",
-          textAlign: "center",
-        }}
-      >
-        <p
-          className="rcp-serif"
-          style={{
-            fontStyle: "italic",
-            fontSize: "1.5rem",
-            lineHeight: 1.4,
-            color: "var(--ink)",
-            margin: "0 0 32px",
-          }}
-        >
-          {t.cta.headline}
-        </p>
-        <a href={MAILTO_DEMO} className="rcp-cta">
-          {t.cta.button} <span aria-hidden="true">→</span>
-        </a>
+      {/* CTA — neutral-50 band (visual rest before footer) */}
+      <section className="bg-neutral-50">
+        <div className="mx-auto max-w-3xl px-6 py-20 text-center sm:py-24">
+          <h2 className="text-3xl font-bold leading-tight tracking-tight text-neutral-900 sm:text-4xl">
+            {t.cta.headline}
+          </h2>
+          <a
+            href={MAILTO_DEMO}
+            className="mt-8 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+          >
+            {t.cta.button} <span aria-hidden="true">→</span>
+          </a>
+        </div>
       </section>
 
       {/* FOOTER */}
-      <footer
-        className="rcp-hairline"
-        style={{
-          borderTopWidth: 1,
-          borderTopStyle: "solid",
-          marginTop: "32px",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "72rem",
-            margin: "0 auto",
-            padding: "24px",
-            fontSize: "0.75rem",
-            color: "var(--ink-faint)",
-            display: "flex",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "8px",
-          }}
-        >
+      <footer className="border-t border-neutral-200 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-6 text-xs text-neutral-500">
+          <span className="font-semibold tracking-tight text-neutral-700">
+            {t.footer.copyright}
+          </span>
           <span>{t.footer.privacy}</span>
           <span>
             &copy; {new Date().getFullYear()} {t.footer.copyright}
@@ -1474,7 +1142,7 @@ function LandingInner() {
 }
 
 // ---------------------------------------------------------------------------
-// Page (outer — wraps the provider)
+// Outer page
 // ---------------------------------------------------------------------------
 
 export default function HomePage() {

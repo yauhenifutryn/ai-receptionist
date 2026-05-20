@@ -36,8 +36,38 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     });
   });
 
-  it("provisionAgent POSTs hardened privacy + locked voice + tool catalog", async () => {
-    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ agent_id: "agent-77" }));
+  it("provisionAgent POSTs hardened privacy + locked voice + tool_ids", async () => {
+    // EL ConvAI deprecated inline `prompt.tools: [...]` in favor of a
+    // workspace catalog referenced by `prompt.tool_ids`. provisionAgent now
+    // calls ensureBookingTools() first to get the ids, then attaches them.
+    // The 3 GET/POST traffic for the catalog comes first; agents/create last.
+    const fetcher = vi
+      .fn()
+      // listWorkspaceTools (called inside ensureBookingTools → findOrCreate
+      // for check_availability). Both tools already exist in workspace.
+      .mockImplementationOnce(() =>
+        Promise.resolve(
+          jsonResponse({
+            tools: [
+              { id: "tool_ca", tool_config: { name: "check_availability" } },
+              { id: "tool_cb", tool_config: { name: "create_booking" } },
+            ],
+          }),
+        ),
+      )
+      // listWorkspaceTools (second findOrCreate, for create_booking).
+      .mockImplementationOnce(() =>
+        Promise.resolve(
+          jsonResponse({
+            tools: [
+              { id: "tool_ca", tool_config: { name: "check_availability" } },
+              { id: "tool_cb", tool_config: { name: "create_booking" } },
+            ],
+          }),
+        ),
+      )
+      // POST /v1/convai/agents/create
+      .mockResolvedValueOnce(jsonResponse({ agent_id: "agent-77" }));
     const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });
     const result = await provider.provisionAgent({
       tenantId: "t-1",
@@ -49,11 +79,16 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     expect(result.agentId).toBe("agent-77");
     expect(result.browserTestUrl).toContain("agent-77");
 
-    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    // Find the agents/create call (last one).
+    const createIdx = fetcher.mock.calls.findIndex(
+      (c) => typeof c[0] === "string" && (c[0] as string).endsWith("/v1/convai/agents/create"),
+    );
+    expect(createIdx).toBeGreaterThanOrEqual(0);
+    const [url, init] = fetcher.mock.calls[createIdx] as [string, RequestInit];
     expect(url).toBe("https://api.elevenlabs.io/v1/convai/agents/create");
     expect(init.method).toBe("POST");
 
-    const body = parseBody(fetcher.mock.calls[0] as [unknown, RequestInit | undefined]);
+    const body = parseBody(fetcher.mock.calls[createIdx] as [unknown, RequestInit | undefined]);
     const platform = body.platform_settings as Record<string, Record<string, unknown>>;
     expect(platform.privacy).toEqual({
       record_voice: false,
@@ -71,14 +106,15 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     expect(prompt.temperature).toBe(0.3);
     expect(agent.language).toBe("pl");
 
-    // Chat B (2026-05-20): tools are enabled at provisioning. The backend
-    // routes them through SimulatedCalendarProvider until a real
-    // CalendarProvider is wired per-pilot. Agent advertises 2 tools:
-    // check_availability + create_booking, both webhook-typed.
-    const tools = prompt.tools as Array<{ name: string; type: string }>;
-    expect(tools).toHaveLength(2);
-    expect(tools.map((t) => t.name).sort()).toEqual(["check_availability", "create_booking"]);
-    expect(tools.every((t) => t.type === "webhook")).toBe(true);
+    // Chat C (2026-05-20): tools attached via workspace catalog tool_ids,
+    // NOT inline `prompt.tools`. EL deprecated the inline form — PATCHes
+    // succeeded (200) but the tools were silently dropped server-side. The
+    // tool_ids must reference workspace tools that already exist (or were
+    // just created by ensureBookingTools).
+    expect(prompt.tools).toBeUndefined();
+    const toolIds = prompt.tool_ids as string[];
+    expect(toolIds).toHaveLength(2);
+    expect(toolIds.sort()).toEqual(["tool_ca", "tool_cb"]);
 
     // ElevenLabs ConvAI knowledge_base entry shape is
     // { type, id, name, usage_mode }, NOT a flat document_id. Using "text"
@@ -107,7 +143,22 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
   });
 
   it("provisionAgent applies a caller-provided voice override when given", async () => {
-    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ agent_id: "agent-1" }));
+    // Two catalog GETs + one agents/create POST. Tools already exist so no
+    // catalog POSTs.
+    const catalogListFactory = () =>
+      Promise.resolve(
+        jsonResponse({
+          tools: [
+            { id: "tool_ca", tool_config: { name: "check_availability" } },
+            { id: "tool_cb", tool_config: { name: "create_booking" } },
+          ],
+        }),
+      );
+    const fetcher = vi
+      .fn()
+      .mockImplementationOnce(catalogListFactory)
+      .mockImplementationOnce(catalogListFactory)
+      .mockResolvedValueOnce(jsonResponse({ agent_id: "agent-1" }));
     const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });
     await provider.provisionAgent({
       tenantId: "t-1",
@@ -117,7 +168,10 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
       postCallWebhookUrl: "https://x/p",
       voiceId: "custom-voice-xyz",
     });
-    const body = parseBody(fetcher.mock.calls[0] as [unknown, RequestInit | undefined]);
+    const createIdx = fetcher.mock.calls.findIndex(
+      (c) => typeof c[0] === "string" && (c[0] as string).endsWith("/v1/convai/agents/create"),
+    );
+    const body = parseBody(fetcher.mock.calls[createIdx] as [unknown, RequestInit | undefined]);
     const conv = body.conversation_config as Record<string, Record<string, unknown>>;
     expect((conv.tts as Record<string, unknown>).voice_id).toBe("custom-voice-xyz");
   });
@@ -144,74 +198,62 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     });
   });
 
-  it("updateAgentTools PATCHes tools[] onto an existing agent", async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+  it("updateAgentTools PATCHes prompt.tool_ids (not inline tools) onto an existing agent", async () => {
+    // Catalog: tool_ca exists, tool_cb missing → one POST creates it. Then
+    // PATCH on agent with tool_ids = [ca, new_cb].
+    const fetcher = vi
+      .fn()
+      // listWorkspaceTools (for check_availability find).
+      .mockImplementationOnce(() =>
+        Promise.resolve(
+          jsonResponse({
+            tools: [
+              { id: "tool_ca", tool_config: { name: "check_availability" } },
+            ],
+          }),
+        ),
+      )
+      // listWorkspaceTools (for create_booking find — still missing).
+      .mockImplementationOnce(() =>
+        Promise.resolve(
+          jsonResponse({
+            tools: [
+              { id: "tool_ca", tool_config: { name: "check_availability" } },
+            ],
+          }),
+        ),
+      )
+      // POST create create_booking.
+      .mockResolvedValueOnce(jsonResponse({ id: "tool_cb_new" }))
+      // PATCH /v1/convai/agents/{id}
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
     const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });
     await provider.updateAgentTools({
       agentId: "agent-77",
       serverToolBaseUrl: "https://backend.example.com",
     });
-    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.elevenlabs.io/v1/convai/agents/agent-77");
-    expect(init.method).toBe("PATCH");
-    const body = parseBody(fetcher.mock.calls[0] as [unknown, RequestInit | undefined]);
-    const tools = (
-      body.conversation_config as Record<string, Record<string, Record<string, unknown>>>
-    ).agent.prompt.tools as Array<Record<string, unknown>>;
-    expect(tools).toHaveLength(2);
-    expect(tools.map((t) => t.name as string).sort()).toEqual([
-      "check_availability",
-      "create_booking",
-    ]);
-  });
-
-  it("tool schemas declare description on every primitive property (EL ConvAI 400 guard)", async () => {
-    // EL ConvAI rejects (HTTP 400, "Must set one of: description, ...") any
-    // string/number/boolean property in a tool's request_body_schema that
-    // lacks `description` (or one of the alternates). This test walks both
-    // tools' schemas and asserts every primitive has `description` set.
-    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ agent_id: "a" }));
-    const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });
-    await provider.provisionAgent({
-      tenantId: "t",
-      tenantDisplayName: "T",
-      knowledgeBaseDocumentIds: [],
-      serverToolBaseUrl: "https://x",
-      postCallWebhookUrl: "https://x/p",
-    });
-    const body = parseBody(fetcher.mock.calls[0] as [unknown, RequestInit | undefined]);
-    const tools = (
-      (body.conversation_config as Record<string, Record<string, Record<string, unknown>>>).agent
-        .prompt as Record<string, unknown>
-    ).tools as Array<Record<string, unknown>>;
-
-    function walk(obj: unknown, path: string): string[] {
-      if (!obj || typeof obj !== "object") return [];
-      const o = obj as Record<string, unknown>;
-      const failures: string[] = [];
-      if (
-        typeof o.type === "string" &&
-        ["string", "number", "boolean", "integer"].includes(o.type) &&
-        typeof o.description !== "string"
-      ) {
-        failures.push(`${path}.${o.type} missing description`);
-      }
-      if (o.properties && typeof o.properties === "object") {
-        for (const [k, v] of Object.entries(o.properties as Record<string, unknown>)) {
-          failures.push(...walk(v, `${path}.${k}`));
-        }
-      }
-      return failures;
-    }
-
-    const failures = tools.flatMap((t) =>
-      walk(
-        ((t.api_schema as Record<string, unknown>).request_body_schema as unknown),
-        `tools.${t.name as string}`,
-      ),
+    const patchIdx = fetcher.mock.calls.findIndex(
+      (c) =>
+        typeof c[0] === "string" &&
+        (c[0] as string).endsWith("/v1/convai/agents/agent-77") &&
+        (c[1] as RequestInit | undefined)?.method === "PATCH",
     );
-    expect(failures).toEqual([]);
+    expect(patchIdx).toBeGreaterThanOrEqual(0);
+    const body = parseBody(fetcher.mock.calls[patchIdx] as [unknown, RequestInit | undefined]);
+    const prompt = (
+      body.conversation_config as Record<string, Record<string, Record<string, unknown>>>
+    ).agent.prompt as Record<string, unknown>;
+    // Old inline form must NOT be sent — that's the regression we're guarding.
+    expect(prompt.tools).toBeUndefined();
+    const toolIds = prompt.tool_ids as string[];
+    expect(toolIds).toEqual(["tool_ca", "tool_cb_new"]);
   });
+
+  // Note: the EL ConvAI "every primitive has description" 400-guard walker
+  // moved to test/orchestration/elevenlabs-tools-catalog.test.ts — the tool
+  // definitions now live in buildToolSpecs() in elevenlabs-tools-catalog.ts,
+  // which is the only place that POSTs the schemas to EL. The walker still
+  // runs against the same source of truth.
 
   it("deleteAgent DELETEs /v1/convai/agents/{id}", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));

@@ -8,6 +8,7 @@ import type {
   VoiceAgentProvider,
 } from "@ai-receptionist/contracts";
 import { buildSystemPrompt } from "../prompts/system-prompt.js";
+import { ElevenLabsToolsCatalog } from "./elevenlabs-tools-catalog.js";
 
 /**
  * ElevenLabs ConvAI implementation of the VoiceAgentProvider contract.
@@ -28,113 +29,12 @@ export const DEFAULT_AGENT_LLM = "qwen36-35b-a3b";
 export const DEFAULT_AGENT_TEMPERATURE = 0.3;
 export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 
-/**
- * EL ConvAI validates every primitive property in a tool's
- * request_body_schema and rejects (HTTP 400) any that doesn't declare one of:
- * `description`, `dynamic_variable`, `is_system_provided`, `constant_value`.
- * We use `description` everywhere — it's what the agent's LLM reads to pick
- * the right value, so it has user-visible value beyond satisfying validation.
- *
- * Single source of truth: both provisionAgent (create) and updateAgentTools
- * (PATCH retrofit) call this so the schemas can't drift.
- */
-function buildToolsDefinition(serverToolBaseUrl: string) {
-  return [
-    {
-      type: "webhook",
-      name: "check_availability",
-      description: "List up to 5 appointment slots for a service category.",
-      api_schema: {
-        url: `${serverToolBaseUrl}/tools/check-availability`,
-        method: "POST",
-        content_type: "application/json",
-        request_body_schema: {
-          type: "object",
-          properties: {
-            serviceCategory: {
-              type: "string",
-              description:
-                "Type of appointment the caller is asking about. Pick the closest match from the enum.",
-              enum: [
-                "consultation",
-                "routine_service",
-                "complex_service",
-                "follow_up",
-                "emergency_triage",
-                "information_only",
-                "other",
-              ],
-            },
-            preferredWindow: {
-              type: "object",
-              description:
-                "Optional caller-stated time window. ISO 8601 datetimes (UTC).",
-              properties: {
-                from: {
-                  type: "string",
-                  description:
-                    "Earliest acceptable slot start (ISO 8601 UTC). Omit if caller has no preference.",
-                },
-                to: {
-                  type: "string",
-                  description:
-                    "Latest acceptable slot start (ISO 8601 UTC). Omit if caller has no preference.",
-                },
-              },
-            },
-          },
-          required: ["serviceCategory"],
-        },
-      },
-    },
-    {
-      type: "webhook",
-      name: "create_booking",
-      description: "Create a booking after the caller confirms a slot.",
-      api_schema: {
-        url: `${serverToolBaseUrl}/tools/create-booking`,
-        method: "POST",
-        content_type: "application/json",
-        request_body_schema: {
-          type: "object",
-          properties: {
-            slotId: {
-              type: "string",
-              description:
-                "Slot identifier returned by a prior check_availability call.",
-            },
-            patientName: {
-              type: "string",
-              description:
-                "Caller's full name as spelled by the caller. Polish diacritics preserved.",
-            },
-            patientPhone: {
-              type: "string",
-              description:
-                "Caller's callback phone number in E.164 (e.g. +48501234567). Confirm with the caller verbally before submitting.",
-            },
-            serviceCategory: {
-              type: "string",
-              description:
-                "Must match the serviceCategory used in check_availability for this slot.",
-            },
-            notes: {
-              type: "string",
-              description:
-                "Optional short note from the caller (chief complaint, preferred doctor, etc.).",
-            },
-          },
-          required: [
-            "slotId",
-            "patientName",
-            "patientPhone",
-            "serviceCategory",
-          ],
-        },
-      },
-    },
-  ];
-}
+// Tool definitions moved to `./elevenlabs-tools-catalog.ts` (TOOL_SPECS,
+// buildToolSpecs). Background: EL deprecated inline `prompt.tools: [...]` in
+// favor of a workspace catalog referenced by `prompt.tool_ids`. PATCHes with
+// inline tools succeed (HTTP 200) but the field is silently dropped — agents
+// then have no tool bindings. ElevenLabsToolsCatalog registers tools in the
+// workspace once and returns ids for binding to agents.
 
 export interface ElevenLabsConvAIProviderOptions {
   apiKey?: string;
@@ -193,6 +93,17 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
         tenantDisplayName: input.tenantDisplayName,
       });
 
+    // Workspace tool catalog: ensure the two booking tools exist (create if
+    // missing) and grab their ids. EL ignores inline `prompt.tools` now, so
+    // ids are the only attachment mechanism that actually binds tools.
+    const catalog = new ElevenLabsToolsCatalog({
+      apiKey: this.apiKey,
+      baseUrl: this.baseUrl,
+      fetcher: this.doFetch,
+    });
+    const { checkAvailabilityId, createBookingId } =
+      await catalog.ensureBookingTools(input.serverToolBaseUrl);
+
     const body = await this.request<{ agent_id?: string; id?: string }>(
       "POST",
       "/v1/convai/agents/create",
@@ -222,11 +133,12 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
                 name: `${input.tenantDisplayName} - knowledge`,
                 usage_mode: "auto",
               })),
-              // Chat B (2026-05-20): booking tools enabled. Backend handlers
-              // at apps/backend/src/tools/{check-availability,create-booking}.ts
-              // run against SimulatedCalendarProvider; real provider plugs in
-              // post-pilot via the CalendarProvider interface.
-              tools: buildToolsDefinition(input.serverToolBaseUrl),
+              // Chat C (2026-05-20): booking tools attached via workspace
+              // catalog tool_ids (NOT inline tools). EL deprecated the inline
+              // form — PATCH returns 200 but the field is silently dropped.
+              // Backend handlers at apps/backend/src/tools/{check-availability,
+              // create-booking}.ts run against SimulatedCalendarProvider.
+              tool_ids: [checkAvailabilityId, createBookingId],
             },
             language,
           },
@@ -309,19 +221,33 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
   }
 
   /**
-   * Refresh the tools[] block on an existing agent without re-provisioning.
-   * Used when the tool catalog changes (e.g. adding check_availability +
-   * create_booking to agents that were provisioned before those tools shipped).
+   * Refresh the tool bindings on an existing agent without re-provisioning.
+   *
+   * Chat C (2026-05-20): rewritten to use the workspace tool catalog. The old
+   * implementation PATCHed `prompt.tools: [...]` inline — EL accepted (HTTP
+   * 200) but silently dropped the field, leaving agents with no tool
+   * bindings. Now: ensureBookingTools creates the tools in the workspace if
+   * missing and returns their ids; PATCH attaches via `prompt.tool_ids`.
+   *
+   * Idempotent: repeated calls are safe — re-running against the same agent
+   * with the same workspace state produces no creates and the same PATCH.
    */
   async updateAgentTools(input: {
     agentId: string;
     serverToolBaseUrl: string;
   }): Promise<void> {
+    const catalog = new ElevenLabsToolsCatalog({
+      apiKey: this.apiKey,
+      baseUrl: this.baseUrl,
+      fetcher: this.doFetch,
+    });
+    const { checkAvailabilityId, createBookingId } =
+      await catalog.ensureBookingTools(input.serverToolBaseUrl);
     await this.request("PATCH", `/v1/convai/agents/${input.agentId}`, {
       conversation_config: {
         agent: {
           prompt: {
-            tools: buildToolsDefinition(input.serverToolBaseUrl),
+            tool_ids: [checkAvailabilityId, createBookingId],
           },
         },
       },

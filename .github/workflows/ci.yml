@@ -37,11 +37,17 @@ jobs:
       - name: Format check
         run: pnpm format:check
 
+      - name: Build contracts (required before typecheck — backend imports from dist/)
+        run: pnpm -F @ai-receptionist/contracts build
+
+      - name: Build backend (required so web's typecheck can resolve backend dist/)
+        run: pnpm -F @ai-receptionist/backend build
+
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Test
         run: pnpm test
 
-      - name: Build (web only — backend has no production build target until W2)
+      - name: Build web
         run: pnpm -F @ai-receptionist/web build

@@ -1,6 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+// No hard limit on owners per tenant — clinics with multiple decision-makers
+// can have multiple owners. Each has identical access (read-only conversations,
+// KB edits, voice/settings). Granular roles are a future concern; today
+// everyone is `role: 'owner'`.
+
+interface OwnerRow {
+  email: string;
+  status: "active" | "pending";
+  user_id?: string;
+  signed_in_at?: string | null;
+  member_since?: string;
+  invitation_id?: string;
+  invited_at?: string;
+  signin_token_expires_at?: string | null;
+  signin_token_consumed_at?: string | null;
+}
 
 /**
  * Operator-facing UI to invite a clinic owner. Two paths:
@@ -17,6 +34,10 @@ import { useState } from "react";
  *
  * Both paths upsert the same tenant_invitations row (idempotent on
  * (tenant_id, email)), so it doesn't matter which one the operator runs.
+ *
+ * Below the invite controls, an "Active owners" table shows the merged
+ * list of current members + pending invites for this tenant, with per-row
+ * Regenerate-link and Revoke actions.
  */
 export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
   const [email, setEmail] = useState("");
@@ -32,6 +53,60 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
   const [linkExpiresAt, setLinkExpiresAt] = useState<string | null>(null);
   const [linkErr, setLinkErr] = useState("");
   const [copied, setCopied] = useState(false);
+
+  // Owners-list state. `refreshKey` is bumped after any mutation (invite,
+  // generate-link, revoke) to retrigger the fetch effect below.
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [owners, setOwners] = useState<OwnerRow[]>([]);
+  const [ownersLoading, setOwnersLoading] = useState(true);
+  const [ownersErr, setOwnersErr] = useState<string | null>(null);
+
+  // Two-step revoke: clicking once arms; clicking again within 5s confirms.
+  // Tracks the email currently armed and a timer to auto-disarm.
+  const [armedRevokeEmail, setArmedRevokeEmail] = useState<string | null>(null);
+  const [revokingEmail, setRevokingEmail] = useState<string | null>(null);
+  const [revokeErr, setRevokeErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setOwnersLoading(true);
+    setOwnersErr(null);
+    void fetch(`/api/agents/${encodeURIComponent(agentId)}/owners`)
+      .then(async (r) => {
+        const body = (await r.json().catch(() => ({}))) as {
+          owners?: OwnerRow[];
+          error?: string;
+          message?: string;
+        };
+        if (cancelled) return;
+        if (!r.ok) {
+          setOwners([]);
+          setOwnersErr(body.message ?? body.error ?? `Failed (${r.status}).`);
+        } else {
+          setOwners(body.owners ?? []);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setOwners([]);
+        setOwnersErr(err instanceof Error ? err.message : "Unexpected error");
+      })
+      .finally(() => {
+        if (!cancelled) setOwnersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId, refreshKey]);
+
+  // Auto-disarm the revoke confirmation after 5s of inactivity.
+  useEffect(() => {
+    if (!armedRevokeEmail) return;
+    const t = window.setTimeout(() => setArmedRevokeEmail(null), 5000);
+    return () => window.clearTimeout(t);
+  }, [armedRevokeEmail]);
+
+  const bumpRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,6 +126,7 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
       if (r.ok) {
         setState("ok");
         setMsg(`Invited ${email}. They sign in at /auth/sign-in with this email.`);
+        bumpRefresh();
       } else {
         setState("err");
         setMsg(body.message ?? body.error ?? `Failed (${r.status}).`);
@@ -93,6 +169,7 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
         setLinkState("ok");
         setLinkUrl(body.url);
         setLinkExpiresAt(body.expires_at ?? null);
+        bumpRefresh();
       } else {
         setLinkState("err");
         setLinkErr(body.message ?? body.error ?? `Failed (${r.status}).`);
@@ -113,6 +190,47 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
       // Some browsers block clipboard access in iframes / insecure contexts.
       // Fall back to manual selection by focusing the input below.
       setCopied(false);
+    }
+  }
+
+  function regenerateForRow(rowEmail: string) {
+    // Pre-fill the input and run the existing generate-link flow.
+    setEmail(rowEmail);
+    // Defer one tick so the input visibly updates before the request fires.
+    window.setTimeout(() => {
+      void generateLink();
+    }, 0);
+  }
+
+  async function revokeRow(rowEmail: string) {
+    if (armedRevokeEmail !== rowEmail) {
+      setArmedRevokeEmail(rowEmail);
+      setRevokeErr(null);
+      return;
+    }
+    // Confirmed: fire the DELETE.
+    setRevokingEmail(rowEmail);
+    setRevokeErr(null);
+    try {
+      const r = await fetch(
+        `/api/agents/${encodeURIComponent(agentId)}/owners?email=${encodeURIComponent(rowEmail)}`,
+        { method: "DELETE" },
+      );
+      const body = (await r.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+      };
+      if (!r.ok) {
+        setRevokeErr(body.message ?? body.error ?? `Failed (${r.status}).`);
+      } else {
+        bumpRefresh();
+      }
+    } catch (err) {
+      setRevokeErr(err instanceof Error ? err.message : "Unexpected error");
+    } finally {
+      setRevokingEmail(null);
+      setArmedRevokeEmail(null);
     }
   }
 
@@ -195,6 +313,120 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
       {linkState === "err" && linkErr ? (
         <p className="text-xs text-rose-700">{linkErr}</p>
       ) : null}
+
+      <div className="mt-2 flex flex-col gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+          Active owners
+        </h3>
+        {ownersLoading ? (
+          <p className="text-xs text-neutral-500">Loading…</p>
+        ) : ownersErr ? (
+          <p className="text-xs text-rose-700">{ownersErr}</p>
+        ) : owners.length === 0 ? (
+          <p className="text-xs text-neutral-500">
+            No owners yet. Invite the clinic owner above to grant access.
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-neutral-200">
+            <table className="min-w-full text-left text-xs">
+              <thead className="bg-neutral-50 text-[10px] uppercase tracking-wider text-neutral-500">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Email</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Activity</th>
+                  <th className="px-3 py-2 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {owners.map((row) => {
+                  const isArmed = armedRevokeEmail === row.email;
+                  const isRevoking = revokingEmail === row.email;
+                  return (
+                    <tr key={`${row.status}-${row.email}`} className="text-neutral-800">
+                      <td className="px-3 py-2 font-mono text-[11px]">{row.email}</td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${
+                            row.status === "active"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {row.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-neutral-600">
+                        {row.status === "active"
+                          ? row.signed_in_at
+                            ? `Signed in ${formatRelative(row.signed_in_at)}`
+                            : row.member_since
+                              ? `Member since ${formatDate(row.member_since)}`
+                              : "—"
+                          : row.invited_at
+                            ? `Invited ${formatRelative(row.invited_at)}`
+                            : "—"}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => regenerateForRow(row.email)}
+                            disabled={linkState === "submitting"}
+                            className="rounded-full border border-neutral-300 bg-white px-3 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                          >
+                            Regenerate link
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => revokeRow(row.email)}
+                            disabled={isRevoking}
+                            className={`rounded-full px-3 py-1 text-[11px] font-medium disabled:opacity-50 ${
+                              isArmed
+                                ? "bg-rose-600 text-white hover:bg-rose-700"
+                                : "border border-rose-300 bg-white text-rose-700 hover:bg-rose-50"
+                            }`}
+                          >
+                            {isRevoking
+                              ? "Revoking…"
+                              : isArmed
+                                ? "Click to confirm"
+                                : "Revoke"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {revokeErr ? <p className="text-xs text-rose-700">{revokeErr}</p> : null}
+      </div>
     </section>
   );
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("pl-PL", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatRelative(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const diffMs = Date.now() - d.getTime();
+  const days = Math.floor(diffMs / 86_400_000);
+  if (days < 1) {
+    const hours = Math.floor(diffMs / 3_600_000);
+    if (hours < 1) return "just now";
+    return `${hours}h ago`;
+  }
+  if (days < 30) return `${days}d ago`;
+  return formatDate(iso);
 }

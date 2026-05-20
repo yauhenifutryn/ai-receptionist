@@ -32,6 +32,10 @@
       "types": "./dist/conversations/index.d.ts",
       "default": "./dist/conversations/index.js"
     },
+    "./owners": {
+      "types": "./dist/owners/index.d.ts",
+      "default": "./dist/owners/index.js"
+    },
     "./integrations/elevenlabs": {
       "types": "./dist/integrations/elevenlabs/index.d.ts",
       "default": "./dist/integrations/elevenlabs/index.js"

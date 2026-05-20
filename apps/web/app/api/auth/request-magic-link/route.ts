@@ -61,13 +61,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
   }
   if (!allowed) {
-    return NextResponse.json(
-      {
-        error: "not_authorized",
-        message: "This email isn't on the operator allow-list. Ask the admin to add you.",
-      },
-      { status: 403 },
-    );
+    // Owners get in via a pending tenant_invitations row, not the operator
+    // allow-list. Materialization into tenant_members happens in verify-otp.
+    const { data: pendingInvite, error: inviteErr } = await service
+      .from("tenant_invitations")
+      .select("id")
+      .eq("email", email)
+      .is("consumed_at", null)
+      .maybeSingle();
+    if (inviteErr) {
+      return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
+    }
+    if (!pendingInvite) {
+      return NextResponse.json(
+        {
+          error: "not_authorized",
+          message: "This email isn't on the allow-list or invited. Ask the admin.",
+        },
+        { status: 403 },
+      );
+    }
   }
 
   // 2. Mint the OTP server-side (no email sent yet).

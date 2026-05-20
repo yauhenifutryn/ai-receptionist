@@ -68,13 +68,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
   }
   if (!allowed) {
-    return NextResponse.json(
-      {
-        error: "not_authorized",
-        message: "This email isn't on the operator allow-list. Ask the admin to add you.",
-      },
-      { status: 403 },
-    );
+    // Defense-in-depth: owners must have a pending tenant_invitations row.
+    const { data: pendingInvite, error: inviteErr } = await service
+      .from("tenant_invitations")
+      .select("id")
+      .eq("email", email)
+      .is("consumed_at", null)
+      .maybeSingle();
+    if (inviteErr) {
+      return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
+    }
+    if (!pendingInvite) {
+      return NextResponse.json(
+        {
+          error: "not_authorized",
+          message: "This email isn't on the allow-list or invited. Ask the admin.",
+        },
+        { status: 403 },
+      );
+    }
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -100,7 +112,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const { error: verifyErr } = await supabase.auth.verifyOtp({
+  const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
     email,
     token,
     type: "email",
@@ -119,6 +131,30 @@ export async function POST(req: NextRequest) {
       },
       { status },
     );
+  }
+
+  // Materialize any pending owner invitations into tenant_members on first
+  // sign-in. The OTP verification has succeeded, so we trust the email/uid
+  // pair Supabase returned. Best-effort: a failure here shouldn't block the
+  // session response — the user can re-trigger materialization on next sign-in.
+  const verifiedEmail = verifyData?.user?.email?.toLowerCase() ?? email;
+  const verifiedUid = verifyData?.user?.id;
+  if (verifiedUid && verifiedEmail) {
+    const { data: invites } = await service
+      .from("tenant_invitations")
+      .select("id, tenant_id, role")
+      .eq("email", verifiedEmail)
+      .is("consumed_at", null);
+    for (const inv of invites ?? []) {
+      await service.from("tenant_members").upsert(
+        { tenant_id: inv.tenant_id, user_id: verifiedUid, role: inv.role },
+        { onConflict: "tenant_id,user_id" },
+      );
+      await service
+        .from("tenant_invitations")
+        .update({ consumed_at: new Date().toISOString() })
+        .eq("id", inv.id);
+    }
   }
 
   return response;

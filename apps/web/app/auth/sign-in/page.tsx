@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 export default function SignInPage() {
@@ -13,9 +13,63 @@ export default function SignInPage() {
 
 type Step = "email" | "code";
 
+// Heading variants driven by `?as=client` / `?as=operator`. Visual change ONLY
+// — auth logic is unchanged. We read the same `odbiera:lang` localStorage key
+// the landing writes so the heading matches the visitor's chosen language.
+type Role = "client" | "operator" | null;
+type SignInLang = "pl" | "en" | "ru";
+
+const SIGN_IN_HEADINGS: Record<SignInLang, { eyebrow: string; client: string; operator: string }> =
+  {
+    pl: {
+      eyebrow: "Logowanie",
+      client: "Logowanie klienta",
+      operator: "Logowanie operatora",
+    },
+    en: {
+      eyebrow: "Sign-in",
+      client: "Client sign-in",
+      operator: "Operator sign-in",
+    },
+    ru: {
+      eyebrow: "Вход",
+      client: "Вход клиента",
+      operator: "Вход оператора",
+    },
+  };
+
+function readLandingLang(): SignInLang {
+  if (typeof window === "undefined") return "pl";
+  try {
+    const stored = window.localStorage.getItem("odbiera:lang");
+    if (stored === "pl" || stored === "en" || stored === "ru") return stored;
+  } catch {
+    // ignore
+  }
+  return "pl";
+}
+
 function SignInForm() {
   const params = useSearchParams();
   const next = params.get("next") ?? "/dashboard";
+  const asParam = params.get("as");
+  const role: Role = asParam === "client" || asParam === "operator" ? asParam : null;
+
+  // SSR-safe: render in Polish on the server, hydrate the language from
+  // localStorage on the client. Initial paint is "Logowanie" then upgrades
+  // to whatever the visitor picked on the landing.
+  const [signInLang, setSignInLang] = useState<SignInLang>("pl");
+  useEffect(() => {
+    setSignInLang(readLandingLang());
+  }, []);
+
+  const headingCopy = SIGN_IN_HEADINGS[signInLang];
+  const heading =
+    role === "client"
+      ? headingCopy.client
+      : role === "operator"
+        ? headingCopy.operator
+        : headingCopy.eyebrow;
 
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
@@ -96,7 +150,7 @@ function SignInForm() {
     <div className="mx-auto flex w-full max-w-md flex-col gap-8 py-16">
       <header className="flex flex-col gap-2">
         <span className="font-mono text-xs uppercase tracking-wider text-neutral-400">
-          Operator sign-in
+          {heading}
         </span>
         <h1 className="text-3xl font-semibold tracking-tight">Sign in</h1>
         <p className="text-sm text-neutral-600">

@@ -4,13 +4,17 @@
 
 /* ============================================================
    Global tokens — bright white / neutral / emerald.
-   Landing v3 aligns to the operator dashboard's Tailwind palette.
-   Section bands alternate white ↔ neutral-50, accents live in
-   emerald-500/600/50, hairlines in neutral-200.
+   Landing v4 (Technical Cinema).
+
+   Fonts are wired through next/font/google in app/layout.tsx
+   and exposed as `--font-display`, `--font-sans`, `--font-mono`
+   on <body>. Tailwind's font-family utilities (font-sans /
+   font-mono / font-serif) point at those vars via
+   tailwind.config.ts, so we no longer redeclare them here.
    ============================================================ */
-:root {
-  /* Type stacks — system-only, no font fetches.
-     Modern system stacks all render Polish + Cyrillic diacritics. */
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Source Code Pro", monospace;
+
+/* Selection — emerald wash, not browser-blue. */
+::selection {
+  background: rgb(167 243 208); /* emerald-200 */
+  color: rgb(6 78 59); /* emerald-900 */
 }

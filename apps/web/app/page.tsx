@@ -1,32 +1,47 @@
 "use client";
 
-// Public landing page v3 — PL / EN / RU.
-// Bright-white, neutral + emerald palette. Sibling to /dashboard, not an alien.
+// ============================================================================
+// Public landing page v4 — Technical Cinema.
+// ----------------------------------------------------------------------------
+// Aesthetic direction (locked):
+//   - Instrument Serif display headlines, Geist Sans body, Geist Mono labels.
+//   - Bright white background, emerald-600 single accent.
+//   - Canvas-based hero with 280-320 sinusoidal-current particles.
+//   - Six architecture cards, each with a UNIQUE micro-visualization.
+//   - Asymmetric grid heights, mono-typed technical eyebrows.
+//   - PL / EN / RU. Persisted via `odbiera:lang` localStorage key.
 //
-// Sections:
-//   1. Header — wordmark + lang toggle + Klient / Operator sign-in links.
-//   2. Hero — ASCII halftone waveform, heavy sans headline, body intro.
-//   3. Live status + calendar duo — 60/40 cards on md+.
-//   4. Typewriter dialogue — subtle ruled-paper card, speaker pills.
-//   5. What it does — 2x3 numbered cards.
-//   6. CTA + footer — soft neutral-50 band, single CTA, single privacy line.
-//
-// All animations honor prefers-reduced-motion and pause on visibilitychange.
+// All animation loops respect:
+//   - prefers-reduced-motion (render one composed frame, no loops)
+//   - document.visibilityState (pause when tab hidden, resume on visible)
+// ============================================================================
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+// useCallback is used in LangProvider's setLang.
 
 // ---------------------------------------------------------------------------
 // Language layer
 // ---------------------------------------------------------------------------
 
 type Lang = "pl" | "en" | "ru";
-const LANG_KEY = "recepcjonistka:lang";
+const LANG_KEY = "odbiera:lang"; // renamed from recepcjonistka:lang (brand change)
 const LANGS: Lang[] = ["pl", "en", "ru"];
 
 interface DialogueLine {
-  speaker: string;
-  line: string;
   side: "clinic" | "patient";
+  ts: string; // HH:MM:SS — purely cosmetic, but consistent
+  line: string;
 }
 
 interface LangBundle {
@@ -34,34 +49,34 @@ interface LangBundle {
   wordmark: string;
   nav: { client: string; operator: string };
   hero: {
-    title: string;
+    line1: string;
+    line2: string;
     body: string;
+    caption: (count: string) => string;
   };
-  statusPanel: {
-    title: string;
-    active: string;
-    response: string;
-    bookings: string;
-    languageRow: string;
-    busy: string;
-    live: string;
+  illustration: {
+    quote: string;
+    attribution: string;
+    caption: string;
   };
-  calendar: {
-    label: string;
-    counter: (n: number) => string;
+  cards: {
+    eyebrow: string; // section eyebrow above the grid
+    voice: { eyebrow: string; title: string };
+    booking: { eyebrow: string; title: string; counter: (n: number) => string };
+    languages: { eyebrow: string; title: string };
+    latency: { eyebrow: string; title: string; p95: string };
+    sms: { eyebrow: string; title: string };
+    memory: { eyebrow: string; title: string; days: [string, string, string, string, string, string, string] };
   };
-  dialoguePanel: {
+  ledger: {
     eyebrow: string;
     speakerClinic: string;
     speakerPatient: string;
   };
-  whatItDoes: {
-    eyebrow: string;
-    items: string[];
-  };
   cta: {
     headline: string;
     button: string;
+    contact: string;
   };
   footer: {
     privacy: string;
@@ -72,180 +87,181 @@ interface LangBundle {
 const STRINGS: Record<Lang, LangBundle> = {
   pl: {
     htmlLang: "pl",
-    wordmark: "Recepcjonistka",
+    wordmark: "Odbiera",
     nav: { client: "Klient", operator: "Operator" },
     hero: {
-      title: "Telefon dzwoni. Ktoś odbiera.",
+      line1: "Telefon dzwoni.",
+      line2: "Ktoś odbiera.",
       body: "Recepcjonistka, która nie chodzi na lunch, nie idzie spać i nie pomyli nazwiska pacjenta. Odpowiada po polsku, angielsku, rosyjsku. Umawia wizyty, potwierdza SMSem, działa w klinice stomatologicznej którą prowadzisz.",
+      caption: (count) => `SYSTEM · 14 dni · 23 klinik · ${count} rozmów odebranych`,
     },
-    statusPanel: {
-      title: "Status · operacyjny",
-      active: "Rozmowy w toku",
-      response: "Czas odpowiedzi",
-      bookings: "Dzisiaj rezerwacji",
-      languageRow: "Język aktywny",
-      busy: "zajęte",
-      live: "LIVE",
+    illustration: {
+      quote: "Klinika zamknięta. Linia nigdy nie.",
+      attribution: "Z dziennika systemu · 02:14:33",
+      caption: "Pierwsza rozmowa odebrana o 03:17",
     },
-    calendar: {
-      label: "Kalendarz · ten miesiąc",
-      counter: (n) => `${n} wizyt zarezerwowanych dzisiaj`,
+    cards: {
+      eyebrow: "ARCHITEKTURA · SZEŚĆ MODUŁÓW",
+      voice: { eyebrow: "VOICE / GŁOS", title: "Audio" },
+      booking: {
+        eyebrow: "BOOKING / KALENDARZ",
+        title: "Sloty",
+        counter: (n) => `${n} z 24`,
+      },
+      languages: { eyebrow: "LANGUAGES / JĘZYKI", title: "Polski · English · Русский" },
+      latency: { eyebrow: "LATENCY / OPÓŹNIENIE", title: "Odpowiedź < 1 s", p95: "p95 · 812 ms" },
+      sms: { eyebrow: "SMS · CONFIRMATIONS", title: "Potwierdzenie" },
+      memory: {
+        eyebrow: "MEMORY / PAMIĘĆ",
+        title: "Tydzień",
+        days: ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"],
+      },
     },
-    dialoguePanel: {
-      eyebrow: "Przykładowa rozmowa · 19:23",
+    ledger: {
+      eyebrow: "LIVE · 19:23 · POLSKI",
       speakerClinic: "Klinika",
       speakerPatient: "Pacjent",
     },
-    whatItDoes: {
-      eyebrow: "Co robi",
-      items: [
-        "Odbiera każdy telefon, dzień i noc.",
-        "Rozmawia po polsku, angielsku, rosyjsku.",
-        "Umawia wizyty bezpośrednio w Twoim kalendarzu.",
-        "Wysyła SMS z potwierdzeniem.",
-        "Przypomina pacjentowi dzień wcześniej.",
-        "Nie zapomina, nie myli, nie idzie spać.",
-      ],
-    },
     cta: {
       headline: "Chcesz zobaczyć, jak to brzmi w Twojej klinice?",
-      button: "Umów rozmowę",
+      button: "Umów rozmowę →",
+      contact: "kontakt@odbiera.com · +48 22 000 00 00",
     },
     footer: {
       privacy: "Dane przechowywane w UE.",
-      copyright: "Recepcjonistka",
+      copyright: "Odbiera",
     },
   },
   en: {
     htmlLang: "en",
-    wordmark: "Recepcjonistka",
+    wordmark: "Odbiera",
     nav: { client: "Client", operator: "Operator" },
     hero: {
-      title: "The phone rings. Someone answers.",
+      line1: "The phone rings.",
+      line2: "Someone answers.",
       body: "A receptionist who never takes lunch, never goes to sleep, and never misspells a patient's name. Speaks Polish, English, and Russian. Books appointments, confirms by SMS, works inside the dental practice you already run.",
+      caption: (count) => `SYSTEM · 14 days · 23 clinics · ${count} calls answered`,
     },
-    statusPanel: {
-      title: "Status · operational",
-      active: "Calls in flight",
-      response: "Response time",
-      bookings: "Bookings today",
-      languageRow: "Active language",
-      busy: "busy",
-      live: "LIVE",
+    illustration: {
+      quote: "The clinic closes. The line never does.",
+      attribution: "From the system log · 02:14:33",
+      caption: "First call answered at 03:17",
     },
-    calendar: {
-      label: "Calendar · this month",
-      counter: (n) => `${n} appointments booked today`,
+    cards: {
+      eyebrow: "ARCHITECTURE · SIX MODULES",
+      voice: { eyebrow: "VOICE", title: "Audio" },
+      booking: {
+        eyebrow: "BOOKING / CALENDAR",
+        title: "Slots",
+        counter: (n) => `${n} of 24`,
+      },
+      languages: { eyebrow: "LANGUAGES", title: "Polski · English · Русский" },
+      latency: { eyebrow: "LATENCY", title: "Response < 1 s", p95: "p95 · 812 ms" },
+      sms: { eyebrow: "SMS · CONFIRMATIONS", title: "Confirmation" },
+      memory: {
+        eyebrow: "MEMORY",
+        title: "Week",
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      },
     },
-    dialoguePanel: {
-      eyebrow: "Sample call · 19:23",
+    ledger: {
+      eyebrow: "LIVE · 19:23 · POLISH",
       speakerClinic: "Clinic",
       speakerPatient: "Patient",
     },
-    whatItDoes: {
-      eyebrow: "What it does",
-      items: [
-        "Answers every call, day and night.",
-        "Speaks Polish, English, and Russian.",
-        "Books appointments straight into your calendar.",
-        "Sends an SMS confirmation.",
-        "Reminds the patient the day before.",
-        "Does not forget, does not confuse, does not sleep.",
-      ],
-    },
     cta: {
       headline: "Want to hear how it sounds inside your clinic?",
-      button: "Book a call",
+      button: "Book a call →",
+      contact: "kontakt@odbiera.com · +48 22 000 00 00",
     },
     footer: {
-      privacy: "EU-hosted data.",
-      copyright: "Recepcjonistka",
+      privacy: "Data stored in the EU.",
+      copyright: "Odbiera",
     },
   },
   ru: {
     htmlLang: "ru",
-    wordmark: "Recepcjonistka",
+    wordmark: "Odbiera",
     nav: { client: "Клиент", operator: "Оператор" },
     hero: {
-      title: "Телефон звонит. Кто-то отвечает.",
+      line1: "Телефон звонит.",
+      line2: "Кто-то отвечает.",
       body: "Администратор, который не уходит на обед, не ложится спать и не путает фамилию пациента. Говорит по-польски, по-английски, по-русски. Записывает на приём, подтверждает SMS, работает в стоматологической клинике, которой вы управляете.",
+      caption: (count) => `SYSTEM · 14 дней · 23 клиник · ${count} принятых звонков`,
     },
-    statusPanel: {
-      title: "Система · в работе",
-      active: "Активные звонки",
-      response: "Время отклика",
-      bookings: "Записей сегодня",
-      languageRow: "Активный язык",
-      busy: "занято",
-      live: "LIVE",
+    illustration: {
+      quote: "Клиника закрывается. Линия — никогда.",
+      attribution: "Из журнала системы · 02:14:33",
+      caption: "Первый звонок принят в 03:17",
     },
-    calendar: {
-      label: "Календарь · этот месяц",
-      counter: (n) => `${n} записей сегодня`,
+    cards: {
+      eyebrow: "АРХИТЕКТУРА · ШЕСТЬ МОДУЛЕЙ",
+      voice: { eyebrow: "VOICE / ГОЛОС", title: "Аудио" },
+      booking: {
+        eyebrow: "BOOKING / КАЛЕНДАРЬ",
+        title: "Слоты",
+        counter: (n) => `${n} из 24`,
+      },
+      languages: {
+        eyebrow: "LANGUAGES / ЯЗЫКИ",
+        title: "Polski · English · Русский",
+      },
+      latency: {
+        eyebrow: "LATENCY / ЗАДЕРЖКА",
+        title: "Ответ < 1 с",
+        p95: "p95 · 812 мс",
+      },
+      sms: { eyebrow: "SMS · ПОДТВЕРЖДЕНИЯ", title: "Подтверждение" },
+      memory: {
+        eyebrow: "MEMORY / ПАМЯТЬ",
+        title: "Неделя",
+        days: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
+      },
     },
-    dialoguePanel: {
-      eyebrow: "Пример разговора · 19:23",
+    ledger: {
+      eyebrow: "LIVE · 19:23 · РУССКИЙ",
       speakerClinic: "Клиника",
       speakerPatient: "Пациент",
     },
-    whatItDoes: {
-      eyebrow: "Что делает",
-      items: [
-        "Отвечает на каждый звонок, днём и ночью.",
-        "Говорит по-польски, по-английски, по-русски.",
-        "Записывает на приём прямо в ваш календарь.",
-        "Отправляет SMS с подтверждением.",
-        "Напоминает пациенту за день до визита.",
-        "Не забывает, не путает, не спит.",
-      ],
-    },
     cta: {
       headline: "Хотите услышать, как это звучит в вашей клинике?",
-      button: "Заказать звонок",
+      button: "Заказать звонок →",
+      contact: "kontakt@odbiera.com · +48 22 000 00 00",
     },
     footer: {
-      privacy: "Данные в ЕС.",
-      copyright: "Recepcjonistka",
+      privacy: "Данные хранятся в ЕС.",
+      copyright: "Odbiera",
     },
   },
 };
 
-// Per-language dialogue scripts. Speaker label is derived from t.dialoguePanel
-// so that switching language reformats the speaker pill correctly.
+// Live transcript dialogue with stable HH:MM:SS timestamps per language.
 const DIALOGUES: Record<Lang, DialogueLine[]> = {
   pl: [
-    { speaker: "Klinika", line: "Dzień dobry.", side: "clinic" },
-    { speaker: "Pacjent", line: "Dobry, chciałbym się umówić na konsultację.", side: "patient" },
-    {
-      speaker: "Klinika",
-      line: "Oczywiście. Mam wolny termin w czwartek o dziesiątej, pasuje?",
-      side: "clinic",
-    },
-    { speaker: "Pacjent", line: "Tak, świetnie.", side: "patient" },
-    { speaker: "Klinika", line: "Potwierdzę SMSem. Do zobaczenia w czwartek.", side: "clinic" },
+    { side: "clinic", ts: "19:23:04", line: "Dzień dobry, klinika Odbiera." },
+    { side: "patient", ts: "19:23:07", line: "Dobry, chciałbym się umówić na konsultację." },
+    { side: "clinic", ts: "19:23:11", line: "Mam wolny termin w czwartek o dziesiątej, pasuje?" },
+    { side: "patient", ts: "19:23:15", line: "Tak, świetnie." },
+    { side: "clinic", ts: "19:23:18", line: "Potwierdzę SMSem. Do zobaczenia w czwartek." },
   ],
   en: [
-    { speaker: "Clinic", line: "Good evening.", side: "clinic" },
-    { speaker: "Patient", line: "Hi, I'd like to book a consultation.", side: "patient" },
-    {
-      speaker: "Clinic",
-      line: "Of course. I have Thursday at ten free, does that work?",
-      side: "clinic",
-    },
-    { speaker: "Patient", line: "Yes, perfect.", side: "patient" },
-    { speaker: "Clinic", line: "I'll confirm by SMS. See you Thursday.", side: "clinic" },
+    { side: "clinic", ts: "19:23:04", line: "Good evening, Odbiera clinic." },
+    { side: "patient", ts: "19:23:07", line: "Hi, I'd like to book a consultation." },
+    { side: "clinic", ts: "19:23:11", line: "I have Thursday at ten free, does that work?" },
+    { side: "patient", ts: "19:23:15", line: "Yes, perfect." },
+    { side: "clinic", ts: "19:23:18", line: "I'll confirm by SMS. See you Thursday." },
   ],
   ru: [
-    { speaker: "Клиника", line: "Добрый вечер.", side: "clinic" },
-    { speaker: "Пациент", line: "Здравствуйте, хочу записаться на консультацию.", side: "patient" },
-    { speaker: "Клиника", line: "Конечно. Четверг в десять свободен, подходит?", side: "clinic" },
-    { speaker: "Пациент", line: "Да, отлично.", side: "patient" },
-    { speaker: "Клиника", line: "Подтвержу SMS. До встречи в четверг.", side: "clinic" },
+    { side: "clinic", ts: "19:23:04", line: "Добрый вечер, клиника Odbiera." },
+    { side: "patient", ts: "19:23:07", line: "Здравствуйте, хочу записаться на консультацию." },
+    { side: "clinic", ts: "19:23:11", line: "Четверг в десять свободен, подходит?" },
+    { side: "patient", ts: "19:23:15", line: "Да, отлично." },
+    { side: "clinic", ts: "19:23:18", line: "Подтвержу SMS. До встречи в четверг." },
   ],
 };
 
 // ---------------------------------------------------------------------------
-// LangContext + hook + provider
+// LangContext + provider
 // ---------------------------------------------------------------------------
 
 interface LangCtxValue {
@@ -263,43 +279,38 @@ function useLang(): LangCtxValue {
 }
 
 function LangProvider({ children }: { children: React.ReactNode }) {
-  // SSR-safe: always start as "pl" on first render; restore from
-  // localStorage in an effect to avoid hydration mismatch.
   const [lang, setLangState] = useState<Lang>("pl");
 
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(LANG_KEY);
-      if (stored === "pl" || stored === "en" || stored === "ru") {
-        setLangState(stored);
-      }
+      if (stored === "pl" || stored === "en" || stored === "ru") setLangState(stored);
     } catch {
-      // localStorage may be unavailable (private mode, SSR); ignore.
+      // private mode, SSR — ignore.
     }
   }, []);
 
-  // Reflect the active language on <html lang="…"> for screen readers.
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.documentElement.lang = STRINGS[lang].htmlLang;
     }
   }, [lang]);
 
-  const setLang = (l: Lang) => {
+  const setLang = useCallback((l: Lang) => {
     setLangState(l);
     try {
       window.localStorage.setItem(LANG_KEY, l);
     } catch {
       // ignore
     }
-  };
+  }, []);
 
-  const value = useMemo<LangCtxValue>(() => ({ lang, setLang, t: STRINGS[lang] }), [lang]);
+  const value = useMemo<LangCtxValue>(() => ({ lang, setLang, t: STRINGS[lang] }), [lang, setLang]);
   return <LangCtx.Provider value={value}>{children}</LangCtx.Provider>;
 }
 
 // ---------------------------------------------------------------------------
-// Reduced motion hook
+// Shared hooks: prefers-reduced-motion + page-visible
 // ---------------------------------------------------------------------------
 
 function usePrefersReducedMotion(): boolean {
@@ -315,835 +326,1012 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-// ---------------------------------------------------------------------------
-// Halftone waveform — preserved from v2. Recolored to emerald via currentColor.
-// ---------------------------------------------------------------------------
-
-const HALFTONE_GLYPHS = [" ", ".", ",", ":", ";", "o", "O", "0", "#", "@"];
-const HALFTONE_WIDTH = 64;
-const HALFTONE_FPS = 24;
-const HALFTONE_FRAME_MS = 1000 / HALFTONE_FPS;
-
-interface FlashPeak {
-  col: number;
-  birth: number; // ms timestamp
-}
-
-function densityChar(v: number): string {
-  const clamped = Math.max(0, Math.min(1, v));
-  const idx = Math.min(HALFTONE_GLYPHS.length - 1, Math.floor(clamped * HALFTONE_GLYPHS.length));
-  return HALFTONE_GLYPHS[idx]!;
-}
-
-function buildHalftoneLine(t: number, phase: number, freq: number, peaks: FlashPeak[]): string {
-  const out: string[] = new Array(HALFTONE_WIDTH);
-  for (let i = 0; i < HALFTONE_WIDTH; i++) {
-    const x = (i / HALFTONE_WIDTH) * Math.PI * 2;
-    const v =
-      Math.sin(x * freq + t * 0.0018 + phase) * 0.5 +
-      Math.sin(x * (freq * 1.7) + t * 0.0011 + phase * 0.6) * 0.3 +
-      Math.sin(x * (freq * 2.3) - t * 0.0007 + phase) * 0.2;
-    let density = (v + 1) / 2;
-    const edge = Math.min(i, HALFTONE_WIDTH - 1 - i);
-    const fade = Math.min(1, edge / 6);
-    density *= fade;
-
-    for (const p of peaks) {
-      if (p.col === i) {
-        const age = t - p.birth;
-        if (age >= 0 && age < 280) {
-          const boost = 1 - age / 280;
-          density = Math.min(1, density + boost * 0.9);
-        }
-      }
-    }
-    out[i] = densityChar(density);
-  }
-  return out.join("");
-}
-
-function HalftoneWaveform() {
-  const reduced = usePrefersReducedMotion();
-  const [frames, setFrames] = useState<{ a: string; b: string }>(() => ({
-    a: buildHalftoneLine(0, 0, 3.1, []),
-    b: buildHalftoneLine(0, Math.PI / 3, 2.4, []),
-  }));
-  const rafRef = useRef<number | null>(null);
-  const startRef = useRef<number>(0);
-  const lastDrawRef = useRef<number>(0);
-  const peaksRef = useRef<FlashPeak[]>([]);
-  const lastPeakAtRef = useRef<number>(0);
-
+function usePageVisible(): boolean {
+  // SSR + first render: assume visible. Subscribe on mount.
+  const [visible, setVisible] = useState(true);
   useEffect(() => {
-    if (reduced) {
-      setFrames({
-        a: buildHalftoneLine(0, 0, 3.1, []),
-        b: buildHalftoneLine(0, Math.PI / 3, 2.4, []),
-      });
-      return;
-    }
-
-    startRef.current = performance.now();
-    lastDrawRef.current = 0;
-
-    const tick = (now: number) => {
-      const t = now - startRef.current;
-      if (t - lastDrawRef.current >= HALFTONE_FRAME_MS) {
-        lastDrawRef.current = t;
-
-        peaksRef.current = peaksRef.current.filter((p) => t - p.birth < 280);
-        if (t - lastPeakAtRef.current > 90 + Math.random() * 180) {
-          const targetCount = 3 + Math.floor(Math.random() * 3);
-          while (peaksRef.current.length < targetCount) {
-            peaksRef.current.push({
-              col: Math.floor(Math.random() * HALFTONE_WIDTH),
-              birth: t,
-            });
-          }
-          lastPeakAtRef.current = t;
-        }
-
-        setFrames({
-          a: buildHalftoneLine(t, 0, 3.1, peaksRef.current),
-          b: buildHalftoneLine(t, Math.PI / 3, 2.4, peaksRef.current),
-        });
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
-
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      } else if (rafRef.current === null) {
-        startRef.current = performance.now() - lastDrawRef.current;
-        rafRef.current = requestAnimationFrame(tick);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [reduced]);
-
-  return (
-    <div
-      aria-hidden="true"
-      className="select-none whitespace-pre text-center font-mono text-emerald-600"
-      style={{
-        fontSize: "0.85rem",
-        letterSpacing: "0.04em",
-        lineHeight: "1.15",
-        // Reserve 2 lines so layout never shifts.
-        height: "2.3em",
-        opacity: 0.85,
-      }}
-    >
-      {frames.a}
-      {"\n"}
-      {frames.b}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Typewriter dialogue — ruled-paper card + emerald speaker pills.
-// ---------------------------------------------------------------------------
-
-const TYPE_MS_PER_CHAR = 30;
-const PAUSE_BETWEEN_LINES_MS = 600;
-const RESTART_DELAY_MS = 5000;
-
-interface RenderedLine {
-  speaker: string;
-  side: "clinic" | "patient";
-  text: string;
-  done: boolean;
-}
-
-function renderDialogue(elapsedMs: number, dialogue: DialogueLine[]): RenderedLine[] {
-  let cursor = 0;
-  const result: RenderedLine[] = [];
-  for (const { speaker, line, side } of dialogue) {
-    const typeMs = line.length * TYPE_MS_PER_CHAR;
-    const start = cursor;
-    const end = cursor + typeMs;
-    if (elapsedMs <= start) {
-      result.push({ speaker, side, text: "", done: false });
-    } else if (elapsedMs >= end) {
-      result.push({ speaker, side, text: line, done: true });
-    } else {
-      const frac = (elapsedMs - start) / typeMs;
-      const chars = Math.max(0, Math.floor(line.length * frac));
-      result.push({ speaker, side, text: line.slice(0, chars), done: false });
-    }
-    cursor = end + PAUSE_BETWEEN_LINES_MS;
-  }
-  return result;
-}
-
-function totalDialogueMs(dialogue: DialogueLine[]): number {
-  let total = 0;
-  for (const { line } of dialogue) {
-    total += line.length * TYPE_MS_PER_CHAR + PAUSE_BETWEEN_LINES_MS;
-  }
-  return total;
-}
-
-function TypewriterDialogue() {
-  const { t, lang } = useLang();
-  const reduced = usePrefersReducedMotion();
-  const dialogue = DIALOGUES[lang];
-  const [lines, setLines] = useState<RenderedLine[]>(() =>
-    dialogue.map((d) => ({ speaker: d.speaker, side: d.side, text: "", done: false })),
-  );
-  const rafRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    setLines(dialogue.map((d) => ({ speaker: d.speaker, side: d.side, text: "", done: false })));
-
-    if (reduced) {
-      setLines(
-        dialogue.map((d) => ({ speaker: d.speaker, side: d.side, text: d.line, done: true })),
-      );
-      return;
-    }
-    const fullCycleMs = totalDialogueMs(dialogue) + RESTART_DELAY_MS;
-    let startedAt = performance.now();
-
-    const tick = (now: number) => {
-      const elapsed = (now - startedAt) % fullCycleMs;
-      setLines(renderDialogue(elapsed, dialogue));
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      } else if (rafRef.current === null) {
-        startedAt = performance.now();
-        rafRef.current = requestAnimationFrame(tick);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [reduced, dialogue]);
-
-  return (
-    <div
-      aria-hidden="true"
-      className="font-mono text-[15px] leading-8 text-neutral-800"
-      style={{
-        // Reserve a stable minimum height — 5 lines * 32px (leading-8) + margin.
-        minHeight: `${dialogue.length * 32}px`,
-      }}
-    >
-      {lines.map((l, i) => {
-        const pillBg = l.side === "clinic" ? "bg-emerald-50" : "bg-neutral-100";
-        const pillText = l.side === "clinic" ? "text-emerald-700" : "text-neutral-600";
-        return (
-          <div key={i} className="flex items-start gap-3 py-0.5">
-            <span
-              className={`mt-1.5 inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${pillBg} ${pillText}`}
-              style={{ minWidth: "62px", justifyContent: "center" }}
-            >
-              {l.side === "clinic" ? t.dialoguePanel.speakerClinic : t.dialoguePanel.speakerPatient}
-            </span>
-            <span className="min-w-0 flex-1 break-words">
-              <span>{l.text}</span>
-              {!l.done && l.text.length > 0 && (
-                <span className="ml-[2px] inline-block h-[1em] w-[7px] translate-y-[2px] bg-emerald-600 align-middle animate-pulse" />
-              )}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Live status panel — white card, neutral hairlines, emerald accent.
-// ---------------------------------------------------------------------------
-
-const BAR_WIDTH = 7;
-const BAR_FULL = "▰";
-const BAR_EMPTY = "▱";
-
-function makeBar(value: number, max: number): string {
-  const filled = Math.max(0, Math.min(BAR_WIDTH, Math.round((value / max) * BAR_WIDTH)));
-  return BAR_FULL.repeat(filled) + BAR_EMPTY.repeat(BAR_WIDTH - filled);
-}
-
-function makeResponseBar(ms: number): string {
-  const ratio = Math.max(0, Math.min(1, (ms - 380) / (820 - 380)));
-  if (ratio < 0.33) return "░░░";
-  if (ratio < 0.66) return "▒▒▒";
-  return "▓▓▓";
-}
-
-function weightedActiveCalls(): number {
-  const r = Math.random();
-  if (r < 0.08) return 1;
-  if (r < 0.22) return 2;
-  if (r < 0.55) return 3;
-  if (r < 0.78) return 4;
-  if (r < 0.93) return 5;
-  return 6;
-}
-
-function LiveStatusPanel() {
-  const { t, lang } = useLang();
-  const reduced = usePrefersReducedMotion();
-
-  const [active, setActive] = useState(3);
-  const [responseMs, setResponseMs] = useState(580);
-  const [bookings, setBookings] = useState(12);
-  const [langPulse, setLangPulse] = useState<Lang>("pl");
-
-  useEffect(() => {
-    if (reduced) {
-      setActive(3);
-      setResponseMs(612);
-      setBookings(12);
-      setLangPulse(lang);
-      return;
-    }
-
-    let responseTimer: ReturnType<typeof setInterval> | null = null;
-    let activeTimer: ReturnType<typeof setInterval> | null = null;
-    let bookingsTimer: ReturnType<typeof setTimeout> | null = null;
-    let langTimer: ReturnType<typeof setInterval> | null = null;
-    let stopped = false;
-
-    const startResponse = () => {
-      let phase = 0;
-      responseTimer = setInterval(() => {
-        phase += 0.4;
-        const base = 600 + Math.sin(phase) * 160;
-        const jitter = (Math.random() - 0.5) * 80;
-        const next = Math.round(Math.max(380, Math.min(820, base + jitter)));
-        setResponseMs(next);
-      }, 1400);
-    };
-
-    const startActive = () => {
-      activeTimer = setInterval(() => {
-        setActive(weightedActiveCalls());
-      }, 2400);
-    };
-
-    const scheduleBookings = () => {
-      const delay = 8000 + Math.random() * 7000;
-      bookingsTimer = setTimeout(() => {
-        if (stopped) return;
-        setBookings((b) => b + 1);
-        scheduleBookings();
-      }, delay);
-    };
-
-    const startLangPulse = () => {
-      let i = 0;
-      langTimer = setInterval(() => {
-        i = (i + 1) % LANGS.length;
-        setLangPulse(LANGS[i]!);
-      }, 2200);
-    };
-
-    const startAll = () => {
-      startResponse();
-      startActive();
-      scheduleBookings();
-      startLangPulse();
-    };
-    const stopAll = () => {
-      if (responseTimer) clearInterval(responseTimer);
-      if (activeTimer) clearInterval(activeTimer);
-      if (bookingsTimer) clearTimeout(bookingsTimer);
-      if (langTimer) clearInterval(langTimer);
-      responseTimer = activeTimer = bookingsTimer = langTimer = null;
-    };
-
-    startAll();
-
-    const onVis = () => {
-      if (document.hidden) stopAll();
-      else if (!responseTimer) startAll();
-    };
-    document.addEventListener("visibilitychange", onVis);
-
-    return () => {
-      stopped = true;
-      stopAll();
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, [reduced, lang]);
-
-  const busy = active > 4;
-  const busyLabel = busy ? ` · ${t.statusPanel.busy}` : "";
-  // Pulsing dot fallback: pure tailwind animate-pulse when motion is allowed.
-
-  return (
-    <div
-      className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-7"
-      style={{ minHeight: "240px" }}
-      aria-label={t.statusPanel.title}
-    >
-      <div className="mb-4 flex items-baseline justify-between border-b border-neutral-100 pb-3">
-        <span className="font-mono text-[11px] uppercase tracking-wider text-neutral-500">
-          {t.statusPanel.title}
-        </span>
-        <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-emerald-600">
-          <span
-            aria-hidden="true"
-            className={`inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 ${reduced ? "" : "animate-pulse"}`}
-          />
-          {t.statusPanel.live}
-        </span>
-      </div>
-
-      <div className="space-y-2 font-mono text-[13px] leading-7 text-neutral-700">
-        <StatusRow
-          label={t.statusPanel.active}
-          valueDisplay={
-            <>
-              <span className={busy ? "text-emerald-600" : "text-neutral-400"}>
-                {makeBar(active, 6)}
-              </span>
-              <span className={`ml-2.5 ${busy ? "text-emerald-700" : "text-neutral-900"}`}>
-                {active}
-                {busyLabel}
-              </span>
-            </>
-          }
-        />
-        <StatusRow
-          label={t.statusPanel.response}
-          valueDisplay={
-            <>
-              <span className="text-neutral-400">{makeResponseBar(responseMs)}</span>
-              <span className="ml-2.5 text-neutral-900">{responseMs} ms</span>
-            </>
-          }
-        />
-        <StatusRow
-          label={t.statusPanel.bookings}
-          valueDisplay={<span className="text-emerald-700">+{bookings}</span>}
-        />
-        <StatusRow
-          label={t.statusPanel.languageRow}
-          valueDisplay={
-            <span aria-hidden="true">
-              {LANGS.map((l, i) => (
-                <span key={l}>
-                  <span
-                    className={
-                      l === langPulse
-                        ? "font-semibold text-emerald-700"
-                        : "text-neutral-400"
-                    }
-                  >
-                    {l.toUpperCase()}
-                  </span>
-                  {i < LANGS.length - 1 && <span className="text-neutral-300"> · </span>}
-                </span>
-              ))}
-            </span>
-          }
-        />
-      </div>
-    </div>
-  );
-}
-
-function StatusRow({ label, valueDisplay }: { label: string; valueDisplay: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-4 py-1">
-      <span className="text-neutral-500">{label}</span>
-      <span className="whitespace-nowrap">{valueDisplay}</span>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Calendar — ported polish from CD HTML. Recolored to emerald.
-// 5 weeks × 7 days = 35 cells. Filled cells use emerald-200 bg, emerald-700 text.
-// ---------------------------------------------------------------------------
-
-const CAL_ROWS = 5;
-const CAL_COLS = 7;
-const CAL_CELLS = CAL_ROWS * CAL_COLS;
-const CAL_FILL_THRESHOLD = 0.7;
-
-interface CalCell {
-  filled: boolean;
-  flashing: boolean;
-}
-
-function CalendarFills() {
-  const { t } = useLang();
-  const reduced = usePrefersReducedMotion();
-
-  // Deterministic initial pattern so SSR + first client render agree.
-  const initialPattern: CalCell[] = useMemo(() => {
-    const arr: CalCell[] = new Array(CAL_CELLS).fill(null).map(() => ({
-      filled: false,
-      flashing: false,
-    }));
-    // Every 4th cell, biased toward early month.
-    for (let i = 0; i < CAL_CELLS; i++) {
-      if (i % 4 === 0 && i < 24) arr[i]!.filled = true;
-    }
-    return arr;
+    if (typeof document === "undefined") return;
+    const onChange = () => setVisible(!document.hidden);
+    onChange();
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
   }, []);
-
-  const [cells, setCells] = useState<CalCell[]>(initialPattern);
-  const [counter, setCounter] = useState(12);
-
-  useEffect(() => {
-    if (reduced) {
-      const half: CalCell[] = new Array(CAL_CELLS).fill(null).map((_, i) => ({
-        filled: i % 2 === 0,
-        flashing: false,
-      }));
-      setCells(half);
-      setCounter(12);
-      return;
-    }
-
-    let fillTimer: ReturnType<typeof setTimeout> | null = null;
-    let counterTimer: ReturnType<typeof setInterval> | null = null;
-    const flashTimers: ReturnType<typeof setTimeout>[] = [];
-    let stopped = false;
-
-    const scheduleFill = () => {
-      const delay = 800 + Math.random() * 1400;
-      fillTimer = setTimeout(() => {
-        if (stopped) return;
-        setCells((prev) => {
-          const filledCount = prev.filter((c) => c.filled).length;
-          if (filledCount / CAL_CELLS >= CAL_FILL_THRESHOLD) {
-            // Reset to seed.
-            return initialPattern.map((c) => ({ ...c }));
-          }
-          const empties: number[] = [];
-          for (let i = 0; i < prev.length; i++) if (!prev[i]!.filled) empties.push(i);
-          if (empties.length === 0) return initialPattern.map((c) => ({ ...c }));
-          const pick = empties[Math.floor(Math.random() * empties.length)]!;
-          const next = prev.map((c) => ({ ...c }));
-          next[pick] = { filled: true, flashing: true };
-
-          // Clear the flash after the CSS pulse window.
-          const tid = setTimeout(() => {
-            if (stopped) return;
-            setCells((curr) =>
-              curr.map((c, i) => (i === pick ? { ...c, flashing: false } : c)),
-            );
-          }, 900);
-          flashTimers.push(tid);
-          return next;
-        });
-        scheduleFill();
-      }, delay);
-    };
-
-    counterTimer = setInterval(() => {
-      setCounter((c) => c + 1);
-    }, 11000);
-
-    scheduleFill();
-
-    const onVis = () => {
-      if (document.hidden) {
-        if (fillTimer) clearTimeout(fillTimer);
-        if (counterTimer) clearInterval(counterTimer);
-        fillTimer = null;
-        counterTimer = null;
-      } else {
-        if (!fillTimer) scheduleFill();
-        if (!counterTimer) {
-          counterTimer = setInterval(() => setCounter((c) => c + 1), 11000);
-        }
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-
-    return () => {
-      stopped = true;
-      if (fillTimer) clearTimeout(fillTimer);
-      if (counterTimer) clearInterval(counterTimer);
-      flashTimers.forEach((t) => clearTimeout(t));
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, [reduced, initialPattern]);
-
-  return (
-    <div
-      className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-7"
-      style={{ minHeight: "240px" }}
-      aria-label={t.calendar.label}
-    >
-      <div className="mb-4 border-b border-neutral-100 pb-3">
-        <span className="font-mono text-[11px] uppercase tracking-wider text-neutral-500">
-          {t.calendar.label}
-        </span>
-      </div>
-      <div
-        aria-hidden="true"
-        className="grid grid-cols-7 gap-1.5"
-        style={{ maxWidth: "260px" }}
-      >
-        {cells.map((c, i) => (
-          <div
-            key={i}
-            className={[
-              "aspect-square rounded-sm border transition-colors duration-300 ease-out",
-              c.filled
-                ? "border-emerald-300 bg-emerald-200"
-                : "border-neutral-200 bg-neutral-100",
-              c.flashing ? "rcp-cal-flash" : "",
-            ].join(" ")}
-          />
-        ))}
-      </div>
-      <div className="mt-4 font-mono text-xs text-neutral-500">{t.calendar.counter(counter)}</div>
-    </div>
-  );
+  return visible;
 }
 
 // ---------------------------------------------------------------------------
-// Language switcher
+// Sticky header
 // ---------------------------------------------------------------------------
 
-function LangSwitcher() {
+function LangToggle() {
   const { lang, setLang } = useLang();
   return (
-    <span
-      role="group"
-      aria-label="Language"
-      className="font-mono text-xs"
-      style={{ letterSpacing: "0.12em" }}
-    >
+    <div role="group" aria-label="Language" className="flex items-center gap-2 font-mono text-xs">
       {LANGS.map((l, i) => (
-        <span key={l}>
+        <span key={l} className="flex items-center">
           <button
             type="button"
             onClick={() => setLang(l)}
             aria-pressed={lang === l}
-            className={[
-              "px-1 py-0.5 uppercase transition-colors duration-200",
+            className={
               lang === l
-                ? "font-bold text-emerald-600"
-                : "text-neutral-400 hover:text-neutral-700",
-            ].join(" ")}
-            style={{ background: "transparent", border: "none", cursor: "pointer" }}
+                ? "uppercase font-medium text-emerald-600"
+                : "uppercase text-neutral-400 transition-colors duration-200 hover:text-neutral-700"
+            }
           >
             {l}
           </button>
           {i < LANGS.length - 1 && (
-            <span aria-hidden="true" className="text-neutral-300">
-              {" · "}
+            <span aria-hidden="true" className="ml-2 text-neutral-300">
+              ·
             </span>
           )}
         </span>
       ))}
-    </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-
-const MAILTO_DEMO =
-  "mailto:yauheni.futryn@gmail.com?subject=Recepcjonistka%20%E2%80%94%20rozmowa&body=Klinika%3A%20%0AMiasto%3A%20%0ATelefon%3A%20";
-
-function LandingInner() {
-  const { t } = useLang();
-
-  return (
-    <div
-      className="min-h-screen bg-white text-neutral-900"
-      style={{ fontFamily: "var(--font-sans)" }}
-    >
-      <style jsx global>{`
-        /* Selection — emerald wash, not the default browser blue. */
-        ::selection {
-          background: rgb(167 243 208); /* emerald-200 */
-          color: rgb(6 78 59); /* emerald-900 */
-        }
-        /* Calendar flash — box-shadow ring fade-out, no layout cost. */
-        @keyframes rcp-cal-flash {
-          0% {
-            box-shadow: 0 0 0 0 rgb(16 185 129 / 0.45);
-          }
-          100% {
-            box-shadow: 0 0 0 8px rgb(16 185 129 / 0);
-          }
-        }
-        .rcp-cal-flash {
-          animation: rcp-cal-flash 900ms ease-out;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .rcp-cal-flash {
-            animation: none;
-          }
-        }
-        /* Ruled-paper backdrop — very subtle 32px gridlines for the dialogue card. */
-        .rcp-ruled {
-          background-image: repeating-linear-gradient(
-            to bottom,
-            transparent 0,
-            transparent calc(2rem - 1px),
-            rgba(0, 0, 0, 0.04) calc(2rem - 1px),
-            rgba(0, 0, 0, 0.04) 2rem
-          );
-          background-position: 0 0.5rem;
-        }
-      `}</style>
-
-      {/* HEADER */}
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <span className="text-base font-semibold tracking-tight text-neutral-900">
-            {t.wordmark}
-          </span>
-          <div className="flex items-center gap-5">
-            <LangSwitcher />
-            <span
-              aria-hidden="true"
-              className="inline-block h-3.5 w-px bg-neutral-200"
-            />
-            <a
-              href="/auth/sign-in"
-              className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
-            >
-              {t.nav.client}
-            </a>
-            <a
-              href="/auth/sign-in"
-              className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
-            >
-              {t.nav.operator}
-            </a>
-          </div>
-        </div>
-      </header>
-
-      {/* HERO — bright white, faint dot grid only on this section. */}
-      <section
-        className="bg-white"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, rgba(0,0,0,0.06) 1px, transparent 0)",
-          backgroundSize: "24px 24px",
-        }}
-      >
-        <div className="mx-auto max-w-3xl px-6 py-20 sm:py-24">
-          <HalftoneWaveform />
-          <h1 className="mt-10 text-4xl font-bold leading-[1.1] tracking-tight text-neutral-900 sm:text-5xl">
-            {t.hero.title}
-          </h1>
-          <p className="mt-6 max-w-2xl text-base leading-relaxed text-neutral-700 sm:text-lg">
-            {t.hero.body}
-          </p>
-        </div>
-      </section>
-
-      {/* LIVE STATUS + CALENDAR — neutral-50 band */}
-      <section className="bg-neutral-50">
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
-            <div className="md:col-span-3">
-              <LiveStatusPanel />
-            </div>
-            <div className="md:col-span-2">
-              <CalendarFills />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* TYPEWRITER DIALOGUE — white band */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-3xl px-6 py-16 sm:py-20">
-          <div className="rcp-ruled rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8">
-            <div className="mb-4 font-mono text-[11px] uppercase tracking-wider text-neutral-500">
-              {t.dialoguePanel.eyebrow}
-            </div>
-            <TypewriterDialogue />
-          </div>
-        </div>
-      </section>
-
-      {/* WHAT IT DOES — neutral-50 band, 2x3 numbered cards */}
-      <section className="bg-neutral-50">
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
-          <div className="mb-8 font-mono text-[11px] uppercase tracking-wider text-neutral-500">
-            {t.whatItDoes.eyebrow}
-          </div>
-          <ol className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {t.whatItDoes.items.map((line, i) => (
-              <li
-                key={line}
-                className="group rounded-2xl border border-neutral-200 bg-white p-6 transition-colors duration-200 hover:border-neutral-300 hover:bg-emerald-50/30"
-              >
-                <div className="font-mono text-xs font-semibold text-emerald-600">
-                  {String(i + 1).padStart(2, "0")}
-                </div>
-                <p className="mt-3 text-[15px] font-medium leading-relaxed text-neutral-900">
-                  {line}
-                </p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* CTA — neutral-50 band (visual rest before footer) */}
-      <section className="bg-neutral-50">
-        <div className="mx-auto max-w-3xl px-6 py-20 text-center sm:py-24">
-          <h2 className="text-3xl font-bold leading-tight tracking-tight text-neutral-900 sm:text-4xl">
-            {t.cta.headline}
-          </h2>
-          <a
-            href={MAILTO_DEMO}
-            className="mt-8 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-          >
-            {t.cta.button} <span aria-hidden="true">→</span>
-          </a>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="border-t border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-6 text-xs text-neutral-500">
-          <span className="font-semibold tracking-tight text-neutral-700">
-            {t.footer.copyright}
-          </span>
-          <span>{t.footer.privacy}</span>
-          <span>
-            &copy; {new Date().getFullYear()} {t.footer.copyright}
-          </span>
-        </div>
-      </footer>
     </div>
   );
 }
 
+function Header() {
+  const { t } = useLang();
+  return (
+    <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+      <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-4">
+        <span className="font-serif text-xl italic text-neutral-900">{t.wordmark}</span>
+        <div className="justify-self-center">
+          <LangToggle />
+        </div>
+        <nav className="flex items-center justify-end gap-5 text-sm">
+          <Link
+            href={"/auth/sign-in?as=client" as Route}
+            className="text-neutral-600 transition-colors duration-200 hover:text-neutral-900"
+          >
+            {t.nav.client}
+          </Link>
+          <Link
+            href={"/auth/sign-in?as=operator" as Route}
+            className="text-neutral-600 transition-colors duration-200 hover:text-neutral-900"
+          >
+            {t.nav.operator}
+          </Link>
+        </nav>
+      </div>
+    </header>
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Outer page
+// HERO — canvas of sinusoidal particles + display headline + caption counter
 // ---------------------------------------------------------------------------
+
+interface Particle {
+  x: number;
+  y: number;
+  baseY: number;
+  amplitude: number;
+  freq: number;
+  phase: number;
+  vx: number;
+  opacity: number;
+  size: number;
+  flare: boolean;
+}
+
+function buildParticles(width: number, height: number, count: number): Particle[] {
+  // Halftone density: at low x, particles are sparse; at high x, dense.
+  // We sample candidate xs against a density curve until we have `count` particles.
+  const particles: Particle[] = [];
+  let safety = 0;
+  while (particles.length < count && safety < count * 8) {
+    safety++;
+    const x = Math.random() * width;
+    // Density rises sigmoid-like from left to right.
+    const u = x / width;
+    const density = 0.18 + Math.pow(u, 1.6) * 0.82; // [0.18 ... 1]
+    if (Math.random() > density) continue;
+
+    const baseY = height * (0.2 + Math.random() * 0.6);
+    particles.push({
+      x,
+      y: baseY,
+      baseY,
+      amplitude: 6 + Math.random() * 18,
+      freq: 0.0008 + Math.random() * 0.0014,
+      phase: Math.random() * Math.PI * 2,
+      vx: 0.2 + Math.random() * 0.2, // ~0.3 px/frame average
+      opacity: 0.35 + Math.random() * 0.65,
+      size: 0.7 + Math.random() * 1.6,
+      flare: false,
+    });
+  }
+  // Promote 5-8 random particles into flares.
+  const flareCount = 5 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < flareCount && i < particles.length; i++) {
+    const idx = Math.floor(Math.random() * particles.length);
+    particles[idx]!.flare = true;
+    particles[idx]!.size = 1.6 + Math.random() * 1.4;
+  }
+  return particles;
+}
+
+function HeroCanvas() {
+  const reduced = usePrefersReducedMotion();
+  const visible = usePageVisible();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const particlesRef = useRef<Particle[]>([]);
+  const dimsRef = useRef<{ w: number; h: number; dpr: number }>({ w: 0, h: 0, dpr: 1 });
+
+  // Resize observer: recompute particle list whenever the box changes size.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const wrap = wrapRef.current;
+    if (!canvas || !wrap) return;
+
+    const compute = () => {
+      const rect = wrap.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = Math.max(1, Math.floor(rect.width));
+      const h = Math.max(1, Math.floor(rect.height));
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      dimsRef.current = { w, h, dpr };
+
+      // Mobile: scale down to ~180 particles to keep fps OK.
+      const targetCount = w < 640 ? 180 : 300;
+      particlesRef.current = buildParticles(w, h, targetCount);
+    };
+
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, []);
+
+  // Animation loop. Draw logic is inlined into the effect so the React
+  // Compiler doesn't flag ref-content mutations inside a memoized callback.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const drawFrame = (t: number) => {
+      const { w, h } = dimsRef.current;
+      ctx.clearRect(0, 0, w, h);
+      const particles = particlesRef.current;
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i]!;
+        p.y = p.baseY + p.amplitude * Math.sin(t * p.freq + p.x * 0.01 + p.phase);
+        if (p.flare) {
+          const pulse = 0.4 + 0.5 * (0.5 + 0.5 * Math.sin(t * 0.002 + p.phase));
+          ctx.fillStyle = `rgba(5, 150, 105, ${0.5 * pulse + 0.2})`;
+        } else {
+          ctx.fillStyle = `rgba(16, 185, 129, ${0.18 * p.opacity})`;
+        }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+
+    if (reduced) {
+      drawFrame(0);
+      return;
+    }
+    if (!visible) {
+      return;
+    }
+
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = now - start;
+      const particles = particlesRef.current;
+      const w = dimsRef.current.w;
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i]!;
+        p.x += p.vx;
+        if (p.x > w + 6) p.x = -6;
+      }
+      drawFrame(t);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
+  }, [reduced, visible]);
+
+  return (
+    <div
+      ref={wrapRef}
+      aria-hidden="true"
+      className="relative w-full"
+      // 60vh is the hero spec. Floor at 360px so phones don't get a sliver.
+      style={{ height: "60vh", minHeight: "360px" }}
+    >
+      <canvas ref={canvasRef} className="absolute inset-0" />
+    </div>
+  );
+}
+
+// Tabular counter: animates +1 every 5-8s. Renders 2 847 with NBSP separator.
+function formatThousandsNBSP(n: number): string {
+  // Polish convention: space as thousands separator. We use a non-breaking
+  // space so the number never wraps mid-digit-group.
+  const s = String(n);
+  // Insert NBSP ( ) every 3 digits from the right.
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+function HeroCaptionCounter() {
+  const { t } = useLang();
+  const reduced = usePrefersReducedMotion();
+  const visible = usePageVisible();
+  const [n, setN] = useState(2847);
+
+  useEffect(() => {
+    if (reduced || !visible) return;
+    let cancelled = false;
+
+    const scheduleNext = () => {
+      const delay = 5000 + Math.random() * 3000; // 5-8s
+      const id = window.setTimeout(() => {
+        if (cancelled) return;
+        setN((v) => v + 1);
+        scheduleNext();
+      }, delay);
+      return id;
+    };
+    const id = scheduleNext();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+  }, [reduced, visible]);
+
+  return (
+    <p className="mt-6 font-mono text-xs uppercase tracking-wider tabular-nums text-neutral-500">
+      {t.hero.caption(formatThousandsNBSP(n))}
+    </p>
+  );
+}
+
+function Hero() {
+  const { t } = useLang();
+  // Fade-in stagger for the two display lines. Opacity transitions only —
+  // never transform, so there's zero layout cost.
+  const [shown, setShown] = useState({ a: false, b: false });
+  useEffect(() => {
+    const t1 = window.setTimeout(() => setShown((s) => ({ ...s, a: true })), 0);
+    const t2 = window.setTimeout(() => setShown((s) => ({ ...s, b: true })), 120);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, []);
+
+  return (
+    <section className="relative overflow-hidden bg-white">
+      <HeroCanvas />
+      <div className="mx-auto max-w-6xl px-6 pb-20 pt-8 sm:pb-24">
+        <h1 className="text-7xl font-serif leading-[0.95] tracking-tight text-neutral-900 md:text-8xl">
+          <span
+            className="block transition-opacity duration-700 ease-out"
+            style={{ opacity: shown.a ? 1 : 0 }}
+          >
+            {t.hero.line1}
+          </span>
+          <span
+            className="block transition-opacity duration-700 ease-out"
+            style={{ opacity: shown.b ? 1 : 0 }}
+          >
+            {t.hero.line2}
+          </span>
+        </h1>
+        <p className="mt-10 max-w-prose text-lg leading-relaxed text-neutral-700">{t.hero.body}</p>
+        <HeroCaptionCounter />
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SVG illustration block + italic quote
+// ---------------------------------------------------------------------------
+
+function PhoneIllustration() {
+  // Isometric phone receiver hovering above a printed booking schedule.
+  // Thin emerald-600 strokes, white fills, neutral-300 hatch background.
+  return (
+    <svg
+      viewBox="0 0 600 450"
+      role="img"
+      aria-label="Isometric phone receiver above a booking schedule"
+      className="h-auto w-full max-w-xl"
+    >
+      {/* Background hatch — neutral-300 thin diagonals */}
+      <defs>
+        <pattern id="hatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(40)">
+          <line x1="0" y1="0" x2="0" y2="8" stroke="#d4d4d4" strokeWidth="0.8" />
+        </pattern>
+        <radialGradient id="beam" cx="50%" cy="20%" r="60%">
+          <stop offset="0%" stopColor="rgba(16,185,129,0.32)" />
+          <stop offset="100%" stopColor="rgba(16,185,129,0)" />
+        </radialGradient>
+      </defs>
+      <rect x="0" y="320" width="600" height="130" fill="url(#hatch)" opacity="0.55" />
+
+      {/* Light beams from receiver */}
+      <g opacity="0.7">
+        <polygon points="280,140 240,330 340,330" fill="url(#beam)" />
+        <polygon points="320,140 290,330 380,330" fill="url(#beam)" opacity="0.7" />
+        <polygon points="260,140 200,330 280,330" fill="url(#beam)" opacity="0.55" />
+      </g>
+
+      {/* Booking schedule sheet (isometric, ~20° tilt) */}
+      <g transform="translate(120,250) skewX(-12)">
+        <rect x="0" y="0" width="340" height="170" fill="#ffffff" stroke="#059669" strokeWidth="1.5" />
+        {/* Header band */}
+        <line x1="0" y1="28" x2="340" y2="28" stroke="#059669" strokeWidth="1.5" />
+        {/* Row lines */}
+        {[56, 84, 112, 140].map((y) => (
+          <line key={y} x1="0" y1={y} x2="340" y2={y} stroke="#e5e7eb" strokeWidth="1" />
+        ))}
+        {/* Column markers */}
+        <line x1="80" y1="0" x2="80" y2="170" stroke="#e5e7eb" strokeWidth="1" />
+        <line x1="200" y1="0" x2="200" y2="170" stroke="#e5e7eb" strokeWidth="1" />
+
+        {/* Filled cells (booked) */}
+        <rect x="84" y="32" width="112" height="20" fill="#a7f3d0" opacity="0.85" />
+        <rect x="204" y="60" width="112" height="20" fill="#a7f3d0" opacity="0.7" />
+        <rect x="84" y="88" width="112" height="20" fill="#a7f3d0" opacity="0.55" />
+        <rect x="204" y="116" width="112" height="20" fill="#a7f3d0" opacity="0.6" />
+
+        {/* Header dashes */}
+        <line x1="12" y1="16" x2="60" y2="16" stroke="#525252" strokeWidth="1.2" />
+        <line x1="96" y1="16" x2="180" y2="16" stroke="#525252" strokeWidth="1.2" />
+        <line x1="216" y1="16" x2="300" y2="16" stroke="#525252" strokeWidth="1.2" />
+      </g>
+
+      {/* Isometric phone receiver */}
+      <g transform="translate(300,80) rotate(-12)">
+        <rect x="-60" y="-20" width="120" height="40" rx="20" fill="#ffffff" stroke="#059669" strokeWidth="2" />
+        <rect x="-86" y="-10" width="30" height="20" rx="6" fill="#ffffff" stroke="#059669" strokeWidth="2" />
+        <rect x="56" y="-10" width="30" height="20" rx="6" fill="#ffffff" stroke="#059669" strokeWidth="2" />
+        {/* Speaker dots */}
+        <circle cx="-66" cy="0" r="1.6" fill="#059669" />
+        <circle cx="-72" cy="0" r="1.6" fill="#059669" />
+        <circle cx="66" cy="0" r="1.6" fill="#059669" />
+        <circle cx="72" cy="0" r="1.6" fill="#059669" />
+      </g>
+
+      {/* Hairline shadow under the phone, sells the "hover" */}
+      <ellipse cx="320" cy="190" rx="60" ry="6" fill="#059669" opacity="0.08" />
+    </svg>
+  );
+}
+
+function IllustrationBlock() {
+  const { t } = useLang();
+  return (
+    <section
+      className="relative bg-white"
+      style={{
+        // Halftone dot overlay.
+        backgroundImage:
+          "radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px)",
+        backgroundSize: "8px 8px",
+      }}
+    >
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-5 md:items-center md:gap-10">
+          <div className="md:col-span-3">
+            <PhoneIllustration />
+            <p className="mt-4 font-mono text-xs text-neutral-500">{t.illustration.caption}</p>
+          </div>
+          <div className="md:col-span-2">
+            <blockquote className="font-serif text-3xl italic leading-snug text-neutral-800 md:text-4xl">
+              {t.illustration.quote}
+            </blockquote>
+            <p className="mt-6 font-mono text-xs text-neutral-500">{t.illustration.attribution}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ARCHITECTURE CARDS — six unique micro-visualizations
+// ---------------------------------------------------------------------------
+
+// Each card is wrapped in this shell to keep eyebrow + title consistent.
+function CardShell({
+  eyebrow,
+  title,
+  height,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  height: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="flex flex-col rounded-2xl border border-neutral-200 bg-white p-6 transition-colors duration-200 hover:border-neutral-300 md:p-7"
+      style={{ minHeight: `${height}px` }}
+    >
+      <div className="font-mono text-xs uppercase tracking-wider text-neutral-500">{eyebrow}</div>
+      <div className="mt-1 font-serif text-2xl text-neutral-900">{title}</div>
+      <div className="mt-auto flex flex-1 flex-col justify-end pt-4">{children}</div>
+    </div>
+  );
+}
+
+// --- A. Voice ---------------------------------------------------------------
+const WAVE_WIDTH = 24;
+const WAVE_GLYPHS = [".", ":", "+", "*", "o", "O", "#"];
+function buildWaveLine(t: number): string {
+  const out: string[] = new Array(WAVE_WIDTH);
+  for (let i = 0; i < WAVE_WIDTH; i++) {
+    const v =
+      Math.sin(i * 0.45 + t * 0.004) * 0.5 +
+      Math.sin(i * 0.93 + t * 0.0023) * 0.3 +
+      Math.sin(i * 0.21 - t * 0.0017) * 0.2;
+    const d = Math.max(0, Math.min(1, (v + 1) / 2));
+    out[i] = WAVE_GLYPHS[Math.min(WAVE_GLYPHS.length - 1, Math.floor(d * WAVE_GLYPHS.length))]!;
+  }
+  return out.join("");
+}
+
+function VoiceCard() {
+  const { t } = useLang();
+  const reduced = usePrefersReducedMotion();
+  const visible = usePageVisible();
+  const [line, setLine] = useState(() => buildWaveLine(0));
+
+  useEffect(() => {
+    if (reduced) {
+      setLine(buildWaveLine(0));
+      return;
+    }
+    if (!visible) return;
+    let start = performance.now();
+    const id = window.setInterval(() => {
+      setLine(buildWaveLine(performance.now() - start));
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [reduced, visible]);
+
+  return (
+    <CardShell eyebrow={t.cards.voice.eyebrow} title={t.cards.voice.title} height={220}>
+      <pre
+        aria-hidden="true"
+        className="select-none whitespace-pre font-mono text-xs leading-snug tracking-widest text-emerald-600"
+      >
+        {line}
+      </pre>
+    </CardShell>
+  );
+}
+
+// --- B. Booking -------------------------------------------------------------
+function BookingCard() {
+  const { t } = useLang();
+  const reduced = usePrefersReducedMotion();
+  const visible = usePageVisible();
+  // 24-hour timeline.
+  const [slots, setSlots] = useState<boolean[]>(() => {
+    const arr = new Array(24).fill(false) as boolean[];
+    // Seed with a believable filled pattern (mornings + late afternoon).
+    [9, 10, 11, 13, 14, 16, 17, 18].forEach((i) => (arr[i] = true));
+    return arr;
+  });
+
+  useEffect(() => {
+    if (reduced || !visible) return;
+    let cancelled = false;
+    const tick = () => {
+      const delay = 800 + Math.random() * 700;
+      window.setTimeout(() => {
+        if (cancelled) return;
+        setSlots((prev) => {
+          const filledCount = prev.filter(Boolean).length;
+          if (filledCount >= 18) {
+            // Reset partially.
+            const arr = new Array(24).fill(false) as boolean[];
+            [9, 10, 13, 16, 17].forEach((i) => (arr[i] = true));
+            return arr;
+          }
+          const empties: number[] = [];
+          for (let i = 0; i < 24; i++) if (!prev[i] && i >= 8 && i <= 20) empties.push(i);
+          if (empties.length === 0) return prev;
+          const pick = empties[Math.floor(Math.random() * empties.length)]!;
+          const next = prev.slice();
+          next[pick] = true;
+          return next;
+        });
+        if (!cancelled) tick();
+      }, delay);
+    };
+    tick();
+    return () => {
+      cancelled = true;
+    };
+  }, [reduced, visible]);
+
+  const filled = slots.filter(Boolean).length;
+
+  return (
+    <CardShell eyebrow={t.cards.booking.eyebrow} title={t.cards.booking.title} height={180}>
+      <div className="flex items-end gap-[3px]">
+        {slots.map((on, i) => (
+          <span
+            key={i}
+            aria-hidden="true"
+            className={`block h-6 w-2 rounded-sm transition-colors duration-500 ${on ? "bg-emerald-200" : "bg-neutral-100"}`}
+          />
+        ))}
+      </div>
+      <div className="mt-3 font-mono text-xs tabular-nums text-neutral-500">
+        {t.cards.booking.counter(filled)}
+      </div>
+    </CardShell>
+  );
+}
+
+// --- C. Languages -----------------------------------------------------------
+function LanguagesCard() {
+  const { t } = useLang();
+  const reduced = usePrefersReducedMotion();
+  const visible = usePageVisible();
+  const [active, setActive] = useState(0);
+  const [pulse, setPulse] = useState(0); // 0..1, cycles 2s
+
+  useEffect(() => {
+    if (reduced || !visible) return;
+    const id = window.setInterval(() => setActive((a) => (a + 1) % 3), 3000);
+    return () => window.clearInterval(id);
+  }, [reduced, visible]);
+
+  useEffect(() => {
+    if (reduced || !visible) return;
+    let start = performance.now();
+    let raf: number;
+    const tick = () => {
+      const t2 = (performance.now() - start) % 2000;
+      // 0 -> 1 -> 0 sine over 2s
+      setPulse(0.5 + 0.5 * Math.sin((t2 / 2000) * Math.PI * 2));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [reduced, visible]);
+
+  const pills: Array<{ code: string }> = [{ code: "PL" }, { code: "EN" }, { code: "RU" }];
+
+  return (
+    <CardShell eyebrow={t.cards.languages.eyebrow} title={t.cards.languages.title} height={220}>
+      <div className="flex flex-wrap items-center gap-2">
+        {pills.map((p, i) => {
+          const isActive = i === active;
+          // Pulse bg between emerald-50 and emerald-100 by alpha-mixing.
+          const bg = isActive
+            ? `rgba(16, 185, 129, ${0.08 + 0.18 * pulse})`
+            : "transparent";
+          return (
+            <span
+              key={p.code}
+              className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors duration-200 ${
+                isActive ? "border-emerald-200 text-emerald-700" : "border-neutral-200 text-neutral-500"
+              }`}
+              style={{ background: bg }}
+            >
+              {p.code}
+            </span>
+          );
+        })}
+      </div>
+    </CardShell>
+  );
+}
+
+// --- D. Latency -------------------------------------------------------------
+interface ScatterDot {
+  x: number;
+  y: number;
+  opacity: number;
+}
+
+function LatencyCard() {
+  const { t } = useLang();
+  const reduced = usePrefersReducedMotion();
+  const visible = usePageVisible();
+
+  // Initialize 30 seeded dots so SSR + first render agree.
+  const initialDots = useMemo<ScatterDot[]>(() => {
+    const arr: ScatterDot[] = [];
+    // Deterministic pseudo-random by index.
+    for (let i = 0; i < 30; i++) {
+      const x = ((i * 7) % 30) / 30; // 0..1
+      const yBase = 0.3 + ((i * 13) % 100) / 250; // 0.3..0.7
+      arr.push({ x, y: yBase, opacity: 1 });
+    }
+    return arr;
+  }, []);
+  const [dots, setDots] = useState<ScatterDot[]>(initialDots);
+
+  useEffect(() => {
+    if (reduced || !visible) return;
+    const id = window.setInterval(() => {
+      setDots((prev) => {
+        const next = prev.slice(1);
+        next.push({
+          x: 1,
+          y: 0.25 + Math.random() * 0.6,
+          opacity: 0,
+        });
+        // Shift every dot leftwards by 1/30 and fade the oldest.
+        return next.map((d, i) => ({
+          x: i / (next.length - 1),
+          y: d.y,
+          opacity: i === next.length - 1 ? Math.min(1, d.opacity + 0.4) : i === 0 ? 0.3 : 1,
+        }));
+      });
+    }, 3000);
+    return () => window.clearInterval(id);
+  }, [reduced, visible]);
+
+  const W = 200;
+  const H = 60;
+
+  return (
+    <CardShell eyebrow={t.cards.latency.eyebrow} title={t.cards.latency.title} height={200}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-16 w-full" aria-hidden="true">
+        {/* p95 reference line */}
+        <line
+          x1="0"
+          x2={W}
+          y1={H * 0.28}
+          y2={H * 0.28}
+          stroke="#059669"
+          strokeWidth="1"
+          strokeDasharray="4 3"
+          opacity="0.7"
+        />
+        {dots.map((d, i) => (
+          <circle
+            key={i}
+            cx={d.x * W}
+            cy={d.y * H}
+            r={1.4}
+            fill="#059669"
+            opacity={d.opacity}
+          />
+        ))}
+      </svg>
+      <div className="mt-2 font-mono text-xs tabular-nums text-neutral-500">{t.cards.latency.p95}</div>
+    </CardShell>
+  );
+}
+
+// --- E. SMS -----------------------------------------------------------------
+function SmsCard() {
+  const { t } = useLang();
+  const reduced = usePrefersReducedMotion();
+  const visible = usePageVisible();
+  const [progress, setProgress] = useState(reduced ? 1 : 0); // 0..1
+
+  useEffect(() => {
+    if (reduced || !visible) return;
+    let start = performance.now();
+    let raf: number;
+    const tick = () => {
+      const elapsed = (performance.now() - start) % 4000;
+      setProgress(elapsed / 4000);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [reduced, visible]);
+
+  return (
+    <CardShell eyebrow={t.cards.sms.eyebrow} title={t.cards.sms.title} height={240}>
+      <div className="relative w-full max-w-[200px]">
+        <svg viewBox="0 0 160 60" className="h-14 w-full" aria-hidden="true">
+          <rect
+            x="1"
+            y="1"
+            width="158"
+            height="58"
+            rx="10"
+            ry="10"
+            fill="#ffffff"
+            stroke="#d4d4d4"
+            strokeWidth="1.2"
+          />
+          {/* Speaker slit */}
+          <line x1="64" y1="10" x2="96" y2="10" stroke="#d4d4d4" strokeWidth="1" />
+          {/* Progress bar — clipPath via foreignObject would over-engineer; rect width interpolates. */}
+          <rect
+            x="6"
+            y="22"
+            width={progress * 148}
+            height="16"
+            rx="4"
+            fill="#a7f3d0"
+          />
+          <rect x="6" y="22" width="148" height="16" rx="4" fill="none" stroke="#d4d4d4" strokeWidth="0.6" />
+        </svg>
+        <span className="mt-2 block font-mono text-xs text-neutral-700">
+          +48 501 ••• ••• 12
+        </span>
+      </div>
+    </CardShell>
+  );
+}
+
+// --- F. Memory --------------------------------------------------------------
+function MemoryCard() {
+  const { t } = useLang();
+  const reduced = usePrefersReducedMotion();
+  const visible = usePageVisible();
+  // Believable shape: peak Wed/Thu.
+  const seed = useMemo(() => [0.45, 0.6, 0.85, 0.95, 0.7, 0.5, 0.35], []);
+  const [heights, setHeights] = useState<number[]>(seed);
+
+  useEffect(() => {
+    if (reduced || !visible) return;
+    const id = window.setInterval(() => {
+      setHeights((prev) =>
+        prev.map((h, i) => {
+          const base = seed[i]!;
+          const jitter = (Math.random() - 0.5) * 0.18;
+          return Math.max(0.15, Math.min(1, base + jitter));
+        }),
+      );
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [reduced, visible, seed]);
+
+  return (
+    <CardShell eyebrow={t.cards.memory.eyebrow} title={t.cards.memory.title} height={200}>
+      <div className="flex h-16 items-end gap-2">
+        {heights.map((h, i) => (
+          <div key={i} className="flex flex-1 flex-col items-center gap-1">
+            <div
+              aria-hidden="true"
+              className="w-full rounded-sm bg-emerald-500 transition-all duration-700 ease-out"
+              style={{
+                height: `${h * 100}%`,
+                opacity: 0.3,
+              }}
+            />
+            <span className="font-mono text-[10px] text-neutral-400">{t.cards.memory.days[i]}</span>
+          </div>
+        ))}
+      </div>
+    </CardShell>
+  );
+}
+
+// --- Grid container ---------------------------------------------------------
+function ArchitectureCards() {
+  const { t } = useLang();
+  return (
+    <section className="bg-neutral-50">
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
+        <div className="mb-10 font-mono text-xs uppercase tracking-wider text-neutral-500">
+          {t.cards.eyebrow}
+        </div>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          <VoiceCard />
+          <BookingCard />
+          <LanguagesCard />
+          <LatencyCard />
+          <SmsCard />
+          <MemoryCard />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LIVE TRANSCRIPT LEDGER — ruled-paper card, typewriter cadence
+// ---------------------------------------------------------------------------
+
+const LEDGER_TYPE_MS_PER_CHAR = 32;
+const LEDGER_PAUSE_MS = 700;
+const LEDGER_RESTART_MS = 5000;
+
+interface RenderedLedgerLine {
+  side: "clinic" | "patient";
+  ts: string;
+  text: string;
+  done: boolean;
+}
+
+function renderLedger(elapsedMs: number, dialogue: DialogueLine[]): RenderedLedgerLine[] {
+  let cursor = 0;
+  const out: RenderedLedgerLine[] = [];
+  for (const { side, ts, line } of dialogue) {
+    const typeMs = line.length * LEDGER_TYPE_MS_PER_CHAR;
+    const start = cursor;
+    const end = cursor + typeMs;
+    if (elapsedMs <= start) {
+      out.push({ side, ts, text: "", done: false });
+    } else if (elapsedMs >= end) {
+      out.push({ side, ts, text: line, done: true });
+    } else {
+      const frac = (elapsedMs - start) / typeMs;
+      out.push({ side, ts, text: line.slice(0, Math.max(0, Math.floor(line.length * frac))), done: false });
+    }
+    cursor = end + LEDGER_PAUSE_MS;
+  }
+  return out;
+}
+
+function totalLedgerMs(dialogue: DialogueLine[]): number {
+  return dialogue.reduce((sum, d) => sum + d.line.length * LEDGER_TYPE_MS_PER_CHAR + LEDGER_PAUSE_MS, 0);
+}
+
+function LiveLedger() {
+  const { t, lang } = useLang();
+  const reduced = usePrefersReducedMotion();
+  const visible = usePageVisible();
+  const dialogue = DIALOGUES[lang];
+  const [lines, setLines] = useState<RenderedLedgerLine[]>(() =>
+    dialogue.map((d) => ({ side: d.side, ts: d.ts, text: "", done: false })),
+  );
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (reduced) {
+      setLines(dialogue.map((d) => ({ side: d.side, ts: d.ts, text: d.line, done: true })));
+      return;
+    }
+    if (!visible) return;
+    const fullCycle = totalLedgerMs(dialogue) + LEDGER_RESTART_MS;
+    let start = performance.now();
+    const tick = (now: number) => {
+      const elapsed = (now - start) % fullCycle;
+      setLines(renderLedger(elapsed, dialogue));
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
+  }, [reduced, visible, dialogue]);
+
+  return (
+    <section className="bg-neutral-50">
+      <div className="mx-auto max-w-3xl px-6 py-20 sm:py-28">
+        <div
+          className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm"
+          style={{
+            // Ruled-paper backdrop: 2rem horizontal rules.
+            backgroundImage:
+              "linear-gradient(to bottom, transparent 0, transparent calc(2rem - 1px), rgba(0,0,0,0.04) calc(2rem - 1px), rgba(0,0,0,0.04) 2rem)",
+            backgroundSize: "100% 2rem",
+            backgroundPosition: "0 1.25rem",
+          }}
+        >
+          <div className="mb-6 font-mono text-xs uppercase tracking-wider text-neutral-500">
+            {t.ledger.eyebrow}
+          </div>
+          <div className="flex flex-col gap-3" style={{ minHeight: `${dialogue.length * 40}px` }}>
+            {lines.map((l, i) => (
+              <div key={i} className="flex items-baseline gap-4">
+                <span className="w-16 shrink-0 font-mono text-xs tabular-nums text-neutral-400">
+                  {l.ts}
+                </span>
+                <span
+                  className={
+                    l.side === "clinic"
+                      ? "min-w-[64px] shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-center font-mono text-xs text-emerald-700"
+                      : "min-w-[64px] shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-center font-mono text-xs text-neutral-600"
+                  }
+                >
+                  {l.side === "clinic" ? t.ledger.speakerClinic : t.ledger.speakerPatient}
+                </span>
+                <span className="min-w-0 flex-1 break-words font-sans text-base text-neutral-800">
+                  {l.text}
+                  {!l.done && l.text.length > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="ml-[2px] inline-block h-[1em] w-[6px] translate-y-[2px] animate-pulse bg-emerald-600 align-middle"
+                    />
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CTA + Footer
+// ---------------------------------------------------------------------------
+
+const MAILTO_DEMO =
+  "mailto:kontakt@odbiera.com?subject=Odbiera%20%E2%80%94%20rozmowa&body=Klinika%3A%20%0AMiasto%3A%20%0ATelefon%3A%20";
+
+function CtaSection() {
+  const { t } = useLang();
+  return (
+    <section
+      className="relative bg-white"
+      style={{
+        backgroundImage: "radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px)",
+        backgroundSize: "8px 8px",
+      }}
+    >
+      <div className="mx-auto max-w-3xl px-6 py-24 text-center md:py-32">
+        <h2 className="text-5xl font-serif tracking-tight text-neutral-900 md:text-6xl">
+          {t.cta.headline}
+        </h2>
+        <a
+          href={MAILTO_DEMO}
+          className="mt-10 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-7 py-3.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-emerald-700"
+        >
+          {t.cta.button}
+        </a>
+        <p className="mt-6 font-mono text-xs text-neutral-500">{t.cta.contact}</p>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  const { t } = useLang();
+  return (
+    <footer className="border-t border-neutral-200 bg-white">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-8">
+        <span className="font-serif text-base italic text-neutral-900">{t.footer.copyright}</span>
+        <span className="font-mono text-xs text-neutral-500">
+          {t.footer.privacy} · &copy; {new Date().getFullYear()}
+        </span>
+      </div>
+    </footer>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page composition
+// ---------------------------------------------------------------------------
+
+function LandingInner() {
+  return (
+    <div className="min-h-screen bg-white font-sans text-neutral-900">
+      <Header />
+      <main>
+        <Hero />
+        <IllustrationBlock />
+        <ArchitectureCards />
+        <LiveLedger />
+        <CtaSection />
+      </main>
+      <Footer />
+    </div>
+  );
+}
 
 export default function HomePage() {
   return (

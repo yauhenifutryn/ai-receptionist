@@ -16,6 +16,7 @@ type Mode = "voice" | "chat";
 interface Props {
   agentId: string;
   strings: DemoStrings;
+  pin: string | null;
 }
 
 /**
@@ -28,15 +29,15 @@ interface Props {
  *   • All strings come from props
  *   • Visually focused on the call experience, not debugging
  */
-export default function DemoVoiceClient({ agentId, strings }: Props) {
+export default function DemoVoiceClient({ agentId, strings, pin }: Props) {
   return (
     <ConversationProvider>
-      <Inner agentId={agentId} strings={strings} />
+      <Inner agentId={agentId} strings={strings} pin={pin} />
     </ConversationProvider>
   );
 }
 
-function Inner({ agentId, strings }: Props) {
+function Inner({ agentId, strings, pin }: Props) {
   const [mode, setMode] = useState<Mode>("voice");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [micPermission, setMicPermission] = useState<"unknown" | "granted" | "denied">("unknown");
@@ -45,7 +46,34 @@ function Inner({ agentId, strings }: Props) {
 
   const conversation = useConversation({
     onConnect: () => {},
-    onDisconnect: () => {},
+    onDisconnect: () => {
+      // Best-effort finalize: ask the backend to fetch the canonical EL record
+      // and persist a `conversations` row. PIN-scoped. Failure is non-fatal so
+      // it must not block React state cleanup.
+      let id: string | undefined;
+      try {
+        id = conversation.getId?.();
+      } catch {
+        // SDK not yet connected — nothing to finalize
+      }
+      if (!id || !pin) return;
+      void (async () => {
+        try {
+          await fetch("/api/conversations/finalize", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              conversationId: id,
+              agentId,
+              source: "pin_demo",
+              pin,
+            }),
+          });
+        } catch {
+          // swallow; the list view can lazy-retry on open
+        }
+      })();
+    },
     onMessage: (msg: { source?: string; message?: string }) => {
       const role = msg.source === "user" ? "user" : "agent";
       const text = msg.message ?? "";
@@ -347,6 +375,7 @@ async function persistTurn(
         text: entry.text,
         timestamp: entry.timestamp,
         source: mode,
+        surface: "pin_demo",
       }),
     });
   } catch (err) {

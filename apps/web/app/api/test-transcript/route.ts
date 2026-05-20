@@ -31,6 +31,7 @@ const BodySchema = z.object({
   text: z.string().min(1).max(8000),
   timestamp: z.number().int().positive(),
   source: z.enum(["voice", "chat"]).optional(),
+  surface: z.enum(["browser_test", "pin_demo"]).optional(),
 });
 
 function repoRoot(): string {
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
       role: b.role,
       text: b.text,
       source: b.source ?? null,
+      surface: b.surface ?? null,
       recorded_at: new Date(b.timestamp).toISOString(),
     });
     if (dbErr) {

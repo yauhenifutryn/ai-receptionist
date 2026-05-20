@@ -91,7 +91,7 @@ export default async function PublicDemoPage({ params, searchParams }: PageProps
           <h2 className="text-xl font-semibold text-neutral-900">{t.callSectionTitle}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-neutral-600">{t.callSectionSubtitle}</p>
         </div>
-        <DemoVoiceClient agentId={agentId} strings={t} />
+        <DemoVoiceClient agentId={agentId} strings={t} pin={pin} />
       </section>
 
       <footer className="mt-16 text-center text-xs text-neutral-400">{t.poweredBy}</footer>

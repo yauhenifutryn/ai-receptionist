@@ -89,6 +89,7 @@ Already mandatory per project rules. Confirm under Workspace → Privacy.
 4. Paste a Polish dental URL (e.g. `https://dynastystomatology.pl`) → provision an agent.
    - Expect: lands on `/test/<agentId>` with the "Assign phone number" panel + voice tester.
 5. Verify in Supabase:
+
    ```sql
    select id, name, provisioned_by_user_id from tenants order by created_at desc limit 1;
    select id, provider_agent_id, phone_number, provisioned_by_user_id from agents order by created_at desc limit 1;

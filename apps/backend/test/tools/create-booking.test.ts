@@ -6,6 +6,11 @@ import type {
   InsertBookingArgs,
   BookingRow,
 } from "../../src/tools/repository.js";
+import { createSimulatedCalendarProvider } from "../../src/integrations/calendar/simulated-calendar-provider.js";
+
+const provider = createSimulatedCalendarProvider({
+  now: () => new Date("2026-05-16T13:23:45.000Z"),
+});
 
 function buildRepo(overrides: Partial<BookingsRepository> = {}): BookingsRepository {
   return {
@@ -23,6 +28,7 @@ function buildRepo(overrides: Partial<BookingsRepository> = {}): BookingsReposit
         id: "booking-1",
         tenantId: args.tenantId,
         requestId: args.requestId,
+        shortToken: args.shortToken,
         startsAt: args.startsAt,
         endsAt: args.endsAt,
       };
@@ -49,24 +55,30 @@ const baseRequest = {
   language: "pl" as const,
 };
 
-describe("handleCreateBooking (W2.3)", () => {
-  it("happy path writes a booking and returns the response envelope", async () => {
-    const insertSpy = vi.fn().mockImplementation(async (args: InsertBookingArgs) => ({
-      id: "booking-9",
-      tenantId: args.tenantId,
-      requestId: args.requestId,
-      startsAt: args.startsAt,
-      endsAt: args.endsAt,
-    }));
+describe("handleCreateBooking (W2.3, CalendarProvider DI)", () => {
+  it("happy path writes a booking with external_id + short_token, returns smsShortUrl", async () => {
+    const insertSpy = vi
+      .fn()
+      .mockImplementation(async (args: InsertBookingArgs): Promise<BookingRow> => ({
+        id: "booking-9",
+        tenantId: args.tenantId,
+        requestId: args.requestId,
+        shortToken: args.shortToken,
+        startsAt: args.startsAt,
+        endsAt: args.endsAt,
+      }));
     const repo = buildRepo({ insertBooking: insertSpy });
     const out = await handleCreateBooking(baseRequest, {
+      provider,
       repo,
       smsShortUrlBase: "https://app.example.com",
     });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.response.bookingId).toBe("booking-9");
-    expect(out.response.smsShortUrl).toBe("https://app.example.com/b/booking-9");
+    expect(out.response.smsShortUrl).toMatch(
+      /^https:\/\/app\.example\.com\/b\/[A-Za-z0-9]{8}$/,
+    );
     expect(out.response.confirmationLine).toMatch(/Potwierdzam/);
     expect(insertSpy).toHaveBeenCalledOnce();
     const insertedArgs = insertSpy.mock.calls[0]![0] as InsertBookingArgs;
@@ -75,6 +87,8 @@ describe("handleCreateBooking (W2.3)", () => {
     expect(insertedArgs.appointmentCategory).toBe("consultation");
     expect(insertedArgs.startsAt).toBe("2026-05-17T09:00:00.000Z");
     expect(insertedArgs.endsAt).toBe("2026-05-17T09:30:00.000Z");
+    expect(insertedArgs.externalId).toMatch(/^sim_/);
+    expect(insertedArgs.shortToken).toMatch(/^[A-Za-z0-9]{8}$/);
   });
 
   it("idempotent: existing booking with same requestId is returned, no insert", async () => {
@@ -85,6 +99,7 @@ describe("handleCreateBooking (W2.3)", () => {
           id: "existing-1",
           tenantId: "tenant-1",
           requestId: REQ_ID,
+          shortToken: "AbCdEfGh",
           startsAt: "2026-05-17T09:00:00.000Z",
           endsAt: "2026-05-17T09:30:00.000Z",
         };
@@ -92,19 +107,21 @@ describe("handleCreateBooking (W2.3)", () => {
       insertBooking: insertSpy,
     });
     const out = await handleCreateBooking(baseRequest, {
+      provider,
       repo,
       smsShortUrlBase: "https://app.example.com",
     });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.response.bookingId).toBe("existing-1");
+    expect(out.response.smsShortUrl).toBe("https://app.example.com/b/AbCdEfGh");
     expect(insertSpy).not.toHaveBeenCalled();
   });
 
   it("returns validation_failed (400) on schema-invalid body", async () => {
     const out = await handleCreateBooking(
       { bogus: true },
-      { repo: buildRepo(), smsShortUrlBase: "https://app.example.com" },
+      { provider, repo: buildRepo(), smsShortUrlBase: "https://app.example.com" },
     );
     expect(out.ok).toBe(false);
     if (out.ok) return;
@@ -115,7 +132,7 @@ describe("handleCreateBooking (W2.3)", () => {
   it("returns slot_no_longer_available (409) on undecodable slotId", async () => {
     const out = await handleCreateBooking(
       { ...baseRequest, slotId: "garbage" },
-      { repo: buildRepo(), smsShortUrlBase: "https://app.example.com" },
+      { provider, repo: buildRepo(), smsShortUrlBase: "https://app.example.com" },
     );
     expect(out.ok).toBe(false);
     if (out.ok) return;
@@ -126,7 +143,7 @@ describe("handleCreateBooking (W2.3)", () => {
   it("returns tenant_not_found (404) when agentId is unknown", async () => {
     const out = await handleCreateBooking(
       { ...baseRequest, agentId: "agent-unknown" },
-      { repo: buildRepo(), smsShortUrlBase: "https://app.example.com" },
+      { provider, repo: buildRepo(), smsShortUrlBase: "https://app.example.com" },
     );
     expect(out.ok).toBe(false);
     if (out.ok) return;
@@ -135,15 +152,19 @@ describe("handleCreateBooking (W2.3)", () => {
   });
 
   it("conversationId from the envelope is preferred over the requestId fallback", async () => {
-    const insertSpy = vi.fn().mockImplementation(async (args: InsertBookingArgs) => ({
-      id: "booking-11",
-      tenantId: args.tenantId,
-      requestId: args.requestId,
-      startsAt: args.startsAt,
-      endsAt: args.endsAt,
-    }));
+    const insertSpy = vi
+      .fn()
+      .mockImplementation(async (args: InsertBookingArgs): Promise<BookingRow> => ({
+        id: "booking-11",
+        tenantId: args.tenantId,
+        requestId: args.requestId,
+        shortToken: args.shortToken,
+        startsAt: args.startsAt,
+        endsAt: args.endsAt,
+      }));
     const repo = buildRepo({ insertBooking: insertSpy });
     await handleCreateBooking(baseRequest, {
+      provider,
       repo,
       smsShortUrlBase: "https://app.example.com",
       conversationId: "conv-xyz",

@@ -52,6 +52,14 @@ export interface DemoStrings {
   chatInputDisabled: string;
   sendButton: string;
 
+  // Past sessions pane (PIN-scoped)
+  pastSessionsTitle: string;
+  pastSessionsEmpty: string;
+  pastSessionsDuration: string;
+  pastSessionsLanguage: string;
+  pastSessionsBooked: string;
+  pastSessionsViewToggle: string;
+
   // Footer
   poweredBy: string;
 }
@@ -121,6 +129,12 @@ const PL: DemoStrings = {
   chatInputPlaceholder: "Napisz wiadomość po polsku…",
   chatInputDisabled: 'Kliknij „Rozpocznij czat", aby zacząć',
   sendButton: "Wyślij",
+  pastSessionsTitle: "Twoje wcześniejsze rozmowy",
+  pastSessionsEmpty: "Nie masz jeszcze żadnych nagranych rozmów testowych.",
+  pastSessionsDuration: "Czas trwania",
+  pastSessionsLanguage: "Język",
+  pastSessionsBooked: "Umówiona wizyta",
+  pastSessionsViewToggle: "Pokaż transkrypcję",
   poweredBy: "Powered by AI Receptionist",
 };
 
@@ -188,6 +202,12 @@ const EN: DemoStrings = {
   chatInputPlaceholder: "Type a message…",
   chatInputDisabled: "Click Start chat to begin",
   sendButton: "Send",
+  pastSessionsTitle: "Your previous sessions",
+  pastSessionsEmpty: "No test sessions recorded yet.",
+  pastSessionsDuration: "Duration",
+  pastSessionsLanguage: "Language",
+  pastSessionsBooked: "Booked",
+  pastSessionsViewToggle: "Show transcript",
   poweredBy: "Powered by AI Receptionist",
 };
 
@@ -256,6 +276,12 @@ const RU: DemoStrings = {
   chatInputPlaceholder: "Напишите сообщение…",
   chatInputDisabled: "Нажмите «Начать чат», чтобы начать",
   sendButton: "Отправить",
+  pastSessionsTitle: "Ваши прошлые сессии",
+  pastSessionsEmpty: "Тестовых сессий пока нет.",
+  pastSessionsDuration: "Длительность",
+  pastSessionsLanguage: "Язык",
+  pastSessionsBooked: "Запись",
+  pastSessionsViewToggle: "Показать стенограмму",
   poweredBy: "Powered by AI Receptionist",
 };
 

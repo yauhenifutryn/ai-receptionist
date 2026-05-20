@@ -3,6 +3,7 @@ import { getServiceRoleSupabase } from "@/lib/supabase-server";
 import { DEMO_STRINGS, isDemoLocale, type DemoLocale } from "@/lib/demo-i18n";
 import DemoVoiceClient from "./demo-voice-client";
 import LanguageSwitcher from "./language-switcher";
+import PastSessionsPane from "./past-sessions-pane";
 
 interface PageProps {
   params: Promise<{ agentId: string }>;
@@ -93,6 +94,8 @@ export default async function PublicDemoPage({ params, searchParams }: PageProps
         </div>
         <DemoVoiceClient agentId={agentId} strings={t} pin={pin} />
       </section>
+
+      <PastSessionsPane agentId={agentId} pin={pin} strings={t} />
 
       <footer className="mt-16 text-center text-xs text-neutral-400">{t.poweredBy}</footer>
     </main>

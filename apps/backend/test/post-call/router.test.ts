@@ -12,6 +12,10 @@ const baseRepo: PostCallRepository = {
     return null;
   },
   async updateBookingRecoveredRevenue() {},
+  async upsertConversation() {},
+  async findBookingIdByConversation() {
+    return null;
+  },
 };
 
 const validPayload = {

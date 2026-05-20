@@ -69,6 +69,42 @@ export async function handlePostCall(
     }
   }
 
+  // Canonical conversations row (Chat C §4.4). Same row may also be updated
+  // by /api/conversations/finalize for browser/PIN sessions; upsert keys on
+  // conversation_id so the post-call webhook is authoritative for PSTN.
+  // Consent gate: strip transcript from raw_jsonb when consent_flag is false
+  // (DB CHECK also enforces this; belt + suspenders).
+  const bookedBookingId = await deps.repo.findBookingIdByConversation(payload.conversationId);
+  const transcriptForJsonb = consentFlag ? payload.transcript : undefined;
+  await deps.repo.upsertConversation({
+    conversationId: payload.conversationId,
+    tenantId: tenant.tenantId,
+    agentId: tenant.agentRowId,
+    providerAgentId: payload.agentId,
+    source: "pstn",
+    direction: payload.direction,
+    startedAt: payload.startedAt,
+    endedAt: payload.endedAt,
+    durationSeconds: payload.durationSeconds,
+    endReason: payload.endReason,
+    consentFlag,
+    consentDecision: payload.derived.consentDecision,
+    callerLanguage: payload.derived.callerLanguage,
+    appointmentCategory: payload.derived.appointmentCategory ?? null,
+    escalated: payload.derived.escalated,
+    escalationReason: payload.derived.escalationReason ?? null,
+    bookedBookingId,
+    toolCallCount: payload.toolInvocations.length,
+    toolErrorCount: payload.toolInvocations.filter((t) => !t.succeeded).length,
+    rawJsonb: {
+      transcript: transcriptForJsonb,
+      toolInvocations: payload.toolInvocations,
+      derived: payload.derived,
+      raw: payload.raw,
+    },
+    finalizedAt: new Date().toISOString(),
+  });
+
   return {
     ok: true,
     tenantId: tenant.tenantId,

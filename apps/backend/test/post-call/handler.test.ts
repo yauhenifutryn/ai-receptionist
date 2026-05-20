@@ -7,6 +7,7 @@ import type {
   ServiceValueLookupArgs,
   ServiceValueLookupResult,
   UpdateBookingRevenueArgs,
+  UpsertConversationArgs,
 } from "../../src/post-call/repository.js";
 import type { TenantBinding } from "../../src/tools/repository.js";
 
@@ -18,6 +19,8 @@ function buildRepo(overrides: Partial<PostCallRepository> = {}): {
     lookupServiceValue: ReturnType<typeof vi.fn>;
     updateBookingRecoveredRevenue: ReturnType<typeof vi.fn>;
     resolveTenantByAgent: ReturnType<typeof vi.fn>;
+    upsertConversation: ReturnType<typeof vi.fn>;
+    findBookingIdByConversation: ReturnType<typeof vi.fn>;
   };
 } {
   const upsertConsentLog = vi.fn(async (_args: InsertConsentLogArgs) => {});
@@ -30,6 +33,8 @@ function buildRepo(overrides: Partial<PostCallRepository> = {}): {
     async (id: string): Promise<TenantBinding | null> =>
       id === "agent-77" ? { tenantId: "tenant-1", agentRowId: "agent-row-1" } : null,
   );
+  const upsertConversation = vi.fn(async (_args: UpsertConversationArgs) => {});
+  const findBookingIdByConversation = vi.fn(async (_id: string): Promise<string | null> => null);
 
   const repo: PostCallRepository = {
     resolveTenantByAgent,
@@ -37,6 +42,8 @@ function buildRepo(overrides: Partial<PostCallRepository> = {}): {
     insertTranscript,
     lookupServiceValue,
     updateBookingRecoveredRevenue,
+    upsertConversation,
+    findBookingIdByConversation,
     ...overrides,
   };
   return {
@@ -47,6 +54,8 @@ function buildRepo(overrides: Partial<PostCallRepository> = {}): {
       lookupServiceValue,
       updateBookingRecoveredRevenue,
       resolveTenantByAgent,
+      upsertConversation,
+      findBookingIdByConversation,
     },
   };
 }
@@ -202,5 +211,95 @@ describe("handlePostCall (W2.4)", () => {
       { repo },
     );
     expect(spies.insertTranscript).not.toHaveBeenCalled();
+  });
+});
+
+describe("handlePostCall (W2.5) — conversations write", () => {
+  function basePayload() {
+    return {
+      conversationId: "conv-c1",
+      agentId: "agent-77",
+      startedAt: "2026-05-21T10:00:00.000Z",
+      endedAt: "2026-05-21T10:02:00.000Z",
+      durationSeconds: 120,
+      endReason: "hangup_caller",
+      direction: "inbound" as const,
+      transcript: [
+        { role: "user", text: "Cześć", startMs: 0, endMs: 800 },
+        { role: "agent", text: "Dzień dobry", startMs: 900, endMs: 1700 },
+      ],
+      toolInvocations: [
+        {
+          toolName: "check_availability",
+          argsJson: "{}",
+          responseJson: "{}",
+          latencyMs: 412,
+          succeeded: true,
+        },
+      ],
+      derived: {
+        callerLanguage: "pl" as const,
+        consentDecision: "yes" as const,
+        consentFlag: true,
+        escalated: false,
+      },
+    };
+  }
+
+  it("PSTN with consent=true writes conversations row with transcript in raw_jsonb", async () => {
+    const { repo, spies } = buildRepo();
+    const r = await handlePostCall(basePayload(), { repo });
+    expect(r.ok).toBe(true);
+    expect(spies.upsertConversation).toHaveBeenCalledOnce();
+    const args = spies.upsertConversation.mock.calls[0]![0] as UpsertConversationArgs;
+    expect(args.conversationId).toBe("conv-c1");
+    expect(args.tenantId).toBe("tenant-1");
+    expect(args.agentId).toBe("agent-row-1");
+    expect(args.providerAgentId).toBe("agent-77");
+    expect(args.source).toBe("pstn");
+    expect(args.direction).toBe("inbound");
+    expect(args.consentFlag).toBe(true);
+    expect(args.consentDecision).toBe("yes");
+    expect(args.callerLanguage).toBe("pl");
+    expect(args.toolCallCount).toBe(1);
+    expect(args.toolErrorCount).toBe(0);
+    expect(args.escalated).toBe(false);
+    expect((args.rawJsonb as { transcript?: unknown[] }).transcript).toHaveLength(2);
+    expect(args.finalizedAt).toBeTruthy();
+  });
+
+  it("PSTN with consent=false strips transcript from raw_jsonb (consent gate)", async () => {
+    const { repo, spies } = buildRepo();
+    const w = basePayload();
+    w.derived = { ...w.derived, consentDecision: "no", consentFlag: false };
+    await handlePostCall(w, { repo });
+    const args = spies.upsertConversation.mock.calls[0]![0] as UpsertConversationArgs;
+    expect(args.consentFlag).toBe(false);
+    expect((args.rawJsonb as { transcript?: unknown[] }).transcript).toBeUndefined();
+  });
+
+  it("tool_error_count counts succeeded=false entries", async () => {
+    const { repo, spies } = buildRepo();
+    const w = basePayload();
+    w.toolInvocations = [
+      {
+        toolName: "create_booking",
+        argsJson: "{}",
+        responseJson: "{}",
+        latencyMs: 800,
+        succeeded: false,
+      },
+      {
+        toolName: "check_availability",
+        argsJson: "{}",
+        responseJson: "{}",
+        latencyMs: 200,
+        succeeded: true,
+      },
+    ];
+    await handlePostCall(w, { repo });
+    const args = spies.upsertConversation.mock.calls[0]![0] as UpsertConversationArgs;
+    expect(args.toolCallCount).toBe(2);
+    expect(args.toolErrorCount).toBe(1);
   });
 });

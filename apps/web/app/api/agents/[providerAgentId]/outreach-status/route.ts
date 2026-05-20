@@ -1,20 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import {
-  getOperatorOrJsonError,
-  getServiceRoleSupabase,
-} from "@/lib/supabase-server";
+import { getOperatorOrJsonError, getServiceRoleSupabase } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const OUTREACH_STATUSES = [
-  "created",
-  "audited",
-  "contacted",
-  "positive",
-  "negative",
-] as const;
+const OUTREACH_STATUSES = ["created", "audited", "contacted", "positive", "negative"] as const;
 
 const BodySchema = z.object({
   status: z.enum(OUTREACH_STATUSES),
@@ -53,10 +44,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     .select("provider_agent_id, outreach_status, outreach_status_updated_at")
     .maybeSingle();
   if (error) {
-    return NextResponse.json(
-      { error: "update_failed", message: error.message },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "update_failed", message: error.message }, { status: 500 });
   }
   if (!data) {
     return NextResponse.json({ error: "agent_not_found" }, { status: 404 });

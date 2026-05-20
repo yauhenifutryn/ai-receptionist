@@ -1,10 +1,6 @@
 import { notFound } from "next/navigation";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
-import {
-  DEMO_STRINGS,
-  isDemoLocale,
-  type DemoLocale,
-} from "@/lib/demo-i18n";
+import { DEMO_STRINGS, isDemoLocale, type DemoLocale } from "@/lib/demo-i18n";
 import DemoVoiceClient from "./demo-voice-client";
 import LanguageSwitcher from "./language-switcher";
 
@@ -15,10 +11,7 @@ interface PageProps {
 
 export const revalidate = 0;
 
-export default async function PublicDemoPage({
-  params,
-  searchParams,
-}: PageProps) {
+export default async function PublicDemoPage({ params, searchParams }: PageProps) {
   const { agentId } = await params;
   const { pin, lang } = await searchParams;
 
@@ -52,18 +45,12 @@ export default async function PublicDemoPage({
       </div>
 
       <header className="mb-10 text-center">
-        <p className="text-xs uppercase tracking-[0.25em] text-neutral-500">
-          {t.badge}
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-          {clinicName}
-        </h1>
+        <p className="text-xs uppercase tracking-[0.25em] text-neutral-500">{t.badge}</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{clinicName}</h1>
         <p className="mt-2 text-sm font-medium text-neutral-500">
           {t.taglinePrefix} {clinicName}
         </p>
-        <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-neutral-700">
-          {t.hero}
-        </p>
+        <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-neutral-700">{t.hero}</p>
       </header>
 
       <section className="mb-12">
@@ -76,12 +63,8 @@ export default async function PublicDemoPage({
               key={f.title}
               className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm"
             >
-              <h3 className="text-sm font-semibold text-neutral-900">
-                {f.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-                {f.body}
-              </p>
+              <h3 className="text-sm font-semibold text-neutral-900">{f.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-600">{f.body}</p>
             </article>
           ))}
         </div>
@@ -105,19 +88,13 @@ export default async function PublicDemoPage({
 
       <section className="mb-10">
         <div className="mb-5 text-center">
-          <h2 className="text-xl font-semibold text-neutral-900">
-            {t.callSectionTitle}
-          </h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-neutral-600">
-            {t.callSectionSubtitle}
-          </p>
+          <h2 className="text-xl font-semibold text-neutral-900">{t.callSectionTitle}</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-neutral-600">{t.callSectionSubtitle}</p>
         </div>
         <DemoVoiceClient agentId={agentId} strings={t} />
       </section>
 
-      <footer className="mt-16 text-center text-xs text-neutral-400">
-        {t.poweredBy}
-      </footer>
+      <footer className="mt-16 text-center text-xs text-neutral-400">{t.poweredBy}</footer>
     </main>
   );
 }

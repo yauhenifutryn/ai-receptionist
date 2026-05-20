@@ -7,12 +7,7 @@ import OutreachStatusSelect from "./outreach-status-select";
 
 export const dynamic = "force-dynamic";
 
-type OutreachStatus =
-  | "created"
-  | "audited"
-  | "contacted"
-  | "positive"
-  | "negative";
+type OutreachStatus = "created" | "audited" | "contacted" | "positive" | "negative";
 
 interface TenantRow {
   id: string;
@@ -55,11 +50,7 @@ export default async function DashboardPage() {
   // (operators RLS may not be permissive to all operators; service-role
   // ensures cross-operator dashboards always render owner names.)
   const provisionerIds = Array.from(
-    new Set(
-      rows
-        .map((r) => r.provisioned_by_user_id)
-        .filter((x): x is string => Boolean(x)),
-    ),
+    new Set(rows.map((r) => r.provisioned_by_user_id).filter((x): x is string => Boolean(x))),
   );
   const ownerNames: Record<string, string> = {};
   if (provisionerIds.length > 0) {
@@ -107,9 +98,8 @@ export default async function DashboardPage() {
           </div>
         </div>
         <p className="max-w-2xl text-sm text-neutral-600">
-          Every agent provisioned by you, Sebastian, or Rem. Click an agent to
-          test it in the browser or assign a Polish phone number. Clients never
-          see this page.
+          Every agent provisioned by you, Sebastian, or Rem. Click an agent to test it in the
+          browser or assign a Polish phone number. Clients never see this page.
         </p>
       </header>
 
@@ -164,9 +154,7 @@ export default async function DashboardPage() {
                       />
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">
-                      {a.phone_number ?? (
-                        <span className="text-neutral-300">— unset</span>
-                      )}
+                      {a.phone_number ?? <span className="text-neutral-300">— unset</span>}
                     </td>
                     <td className="px-4 py-3">
                       <AgentDemoActions
@@ -220,13 +208,9 @@ export default async function DashboardPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
                   <span className="font-mono">
-                    {a.phone_number ?? (
-                      <span className="text-neutral-300">no phone</span>
-                    )}
+                    {a.phone_number ?? <span className="text-neutral-300">no phone</span>}
                   </span>
-                  <span className="uppercase tracking-wider">
-                    {a.default_language}
-                  </span>
+                  <span className="uppercase tracking-wider">{a.default_language}</span>
                   <span>{formatDate(a.created_at)}</span>
                   {a.provisioned_by_user_id ? (
                     <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-700">
@@ -259,13 +243,10 @@ export default async function DashboardPage() {
 function EmptyState() {
   return (
     <section className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-neutral-300 bg-white px-6 py-16 text-center">
-      <div className="text-base font-medium text-neutral-800">
-        No agents yet.
-      </div>
+      <div className="text-base font-medium text-neutral-800">No agents yet.</div>
       <p className="max-w-md text-sm text-neutral-500">
-        Provision your first agent: paste a clinic URL, Firecrawl + Gemini build
-        the knowledge base, ElevenLabs spins up the Polish voice agent. About 5
-        minutes.
+        Provision your first agent: paste a clinic URL, Firecrawl + Gemini build the knowledge base,
+        ElevenLabs spins up the Polish voice agent. About 5 minutes.
       </p>
       <Link
         href={"/provision" as Route}

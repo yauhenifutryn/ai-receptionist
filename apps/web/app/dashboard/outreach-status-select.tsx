@@ -2,12 +2,7 @@
 
 import { useState } from "react";
 
-type OutreachStatus =
-  | "created"
-  | "audited"
-  | "contacted"
-  | "positive"
-  | "negative";
+type OutreachStatus = "created" | "audited" | "contacted" | "positive" | "negative";
 
 const LABELS: Record<OutreachStatus, string> = {
   created: "Created",
@@ -36,10 +31,7 @@ interface Props {
  * Persists optimistically — if the API rejects, we revert and surface the
  * error inline.
  */
-export default function OutreachStatusSelect({
-  providerAgentId,
-  initial,
-}: Props) {
+export default function OutreachStatusSelect({ providerAgentId, initial }: Props) {
   const [status, setStatus] = useState<OutreachStatus>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,14 +43,11 @@ export default function OutreachStatusSelect({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/agents/${providerAgentId}/outreach-status`,
-        {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ status: next }),
-        },
-      );
+      const res = await fetch(`/api/agents/${providerAgentId}/outreach-status`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
       if (!res.ok) {
         setStatus(prev);
         const j = (await res.json().catch(() => ({}))) as { message?: string };
@@ -87,10 +76,7 @@ export default function OutreachStatusSelect({
             </option>
           ))}
         </select>
-        <span
-          aria-hidden
-          className="pointer-events-none absolute right-2 text-[8px] text-current"
-        >
+        <span aria-hidden className="pointer-events-none absolute right-2 text-[8px] text-current">
           ▼
         </span>
       </label>

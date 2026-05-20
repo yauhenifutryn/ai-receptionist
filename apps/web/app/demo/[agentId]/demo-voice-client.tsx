@@ -39,9 +39,7 @@ export default function DemoVoiceClient({ agentId, strings }: Props) {
 function Inner({ agentId, strings }: Props) {
   const [mode, setMode] = useState<Mode>("voice");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
-  const [micPermission, setMicPermission] = useState<
-    "unknown" | "granted" | "denied"
-  >("unknown");
+  const [micPermission, setMicPermission] = useState<"unknown" | "granted" | "denied">("unknown");
   const [chatInput, setChatInput] = useState("");
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
@@ -180,9 +178,7 @@ function Inner({ agentId, strings }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className={`h-2.5 w-2.5 rounded-full ${statusColor}`} />
-            <span className="text-sm font-medium text-neutral-800">
-              {statusLabel}
-            </span>
+            <span className="text-sm font-medium text-neutral-800">{statusLabel}</span>
           </div>
           {status === "connected" ? (
             <button
@@ -246,9 +242,7 @@ function Inner({ agentId, strings }: Props) {
                       : "bg-emerald-100 text-emerald-800"
                   }`}
                 >
-                  {entry.role === "user"
-                    ? strings.speakerYou
-                    : strings.speakerAgent}
+                  {entry.role === "user" ? strings.speakerYou : strings.speakerAgent}
                 </span>
                 <p
                   className={`max-w-[75%] rounded-2xl px-3 py-2 leading-relaxed ${
@@ -275,18 +269,14 @@ function Inner({ agentId, strings }: Props) {
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder={
-                status === "connected"
-                  ? strings.chatInputPlaceholder
-                  : strings.chatInputDisabled
+                status === "connected" ? strings.chatInputPlaceholder : strings.chatInputDisabled
               }
               disabled={status !== "connected"}
               className="flex-1 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm transition focus:border-neutral-400 focus:bg-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
             <button
               type="submit"
-              disabled={
-                status !== "connected" || chatInput.trim().length === 0
-              }
+              disabled={status !== "connected" || chatInput.trim().length === 0}
               className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {strings.sendButton}
@@ -321,9 +311,7 @@ function ModeToggle({
             onClick={() => onChange(m)}
             disabled={disabled}
             className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition ${
-              active
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:text-neutral-900"
+              active ? "bg-neutral-900 text-white" : "text-neutral-600 hover:text-neutral-900"
             } disabled:cursor-not-allowed disabled:opacity-50`}
           >
             <span aria-hidden>{m === "voice" ? "🎙" : "💬"}</span>

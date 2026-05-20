@@ -26,9 +26,7 @@ export default function LanguageSwitcher({ current, agentId, pin }: Props) {
             key={loc}
             href={href}
             className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-              active
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:text-neutral-900"
+              active ? "bg-neutral-900 text-white" : "text-neutral-600 hover:text-neutral-900"
             }`}
           >
             {LABELS[loc]}

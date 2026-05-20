@@ -162,8 +162,7 @@ const EN: DemoStrings = {
     "Demo SMS sends from a neutral sender ID. In production the sender ID is your clinic's name.",
   ],
   callSectionTitle: "Talk to the assistant",
-  callSectionSubtitle:
-    "Pick voice or chat. Voice mode gives the full experience of a real caller.",
+  callSectionSubtitle: "Pick voice or chat. Voice mode gives the full experience of a real caller.",
   modeVoice: "Voice",
   modeChat: "Chat",
   statusReady: "Ready",

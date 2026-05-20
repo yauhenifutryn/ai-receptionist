@@ -71,23 +71,39 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     expect(prompt.temperature).toBe(0.3);
     expect(agent.language).toBe("pl");
 
-    const tools = prompt.tools as Array<Record<string, unknown>>;
+    // Chat B (2026-05-20): tools are enabled at provisioning. The backend
+    // routes them through SimulatedCalendarProvider until a real
+    // CalendarProvider is wired per-pilot. Agent advertises 2 tools:
+    // check_availability + create_booking, both webhook-typed.
+    const tools = prompt.tools as Array<{ name: string; type: string }>;
     expect(tools).toHaveLength(2);
-    const names = tools.map((t) => t.name);
-    expect(names).toContain("check_availability");
-    expect(names).toContain("create_booking");
-    expect(
-      (tools.find((t) => t.name === "check_availability") as Record<string, unknown>).url,
-    ).toBe("https://backend.example.com/tools/check-availability");
-    expect(
-      (tools.find((t) => t.name === "create_booking") as Record<string, unknown>).url,
-    ).toBe("https://backend.example.com/tools/create-booking");
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      "check_availability",
+      "create_booking",
+    ]);
+    expect(tools.every((t) => t.type === "webhook")).toBe(true);
 
+    // ElevenLabs ConvAI knowledge_base entry shape is
+    // { type, id, name, usage_mode }, NOT a flat document_id. Using "text"
+    // because we upload via POST /v1/convai/knowledge-base/text. The old
+    // { document_id } shape returns 422 from the agents/create endpoint.
     const kb = prompt.knowledge_base as Array<Record<string, unknown>>;
     expect(kb).toEqual([
-      { document_id: "doc-1", usage_mode: "auto" },
-      { document_id: "doc-2", usage_mode: "auto" },
+      { type: "text", id: "doc-1", name: "Klinika Łapka - knowledge", usage_mode: "auto" },
+      { type: "text", id: "doc-2", name: "Klinika Łapka - knowledge", usage_mode: "auto" },
     ]);
+
+    // Hard-pinned TTS / ASR / first-message guardrails. If any of these
+    // regress, calls either 400 (non-English TTS without flash/turbo model)
+    // or deliver a degraded experience (default voice, default first
+    // message). See memory project_ai_receptionist_agent_config.
+    expect(agent.first_message).toBe(
+      "Dzień dobry, mówi asystent sztucznej inteligencji w Klinika Łapka. W czym mogę pomóc?",
+    );
+    expect((conv.tts as Record<string, unknown>).model_id).toBe("eleven_flash_v2_5");
+    expect((conv.tts as Record<string, unknown>).stability).toBe(0.85);
+    expect((conv.tts as Record<string, unknown>).speed).toBe(0.8);
+    expect((conv.asr as Record<string, unknown>).provider).toBe("scribe_realtime");
 
     expect((prompt.prompt as string).toLowerCase()).toContain("klinika łapka");
     expect(prompt.prompt as string).toContain("Czy zgadza się");
@@ -124,7 +140,9 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
       conversation_config: {
         agent: {
           prompt: {
-            knowledge_base: [{ document_id: "doc-9", usage_mode: "auto" }],
+            knowledge_base: [
+              { type: "text", id: "doc-9", name: "doc-9", usage_mode: "auto" },
+            ],
           },
         },
       },

@@ -1,28 +1,29 @@
 "use client";
 
 // ============================================================================
-// Public landing page v5 — Operator-dashboard kin.
+// Public landing page v6.
 // ----------------------------------------------------------------------------
-// v4 feedback: "ASCII gone, only flying dots, generic, static, boring."
-// v5 corrections:
-//   - Drop the canvas dot-cloud. Replace with a BIG animated ASCII waveform
-//     across the hero, refreshed at 10 Hz.
-//   - Drop the 6-up card grid (a v4 generic card grid was the bigger problem
-//     than the canvas). Replace with three storytelling feature rows that
-//     actually explain what the product does in Polish prose.
-//   - New "Jak to działa" section: 5-step animated ASCII flow with a
-//     traveling active highlight (one step pulses emerald at a time).
-//   - New "Czego nie robimy" honesty section (4 items).
-//   - New "Logowanie kodem" note: operator + owner sign-in is a one-time
-//     code from email, never a clickable link. Important enough that visitors
-//     who land here from a bookmarked sign-in URL see it explained.
-//   - Stylistically aligned with the operator dashboard:
-//     sans-dominant, neutral-200 borders, neutral-900 primary buttons,
-//     emerald-600 as the single accent. Serif used only for one big hero
-//     accent line.
+// v5 feedback (resolved here):
+//   - Fake call counter "2 854 ROZMÓW · 14 DNI" → removed entirely. Pre-launch
+//     metrics on a public page collapse trust. Replaced with honest signals
+//     (latency target, language coverage, availability promise).
+//   - SMS visual was a chopped ASCII frame with content in the middle. Rebuilt
+//     as a proper iPhone-style rounded frame with a chat bubble inside.
+//   - "more ASCII, more unique" → new HeroConsole: a multi-pane dark terminal
+//     showing live transcript + knowledge-base hits + tool calls. Reads
+//     unambiguously as software, not an actor pretending to be a receptionist.
+//   - Brand: stripped "Odbiera" from visible copy. We're stealth pre-incorp.
+//     Wordmark is "AI Receptionist" placeholder (matches CLAUDE.md working name).
+//   - Core product capability missing on the landing: out-of-box Q&A from
+//     scraped clinic site + Polish dental ontology + client input. Added as
+//     feature row 01 (the wedge that competitors don't have).
+//   - Mobile pass: hero console responsive, feature visuals stack cleanly,
+//     hero typography scales from text-4xl on small viewports.
 //
 // All animations honor prefers-reduced-motion + document.visibilityState.
-// PL / EN / RU. Persisted via `odbiera:lang` localStorage key.
+// PL / EN / RU. Persisted via odbiera:lang localStorage key (internal, not
+// visible — the storage key staying static survives a future rebrand
+// without invalidating existing user preferences).
 // ============================================================================
 
 import Link from "next/link";
@@ -59,6 +60,12 @@ interface FeatureCopy {
   bullets: [string, string, string];
 }
 
+interface KbQuery {
+  question: string;
+  source: string;
+  answer: string;
+}
+
 interface LangBundle {
   htmlLang: string;
   wordmark: string;
@@ -68,10 +75,19 @@ interface LangBundle {
     line1: string;
     line2: string;
     body: string;
-    statusPrefix: string;
-    statusCount: (n: string) => string;
+    statusLanguages: string;
+    statusUptime: string;
     statusLatency: string;
-    statusLast: string;
+    statusRegion: string;
+  };
+  console: {
+    title: string;
+    statusLabel: string;
+    paneTranscript: string;
+    paneKnowledge: string;
+    paneTools: string;
+    speakerClinic: string;
+    speakerPatient: string;
   };
   flow: {
     eyebrow: string;
@@ -84,11 +100,19 @@ interface LangBundle {
     eyebrow: string;
     title: string;
     body: string;
-    rows: [FeatureCopy, FeatureCopy, FeatureCopy];
+    rows: [FeatureCopy, FeatureCopy, FeatureCopy, FeatureCopy];
+    knowledgeLabel: string;
+    knowledgeQueries: [KbQuery, KbQuery, KbQuery];
+    knowledgeStateThinking: string;
+    knowledgeStateAnswer: string;
     sampleLabel: string;
     samples: [string, string, string];
     bookingLabel: string;
-    smsLabel: string;
+    bookingFreeLabel: string;
+    smsHeader: string;
+    smsPhase: { queued: string; sending: string; delivered: string };
+    smsTimePill: string;
+    smsBody: string;
   };
   ledger: {
     eyebrow: string;
@@ -122,20 +146,50 @@ interface LangBundle {
   };
 }
 
+// Source labels for the console KB pane. Same across languages — these are
+// file paths and URLs, not translatable copy.
+const KB_SOURCES = [
+  "klinika.pl/cennik",
+  "ontology/services.md",
+  "ontology/scripts.md",
+  "ontology/triage.md",
+] as const;
+
+interface ToolCall {
+  name: string;
+  args: string;
+  duration: string;
+}
+
+const TOOL_CALLS: readonly ToolCall[] = [
+  { name: "check_availability", args: "date=2026-05-22, dur=30", duration: "142 ms" },
+  { name: "create_booking", args: "slot=4521, lang=pl", duration: "287 ms" },
+  { name: "send_sms", args: "to=+48501***12", duration: "1.4 s" },
+] as const;
+
 const STRINGS: Record<Lang, LangBundle> = {
   pl: {
     htmlLang: "pl",
-    wordmark: "Odbiera",
+    wordmark: "AI Receptionist",
     tagline: "recepcja telefoniczna · 24 h",
     nav: { client: "Klient", operator: "Operator" },
     hero: {
       line1: "Telefon dzwoni.",
       line2: "Ktoś odbiera.",
-      body: "Polskojęzyczna recepcja dla kliniki stomatologicznej. Odpowiada po polsku, angielsku i rosyjsku. Umawia wizyty, potwierdza SMSem, pracuje również wtedy, gdy klinika jest zamknięta. Bez nagrywania bez zgody, bez sprzedaży danych, bez improwizacji w sprawach medycznych.",
-      statusPrefix: "AKTYWNY",
-      statusCount: (n) => `${n} ROZMÓW · 14 DNI`,
-      statusLatency: "ODPOWIEDŹ < 1 s",
-      statusLast: "OSTATNIA: 12 s",
+      body: "Recepcja telefoniczna dla kliniki stomatologicznej. Mówi po polsku, angielsku i rosyjsku. Odpowiada na pytania pacjentów na żywo, umawia wizyty, potwierdza SMSem. Pracuje też wtedy, gdy klinika jest zamknięta.",
+      statusLanguages: "PL · EN · RU",
+      statusUptime: "24 / 7",
+      statusLatency: "ODP. < 1 s",
+      statusRegion: "DANE W UE",
+    },
+    console: {
+      title: "AGENT · LIVE",
+      statusLabel: "19:23:04 · PL",
+      paneTranscript: "TRANSCRIPT",
+      paneKnowledge: "KNOWLEDGE",
+      paneTools: "TOOLS",
+      speakerClinic: "Klin",
+      speakerPatient: "Pacj",
     },
     flow: {
       eyebrow: "JAK TO DZIAŁA",
@@ -158,11 +212,25 @@ const STRINGS: Record<Lang, LangBundle> = {
     },
     features: {
       eyebrow: "MOŻLIWOŚCI",
-      title: "Trzy rzeczy, które naprawdę musi umieć recepcja.",
-      body: "Reszta to detale. Najpierw musi się dogadać. Potem nie pomylić terminu. Potem przypomnieć pacjentowi.",
+      title: "Cztery rzeczy, które recepcja musi naprawdę umieć.",
+      body: "Reszta to detale. Najpierw musi się dogadać. Potem odpowiedzieć na pytania. Potem nie pomylić terminu. Potem przypomnieć pacjentowi.",
       rows: [
         {
           number: "01",
+          eyebrow: "BAZA WIEDZY",
+          title: "Odpowiada na pytania o klinikę. Bez briefingu personelu.",
+          paragraphs: [
+            "Po podłączeniu kliniki recepcjonistka czyta jej stronę, łączy ją z polską ontologią stomatologiczną i odpowiada pacjentom na żywo. NFZ? Cennik implantów? Godziny w sobotę? Czy przyjmuje pan dr Nowak nowych pacjentów? Wszystko z dnia, w którym podpinasz klinikę.",
+            "Jeśli czegoś nie wie, mówi to wprost i proponuje kontakt z żywą osobą. Bez halucynacji, bez wymyślania cen, bez „chyba\". Aktualizacja jest banalna: dorzucasz markdown z FAQ, recepcjonistka uczy się natychmiast.",
+          ],
+          bullets: [
+            "Strona kliniki + nasza ontologia jako baza RAG.",
+            "Jasne „nie wiem\" zamiast wymyślania.",
+            "Update bez wgrywania kodu, w panelu właściciela.",
+          ],
+        },
+        {
+          number: "02",
           eyebrow: "JĘZYK",
           title: "Mówi po polsku jak człowiek. Po angielsku i rosyjsku tak samo.",
           paragraphs: [
@@ -176,7 +244,7 @@ const STRINGS: Record<Lang, LangBundle> = {
           ],
         },
         {
-          number: "02",
+          number: "03",
           eyebrow: "REZERWACJE",
           title: "Pyta o dogodny termin, sprawdza grafik, rezerwuje od razu.",
           paragraphs: [
@@ -190,12 +258,12 @@ const STRINGS: Record<Lang, LangBundle> = {
           ],
         },
         {
-          number: "03",
+          number: "04",
           eyebrow: "POTWIERDZENIE",
           title: "SMS leci w 30 sekund od zakończenia rozmowy.",
           paragraphs: [
             "Pacjent dostaje wiadomość z datą, godziną, lekarzem i adresem kliniki. Z linkiem do ICS, żeby od razu dodać do kalendarza. Z numerem do zmiany terminu, jeśli coś wypadnie.",
-            "Bez podpisywania się pod kogoś innego. Wiadomość wychodzi z nadawcy „Odbiera\" albo, w pakiecie premium, spod marki kliniki.",
+            "Bez podpisywania się pod kogoś innego. Wiadomość wychodzi z wspólnego nadawcy projektu albo, w pakiecie premium, spod marki kliniki.",
           ],
           bullets: [
             "Treść po polsku, kulturalna, krótka.",
@@ -204,14 +272,40 @@ const STRINGS: Record<Lang, LangBundle> = {
           ],
         },
       ],
+      knowledgeLabel: "PYTANIE PACJENTA",
+      knowledgeQueries: [
+        {
+          question: "Czy przyjmujecie NFZ?",
+          source: "ontology/services.md",
+          answer:
+            "Nie, wszystkie usługi prywatne. Pełny cennik widoczny na stronie klinika.pl/cennik.",
+        },
+        {
+          question: "Ile kosztuje implant?",
+          source: "klinika.pl/cennik",
+          answer:
+            "Implant Straumann od 4 800 PLN, dr Nowak. Konsultacja gratis przy decyzji o leczeniu.",
+        },
+        {
+          question: "Czy jesteście otwarci w sobotę?",
+          source: "klinika.pl/godziny",
+          answer: "Sobota 9:00–14:00. Niedziele zamknięte. Czy zarezerwować Pani termin?",
+        },
+      ],
+      knowledgeStateThinking: "WYSZUKIWANIE…",
+      knowledgeStateAnswer: "ODPOWIEDŹ",
       sampleLabel: "PRZYKŁAD",
       samples: [
-        "Dzień dobry, klinika Odbiera, w czym mogę pomóc?",
-        "Good evening, Odbiera clinic, how can I help?",
-        "Добрый вечер, клиника Odbiera, чем могу помочь?",
+        "Dzień dobry, w czym mogę pomóc?",
+        "Good evening, how can I help you?",
+        "Добрый вечер, чем могу помочь?",
       ],
       bookingLabel: "GRAFIK · CZWARTEK",
-      smsLabel: "SMS · 19:23:48",
+      bookingFreeLabel: "wolnych",
+      smsHeader: "SMS · 19:23:48",
+      smsPhase: { queued: "QUEUED", sending: "SENDING…", delivered: "✓ DELIVERED" },
+      smsTimePill: "19:23 dziś",
+      smsBody: "Czwartek 10:00, dr Kowalska. ICS w wiadomości.",
     },
     ledger: {
       eyebrow: "LIVE · POLSKI · 19:23",
@@ -241,27 +335,36 @@ const STRINGS: Record<Lang, LangBundle> = {
       headline: "Posłuchaj, jak brzmi w Twojej klinice.",
       body: "15 minut, rozmowa wideo, na żywo testujemy recepcjonistkę dla Twojej kliniki. Bez handlowca, bez slajdów.",
       button: "Umów rozmowę →",
-      contact: "kontakt@odbiera.com · Warszawa",
+      contact: "Warszawa",
     },
     footer: {
       privacy: "Dane pacjentów przechowywane w Unii Europejskiej.",
-      copyright: "Odbiera",
+      copyright: "AI Receptionist",
       region: "Frankfurt · Irlandia · UE",
     },
   },
   en: {
     htmlLang: "en",
-    wordmark: "Odbiera",
+    wordmark: "AI Receptionist",
     tagline: "phone reception · 24 h",
     nav: { client: "Client", operator: "Operator" },
     hero: {
       line1: "The phone rings.",
       line2: "Someone answers.",
-      body: "A Polish-speaking receptionist for dental practices. Speaks Polish, English, and Russian. Books appointments, confirms by SMS, works the hours your clinic is closed. No recording without consent, no data resale, no improvising on anything medical.",
-      statusPrefix: "ACTIVE",
-      statusCount: (n) => `${n} CALLS · 14 DAYS`,
-      statusLatency: "RESPONSE < 1 s",
-      statusLast: "LAST: 12 s",
+      body: "Phone reception for dental practices. Speaks Polish, English, and Russian. Answers live questions about the clinic, books appointments, confirms by SMS. Works the hours your clinic is closed too.",
+      statusLanguages: "PL · EN · RU",
+      statusUptime: "24 / 7",
+      statusLatency: "ANSWER < 1 s",
+      statusRegion: "DATA IN EU",
+    },
+    console: {
+      title: "AGENT · LIVE",
+      statusLabel: "19:23:04 · PL",
+      paneTranscript: "TRANSCRIPT",
+      paneKnowledge: "KNOWLEDGE",
+      paneTools: "TOOLS",
+      speakerClinic: "Clin",
+      speakerPatient: "Pat",
     },
     flow: {
       eyebrow: "HOW IT WORKS",
@@ -284,11 +387,25 @@ const STRINGS: Record<Lang, LangBundle> = {
     },
     features: {
       eyebrow: "CAPABILITIES",
-      title: "Three things a reception desk has to actually do.",
-      body: "Everything else is detail. First it has to understand. Then it has to not screw up the date. Then it has to remind the patient.",
+      title: "Four things a reception desk has to actually do.",
+      body: "Everything else is detail. First understand. Then answer questions. Then not screw up the date. Then remind the patient.",
       rows: [
         {
           number: "01",
+          eyebrow: "KNOWLEDGE",
+          title: "Answers questions about the clinic. No staff briefing required.",
+          paragraphs: [
+            "When you connect a clinic, the receptionist reads its website, combines it with our Polish dental ontology, and answers patient questions live. Public/private insurance? Implant prices? Saturday hours? Is Dr Nowak taking new patients? All of it, on the day you onboard.",
+            "If it doesn't know, it says so explicitly and offers a callback to a human. No hallucinations, no invented prices, no \"I think\". Updates are trivial: drop in a markdown FAQ, the receptionist picks it up immediately.",
+          ],
+          bullets: [
+            "Clinic website plus our ontology, as a RAG base.",
+            "Explicit \"I don't know\" rather than guesses.",
+            "Update from the owner panel, no code deploy.",
+          ],
+        },
+        {
+          number: "02",
           eyebrow: "LANGUAGE",
           title: "Speaks Polish like a person. English and Russian, equally.",
           paragraphs: [
@@ -302,7 +419,7 @@ const STRINGS: Record<Lang, LangBundle> = {
           ],
         },
         {
-          number: "02",
+          number: "03",
           eyebrow: "BOOKINGS",
           title: "Asks for a time, checks the schedule, books on the spot.",
           paragraphs: [
@@ -316,12 +433,12 @@ const STRINGS: Record<Lang, LangBundle> = {
           ],
         },
         {
-          number: "03",
+          number: "04",
           eyebrow: "CONFIRMATION",
           title: "SMS goes out within 30 seconds of hangup.",
           paragraphs: [
             "Date, time, doctor, address. ICS link to add to a calendar. Callback number to reschedule. No spam, no marketing footer.",
-            "No impersonation. Sender is \"Odbiera\" by default, or your clinic's brand on the premium tier.",
+            "No impersonation. Sender is the project default by default, or your clinic's brand on the premium tier.",
           ],
           bullets: [
             "Polish copy, short, polite.",
@@ -330,14 +447,40 @@ const STRINGS: Record<Lang, LangBundle> = {
           ],
         },
       ],
+      knowledgeLabel: "PATIENT QUESTION",
+      knowledgeQueries: [
+        {
+          question: "Do you accept public insurance?",
+          source: "ontology/services.md",
+          answer:
+            "No, all services are private. Full price list at klinika.pl/cennik.",
+        },
+        {
+          question: "How much is an implant?",
+          source: "klinika.pl/cennik",
+          answer:
+            "Straumann implant from 4,800 PLN, Dr Nowak. Free consultation when treatment is booked.",
+        },
+        {
+          question: "Are you open on Saturday?",
+          source: "klinika.pl/godziny",
+          answer: "Saturday 9:00–14:00. Closed Sundays. Should I book you in?",
+        },
+      ],
+      knowledgeStateThinking: "SEARCHING…",
+      knowledgeStateAnswer: "ANSWER",
       sampleLabel: "SAMPLE",
       samples: [
-        "Good evening, Odbiera clinic, how can I help?",
-        "Dzień dobry, klinika Odbiera, w czym mogę pomóc?",
-        "Добрый вечер, клиника Odbiera, чем могу помочь?",
+        "Good evening, how can I help you?",
+        "Dzień dobry, w czym mogę pomóc?",
+        "Добрый вечер, чем могу помочь?",
       ],
       bookingLabel: "SCHEDULE · THURSDAY",
-      smsLabel: "SMS · 19:23:48",
+      bookingFreeLabel: "free",
+      smsHeader: "SMS · 19:23:48",
+      smsPhase: { queued: "QUEUED", sending: "SENDING…", delivered: "✓ DELIVERED" },
+      smsTimePill: "19:23 today",
+      smsBody: "Thursday 10:00, dr Kowalska. ICS in the SMS.",
     },
     ledger: {
       eyebrow: "LIVE · POLISH · 19:23",
@@ -367,27 +510,36 @@ const STRINGS: Record<Lang, LangBundle> = {
       headline: "Hear how it sounds inside your practice.",
       body: "15 minutes, video call, we run the receptionist live against your clinic's details. No salesperson, no slides.",
       button: "Book a call →",
-      contact: "kontakt@odbiera.com · Warsaw",
+      contact: "Warsaw",
     },
     footer: {
       privacy: "Patient data stored within the European Union.",
-      copyright: "Odbiera",
+      copyright: "AI Receptionist",
       region: "Frankfurt · Ireland · EU",
     },
   },
   ru: {
     htmlLang: "ru",
-    wordmark: "Odbiera",
+    wordmark: "AI Receptionist",
     tagline: "приём звонков · 24 ч",
     nav: { client: "Клиент", operator: "Оператор" },
     hero: {
       line1: "Телефон звонит.",
       line2: "Кто-то отвечает.",
-      body: "Польскоязычный администратор для стоматологической клиники. Говорит по-польски, по-английски и по-русски. Записывает на приём, подтверждает SMS, работает и тогда, когда клиника закрыта. Без записи без согласия, без перепродажи данных, без импровизаций в медицинских вопросах.",
-      statusPrefix: "АКТИВНО",
-      statusCount: (n) => `${n} ЗВОНКОВ · 14 ДН.`,
+      body: "Приём звонков для стоматологической клиники. Говорит по-польски, по-английски и по-русски. Отвечает на вопросы пациентов вживую, записывает на приём, подтверждает SMS. Работает и в часы, когда клиника закрыта.",
+      statusLanguages: "PL · EN · RU",
+      statusUptime: "24 / 7",
       statusLatency: "ОТВЕТ < 1 с",
-      statusLast: "ПОСЛ.: 12 с",
+      statusRegion: "ДАННЫЕ В ЕС",
+    },
+    console: {
+      title: "AGENT · LIVE",
+      statusLabel: "19:23:04 · PL",
+      paneTranscript: "TRANSCRIPT",
+      paneKnowledge: "KNOWLEDGE",
+      paneTools: "TOOLS",
+      speakerClinic: "Клин",
+      speakerPatient: "Пац",
     },
     flow: {
       eyebrow: "КАК ЭТО РАБОТАЕТ",
@@ -410,11 +562,25 @@ const STRINGS: Record<Lang, LangBundle> = {
     },
     features: {
       eyebrow: "ВОЗМОЖНОСТИ",
-      title: "Три вещи, которые администратор обязан уметь.",
-      body: "Остальное — детали. Сначала договориться. Потом не перепутать дату. Потом напомнить пациенту.",
+      title: "Четыре вещи, которые администратор обязан уметь.",
+      body: "Остальное — детали. Сначала понять. Потом ответить на вопросы. Потом не перепутать дату. Потом напомнить пациенту.",
       rows: [
         {
           number: "01",
+          eyebrow: "БАЗА ЗНАНИЙ",
+          title: "Отвечает на вопросы о клинике. Без брифинга персонала.",
+          paragraphs: [
+            "При подключении клиники администратор читает её сайт, объединяет с польской стоматологической онтологией и отвечает пациентам вживую. Госстраховка? Цена импланта? Часы работы в субботу? Принимает ли доктор Новак новых пациентов? Всё это работает с первого дня.",
+            "Если чего-то не знает, говорит об этом прямо и предлагает обратный звонок живому человеку. Без галлюцинаций, без выдуманных цен, без «наверное». Обновления тривиальны: дописываете FAQ в markdown, администратор подхватывает мгновенно.",
+          ],
+          bullets: [
+            "Сайт клиники плюс наша онтология как RAG-база.",
+            "Прямое «не знаю» вместо догадок.",
+            "Обновление из панели владельца, без релиза кода.",
+          ],
+        },
+        {
+          number: "02",
           eyebrow: "ЯЗЫК",
           title: "Говорит по-польски как человек. Английский и русский — на том же уровне.",
           paragraphs: [
@@ -428,7 +594,7 @@ const STRINGS: Record<Lang, LangBundle> = {
           ],
         },
         {
-          number: "02",
+          number: "03",
           eyebrow: "БРОНИРОВАНИЕ",
           title: "Спрашивает удобное время, сверяется с графиком, сразу бронирует.",
           paragraphs: [
@@ -442,12 +608,12 @@ const STRINGS: Record<Lang, LangBundle> = {
           ],
         },
         {
-          number: "03",
+          number: "04",
           eyebrow: "ПОДТВЕРЖДЕНИЕ",
           title: "SMS уходит в течение 30 секунд после звонка.",
           paragraphs: [
             "Дата, время, врач, адрес. Ссылка ICS, чтобы добавить в календарь. Обратный номер для переноса. Без спама и маркетинговых подписей.",
-            "Без подделки отправителя. По умолчанию «Odbiera», в премиум-пакете — бренд клиники.",
+            "Без подделки отправителя. По умолчанию — общий отправитель проекта, в премиум-пакете — бренд клиники.",
           ],
           bullets: [
             "Текст по-польски, короткий, вежливый.",
@@ -456,14 +622,40 @@ const STRINGS: Record<Lang, LangBundle> = {
           ],
         },
       ],
+      knowledgeLabel: "ВОПРОС ПАЦИЕНТА",
+      knowledgeQueries: [
+        {
+          question: "Вы принимаете по госстраховке?",
+          source: "ontology/services.md",
+          answer:
+            "Нет, все услуги платные. Полный прейскурант на сайте klinika.pl/cennik.",
+        },
+        {
+          question: "Сколько стоит имплант?",
+          source: "klinika.pl/cennik",
+          answer:
+            "Имплант Straumann от 4 800 PLN, доктор Новак. Консультация бесплатно при записи на лечение.",
+        },
+        {
+          question: "В субботу работаете?",
+          source: "klinika.pl/godziny",
+          answer: "Суббота 9:00–14:00. Воскресенье — закрыто. Записать вас?",
+        },
+      ],
+      knowledgeStateThinking: "ПОИСК…",
+      knowledgeStateAnswer: "ОТВЕТ",
       sampleLabel: "ПРИМЕР",
       samples: [
-        "Добрый вечер, клиника Odbiera, чем могу помочь?",
-        "Dzień dobry, klinika Odbiera, w czym mogę pomóc?",
-        "Good evening, Odbiera clinic, how can I help?",
+        "Добрый вечер, чем могу помочь?",
+        "Dzień dobry, w czym mogę pomóc?",
+        "Good evening, how can I help you?",
       ],
       bookingLabel: "ГРАФИК · ЧЕТВЕРГ",
-      smsLabel: "SMS · 19:23:48",
+      bookingFreeLabel: "свободно",
+      smsHeader: "SMS · 19:23:48",
+      smsPhase: { queued: "QUEUED", sending: "SENDING…", delivered: "✓ DELIVERED" },
+      smsTimePill: "19:23 сегодня",
+      smsBody: "Четверг 10:00, др Ковальская. ICS в сообщении.",
     },
     ledger: {
       eyebrow: "LIVE · РУССКИЙ · 19:23",
@@ -493,34 +685,35 @@ const STRINGS: Record<Lang, LangBundle> = {
       headline: "Послушайте, как это звучит у вас в клинике.",
       body: "15 минут, видеозвонок, прогон администратора по реальным данным вашей клиники. Без продавцов и слайдов.",
       button: "Заказать звонок →",
-      contact: "kontakt@odbiera.com · Варшава",
+      contact: "Варшава",
     },
     footer: {
       privacy: "Данные пациентов хранятся в пределах Европейского союза.",
-      copyright: "Odbiera",
+      copyright: "AI Receptionist",
       region: "Франкфурт · Ирландия · ЕС",
     },
   },
 };
 
-// Live transcript dialogue (typewriter-rendered in LiveLedger).
+// Live transcript dialogue (used by both the hero console and the standalone
+// LiveLedger section). Generic clinic phrasing — no brand name leak.
 const DIALOGUES: Record<Lang, DialogueLine[]> = {
   pl: [
-    { side: "clinic", ts: "19:23:04", line: "Dzień dobry, klinika Odbiera." },
+    { side: "clinic", ts: "19:23:04", line: "Dzień dobry, w czym mogę pomóc?" },
     { side: "patient", ts: "19:23:07", line: "Dobry, chciałbym się umówić na konsultację." },
     { side: "clinic", ts: "19:23:11", line: "Mam wolny termin w czwartek o dziesiątej, pasuje?" },
     { side: "patient", ts: "19:23:15", line: "Tak, świetnie." },
     { side: "clinic", ts: "19:23:18", line: "Potwierdzę SMSem. Do zobaczenia w czwartek." },
   ],
   en: [
-    { side: "clinic", ts: "19:23:04", line: "Good evening, Odbiera clinic." },
+    { side: "clinic", ts: "19:23:04", line: "Good evening, how can I help?" },
     { side: "patient", ts: "19:23:07", line: "Hi, I'd like to book a consultation." },
     { side: "clinic", ts: "19:23:11", line: "I have Thursday at ten free, does that work?" },
     { side: "patient", ts: "19:23:15", line: "Yes, perfect." },
     { side: "clinic", ts: "19:23:18", line: "I'll confirm by SMS. See you Thursday." },
   ],
   ru: [
-    { side: "clinic", ts: "19:23:04", line: "Добрый вечер, клиника Odbiera." },
+    { side: "clinic", ts: "19:23:04", line: "Добрый вечер, чем могу помочь?" },
     { side: "patient", ts: "19:23:07", line: "Здравствуйте, хочу записаться на консультацию." },
     { side: "clinic", ts: "19:23:11", line: "Четверг в десять свободен, подходит?" },
     { side: "patient", ts: "19:23:15", line: "Да, отлично." },
@@ -578,7 +771,7 @@ function LangProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared hooks: prefers-reduced-motion + page-visible
+// Shared hooks
 // ---------------------------------------------------------------------------
 
 function usePrefersReducedMotion(): boolean {
@@ -607,7 +800,7 @@ function usePageVisible(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Header — wordmark, lang toggle, sign-in nav
+// Header
 // ---------------------------------------------------------------------------
 
 function LangToggle() {
@@ -643,26 +836,28 @@ function Header() {
   const { t } = useLang();
   return (
     <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-      <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-4">
-        <div className="flex items-baseline gap-3">
-          <span className="text-xl font-semibold tracking-tight text-neutral-900">{t.wordmark}</span>
-          <span className="hidden font-mono text-[11px] uppercase tracking-wider text-neutral-400 sm:inline">
+      <div className="mx-auto grid max-w-6xl grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3 sm:grid-cols-[1fr_auto_1fr] sm:gap-4 sm:px-6 sm:py-4">
+        <div className="flex items-baseline gap-3 min-w-0">
+          <span className="truncate text-base font-semibold tracking-tight text-neutral-900 sm:text-xl">
+            {t.wordmark}
+          </span>
+          <span className="hidden font-mono text-[11px] uppercase tracking-wider text-neutral-400 lg:inline">
             {t.tagline}
           </span>
         </div>
         <div className="justify-self-center">
           <LangToggle />
         </div>
-        <nav className="flex items-center justify-end gap-2 text-sm">
+        <nav className="flex items-center justify-end gap-1.5 text-sm sm:gap-2">
           <Link
             href={"/auth/sign-in?as=client" as Route}
-            className="rounded-full border border-neutral-200 px-4 py-1.5 font-mono text-xs uppercase tracking-wider text-neutral-700 transition-colors duration-200 hover:border-neutral-300 hover:text-neutral-900"
+            className="rounded-full border border-neutral-200 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-neutral-700 transition-colors duration-200 hover:border-neutral-300 hover:text-neutral-900 sm:px-4 sm:text-xs"
           >
             {t.nav.client}
           </Link>
           <Link
             href={"/auth/sign-in?as=operator" as Route}
-            className="rounded-full bg-neutral-900 px-4 py-1.5 font-mono text-xs uppercase tracking-wider text-white transition-colors duration-200 hover:bg-neutral-800"
+            className="rounded-full bg-neutral-900 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-white transition-colors duration-200 hover:bg-neutral-800 sm:px-4 sm:text-xs"
           >
             {t.nav.operator}
           </Link>
@@ -673,115 +868,232 @@ function Header() {
 }
 
 // ---------------------------------------------------------------------------
-// HERO — sans headline + BIG animated ASCII waveform + status strip
+// HERO CONSOLE — multi-pane dark terminal with live transcript, KB hits, tools
 // ---------------------------------------------------------------------------
 
-// Build a 9-line ASCII waveform across `width` characters.
-// Uses a tight density ramp from " " (silence) to "█" (peak).
-const WAVE_RAMP = " ·:+*xX#█";
-const WAVE_WIDTH = 80;
-const WAVE_ROWS = 9;
+// One 24-second animation cycle drives all three panes. Times below are in ms
+// relative to the start of the current cycle.
+const CONSOLE_CYCLE_MS = 24000;
+const TRANSCRIPT_LINE_TYPE_MS = 1500;
+const TRANSCRIPT_LINE_GAP_MS = 500;
+const KB_START_MS = 11000;
+const KB_PER_HIT_MS = 1100;
+const TOOLS_START_MS = 16000;
+const TOOLS_GAP_MS = 1800;
 
-function buildWaveFrame(t: number, width: number, rows: number): string[] {
-  const out: string[] = [];
-  const centre = (rows - 1) / 2;
-  // Per-column amplitude is a sum of three sinusoids — produces a believable
-  // breathing waveform that never feels purely periodic.
-  for (let r = 0; r < rows; r++) {
-    const row = new Array<string>(width);
-    for (let c = 0; c < width; c++) {
-      const x = c / width;
-      const env =
-        0.6 * Math.sin(x * Math.PI) + // overall envelope, peaks at centre
-        0.25 * Math.sin(x * Math.PI * 3 + t * 0.0018) +
-        0.15 * Math.sin(x * Math.PI * 7 - t * 0.0023);
-      const amp = Math.max(0, env) * (rows - 1);
-      const dist = Math.abs(r - centre);
-      // Each row's density = 1 where amp >= dist, fading at the edge.
-      const d = Math.max(0, Math.min(1, (amp - dist + 0.6) * 0.75));
-      const idx = Math.floor(d * (WAVE_RAMP.length - 1));
-      row[c] = WAVE_RAMP[idx] ?? " ";
-    }
-    out.push(row.join(""));
-  }
-  return out;
+interface RenderedTranscript {
+  side: "clinic" | "patient";
+  text: string;
+  typing: boolean;
+  visible: boolean;
 }
 
-function HeroWave() {
+function computeTranscriptStates(
+  elapsedMs: number,
+  dialogue: DialogueLine[],
+): RenderedTranscript[] {
+  return dialogue.map((d, i) => {
+    const lineStart = i * (TRANSCRIPT_LINE_TYPE_MS + TRANSCRIPT_LINE_GAP_MS);
+    const lineEnd = lineStart + TRANSCRIPT_LINE_TYPE_MS;
+    if (elapsedMs < lineStart) {
+      return { side: d.side, text: "", typing: false, visible: false };
+    }
+    if (elapsedMs > lineEnd) {
+      return { side: d.side, text: d.line, typing: false, visible: true };
+    }
+    const frac = (elapsedMs - lineStart) / TRANSCRIPT_LINE_TYPE_MS;
+    return {
+      side: d.side,
+      text: d.line.slice(0, Math.max(0, Math.floor(d.line.length * frac))),
+      typing: true,
+      visible: true,
+    };
+  });
+}
+
+function HeroConsole() {
+  const { t, lang } = useLang();
+  const dialogue = DIALOGUES[lang];
   const reduced = usePrefersReducedMotion();
   const visible = usePageVisible();
-  const [frame, setFrame] = useState<string[]>(() =>
-    buildWaveFrame(0, WAVE_WIDTH, WAVE_ROWS),
-  );
+  const [elapsed, setElapsed] = useState(0);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (reduced) {
-      setFrame(buildWaveFrame(0, WAVE_WIDTH, WAVE_ROWS));
+      setElapsed(CONSOLE_CYCLE_MS - 1);
       return;
     }
     if (!visible) return;
     const start = performance.now();
-    const id = window.setInterval(() => {
-      setFrame(buildWaveFrame(performance.now() - start, WAVE_WIDTH, WAVE_ROWS));
-    }, 100);
-    return () => window.clearInterval(id);
+    const tick = (now: number) => {
+      setElapsed((now - start) % CONSOLE_CYCLE_MS);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
   }, [reduced, visible]);
 
+  const transcriptStates = useMemo(
+    () => computeTranscriptStates(elapsed, dialogue),
+    [elapsed, dialogue],
+  );
+
+  // KB pane: from t=KB_START_MS, advance one source per KB_PER_HIT_MS.
+  // Active = currently being checked (▸ emerald). Done = already consulted (✓).
+  let kbActiveIdx = -1;
+  let kbDoneCount = 0;
+  if (elapsed > KB_START_MS) {
+    const slot = Math.floor((elapsed - KB_START_MS) / KB_PER_HIT_MS);
+    if (slot < KB_SOURCES.length) {
+      kbActiveIdx = slot;
+      kbDoneCount = slot;
+    } else {
+      kbDoneCount = KB_SOURCES.length;
+    }
+  }
+
+  // Tools pane: each tool appears at TOOLS_START_MS + i * TOOLS_GAP_MS.
+  const toolsVisible = TOOL_CALLS.map(
+    (_, i) => elapsed > TOOLS_START_MS + i * TOOLS_GAP_MS,
+  );
+
   return (
-    <pre
-      aria-hidden="true"
-      className="select-none overflow-x-hidden whitespace-pre font-mono text-[9px] leading-[1.05] tracking-tight text-emerald-600/80 sm:text-[10px] md:text-[11px] lg:text-xs"
-    >
-      {frame.join("\n")}
-    </pre>
+    <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950 font-mono text-[10px] leading-relaxed text-neutral-300 shadow-2xl sm:text-[11px] md:text-xs">
+      {/* Header bar */}
+      <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+          <span className="truncate text-emerald-400">{t.console.title}</span>
+        </div>
+        <span className="shrink-0 text-neutral-500 tabular-nums">{t.console.statusLabel}</span>
+      </div>
+
+      {/* Transcript + Knowledge panes */}
+      <div className="grid grid-cols-1 gap-px bg-neutral-800 md:grid-cols-2">
+        {/* Transcript */}
+        <div className="bg-neutral-950 p-3 sm:p-4">
+          <div className="mb-2 text-[9px] uppercase tracking-wider text-neutral-500">
+            ─ {t.console.paneTranscript}
+          </div>
+          <div className="space-y-1" style={{ minHeight: "140px" }}>
+            {transcriptStates.map((s, i) =>
+              s.visible ? (
+                <div key={i} className="flex gap-2">
+                  <span
+                    className={
+                      s.side === "clinic"
+                        ? "shrink-0 text-emerald-400"
+                        : "shrink-0 text-neutral-400"
+                    }
+                  >
+                    {s.side === "clinic" ? t.console.speakerClinic : t.console.speakerPatient}
+                  </span>
+                  <span className="min-w-0 break-words text-neutral-200">
+                    {s.text}
+                    {s.typing && (
+                      <span
+                        aria-hidden="true"
+                        className="ml-px inline-block h-[0.9em] w-[5px] translate-y-[1px] animate-pulse bg-emerald-400 align-middle"
+                      />
+                    )}
+                  </span>
+                </div>
+              ) : null,
+            )}
+          </div>
+        </div>
+
+        {/* Knowledge */}
+        <div className="bg-neutral-950 p-3 sm:p-4">
+          <div className="mb-2 text-[9px] uppercase tracking-wider text-neutral-500">
+            ─ {t.console.paneKnowledge}
+          </div>
+          <div className="space-y-1" style={{ minHeight: "140px" }}>
+            {KB_SOURCES.map((src, i) => {
+              const isActive = i === kbActiveIdx;
+              const isDone = i < kbDoneCount;
+              return (
+                <div key={src} className="flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className={
+                      isActive
+                        ? "w-3 shrink-0 text-emerald-400"
+                        : isDone
+                          ? "w-3 shrink-0 text-emerald-600"
+                          : "w-3 shrink-0 text-neutral-700"
+                    }
+                  >
+                    {isActive ? "▸" : isDone ? "✓" : "·"}
+                  </span>
+                  <span
+                    className={
+                      isActive
+                        ? "truncate text-emerald-200"
+                        : isDone
+                          ? "truncate text-neutral-400"
+                          : "truncate text-neutral-600"
+                    }
+                  >
+                    {src}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Tools pane (full width) */}
+      <div className="border-t border-neutral-800 p-3 sm:p-4">
+        <div className="mb-2 text-[9px] uppercase tracking-wider text-neutral-500">
+          ─ {t.console.paneTools}
+        </div>
+        <div className="space-y-1" style={{ minHeight: "78px" }}>
+          {TOOL_CALLS.map((tc, i) => (
+            <div
+              key={tc.name}
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 transition-opacity duration-300"
+              style={{ opacity: toolsVisible[i] ? 1 : 0.15 }}
+            >
+              <span className="min-w-0">
+                <span aria-hidden="true" className="text-emerald-400">▸ </span>
+                <span className="text-neutral-200">{tc.name}</span>
+                <span className="text-neutral-500">({tc.args})</span>
+              </span>
+              <span className="shrink-0 text-neutral-500 tabular-nums">
+                {toolsVisible[i] ? `✓ ${tc.duration}` : "..."}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
-function formatThousandsNBSP(n: number): string {
-  // Polish convention: NBSP as thousands separator.
-  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-}
+// ---------------------------------------------------------------------------
+// HERO
+// ---------------------------------------------------------------------------
 
-function HeroStatusStrip() {
+function HeroSignals() {
   const { t } = useLang();
+  // Heartbeat dot pulse only — no fake counters.
   const reduced = usePrefersReducedMotion();
   const visible = usePageVisible();
-  const [count, setCount] = useState(2847);
-  const [last, setLast] = useState(12);
-
-  useEffect(() => {
-    if (reduced || !visible) return;
-    let cancelled = false;
-    const scheduleCount = () => {
-      const id = window.setTimeout(() => {
-        if (cancelled) return;
-        setCount((v) => v + 1);
-        setLast(0);
-        scheduleCount();
-      }, 5000 + Math.random() * 3000);
-      return id;
-    };
-    const id = scheduleCount();
-    const tickLast = window.setInterval(() => {
-      if (cancelled) return;
-      setLast((v) => v + 1);
-    }, 1000);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(id);
-      window.clearInterval(tickLast);
-    };
-  }, [reduced, visible]);
-
-  // Heartbeat dot opacity oscillates 0.3 → 1 → 0.3 every 2s.
   const [pulse, setPulse] = useState(1);
+
   useEffect(() => {
     if (reduced || !visible) return;
-    const start = performance.now();
     let raf = 0;
+    const start = performance.now();
     const tick = () => {
-      const t2 = (performance.now() - start) % 2000;
-      setPulse(0.3 + 0.7 * (0.5 + 0.5 * Math.sin((t2 / 2000) * Math.PI * 2)));
+      const tt = (performance.now() - start) % 2000;
+      setPulse(0.3 + 0.7 * (0.5 + 0.5 * Math.sin((tt / 2000) * Math.PI * 2)));
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -789,20 +1101,18 @@ function HeroStatusStrip() {
   }, [reduced, visible]);
 
   return (
-    <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] uppercase tracking-wider text-neutral-600 sm:text-xs">
+    <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-wider text-neutral-600 sm:gap-x-6 sm:text-xs">
       <span className="flex items-center gap-2">
         <span
           aria-hidden="true"
           className="inline-block h-2 w-2 rounded-full bg-emerald-500"
           style={{ opacity: pulse }}
         />
-        {t.hero.statusPrefix}
+        {t.hero.statusUptime}
       </span>
-      <span className="tabular-nums">{t.hero.statusCount(formatThousandsNBSP(count))}</span>
+      <span>{t.hero.statusLanguages}</span>
       <span>{t.hero.statusLatency}</span>
-      <span className="tabular-nums">
-        {t.hero.statusLast.replace("12", String(last))}
-      </span>
+      <span>{t.hero.statusRegion}</span>
     </div>
   );
 }
@@ -821,7 +1131,7 @@ function Hero() {
 
   return (
     <section className="relative overflow-hidden border-b border-neutral-200 bg-white">
-      {/* Subtle dot grid background, very low contrast. */}
+      {/* Dot grid background */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
@@ -831,31 +1141,31 @@ function Hero() {
           backgroundSize: "16px 16px",
         }}
       />
-      <div className="relative mx-auto max-w-6xl px-6 pb-12 pt-16 sm:pt-20">
-        <h1 className="text-5xl font-semibold leading-[0.95] tracking-tight text-neutral-900 sm:text-6xl md:text-7xl">
-          <span
-            className="block transition-opacity duration-700 ease-out"
-            style={{ opacity: shown.a ? 1 : 0 }}
-          >
-            {t.hero.line1}
-          </span>
-          <span
-            className="block text-neutral-400 transition-opacity duration-700 ease-out"
-            style={{ opacity: shown.b ? 1 : 0 }}
-          >
-            {t.hero.line2}
-          </span>
-        </h1>
-        <p className="mt-8 max-w-2xl text-base leading-relaxed text-neutral-700 sm:text-lg">
-          {t.hero.body}
-        </p>
-        <HeroStatusStrip />
-        <div className="mt-10 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 sm:p-6">
-          <div className="mb-3 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-neutral-500 sm:text-xs">
-            <span>WAVEFORM · LIVE</span>
-            <span className="tabular-nums">48 kHz · mono · 16 bit</span>
+      <div className="relative mx-auto max-w-6xl px-4 pb-14 pt-14 sm:px-6 sm:pb-20 sm:pt-20">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:items-center lg:gap-10">
+          <div className="lg:col-span-5">
+            <h1 className="text-4xl font-semibold leading-[0.95] tracking-tight text-neutral-900 sm:text-5xl md:text-6xl lg:text-6xl">
+              <span
+                className="block transition-opacity duration-700 ease-out"
+                style={{ opacity: shown.a ? 1 : 0 }}
+              >
+                {t.hero.line1}
+              </span>
+              <span
+                className="block text-neutral-400 transition-opacity duration-700 ease-out"
+                style={{ opacity: shown.b ? 1 : 0 }}
+              >
+                {t.hero.line2}
+              </span>
+            </h1>
+            <p className="mt-7 max-w-xl text-base leading-relaxed text-neutral-700 sm:mt-8 sm:text-lg">
+              {t.hero.body}
+            </p>
+            <HeroSignals />
           </div>
-          <HeroWave />
+          <div className="lg:col-span-7">
+            <HeroConsole />
+          </div>
         </div>
       </div>
     </section>
@@ -863,7 +1173,7 @@ function Hero() {
 }
 
 // ---------------------------------------------------------------------------
-// HOW IT WORKS — 5-step animated ASCII flow with traveling active highlight
+// HOW IT WORKS — 5-step animated rail
 // ---------------------------------------------------------------------------
 
 function FlowSection() {
@@ -882,8 +1192,8 @@ function FlowSection() {
 
   return (
     <section className="border-b border-neutral-200 bg-neutral-50">
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
-        <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-10">
+      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-10">
           <div className="md:col-span-5">
             <div className="font-mono text-xs uppercase tracking-wider text-neutral-500">
               {t.flow.eyebrow}
@@ -901,12 +1211,10 @@ function FlowSection() {
               const isActive = i === active;
               const isPast = i < active;
               return (
-                <li key={i} className="grid grid-cols-[44px_24px_1fr] items-stretch">
-                  {/* index column */}
+                <li key={step} className="grid grid-cols-[36px_22px_1fr] items-stretch sm:grid-cols-[44px_24px_1fr]">
                   <div className="flex items-start pt-3 font-mono text-[10px] uppercase tracking-wider text-neutral-400 tabular-nums">
                     0{i + 1}
                   </div>
-                  {/* rail column */}
                   <div className="relative flex flex-col items-center">
                     <span
                       aria-hidden="true"
@@ -927,10 +1235,9 @@ function FlowSection() {
                       />
                     )}
                   </div>
-                  {/* content column */}
                   <div className={`pb-8 pt-2 transition-opacity duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}>
                     <div
-                      className={`text-lg font-semibold tracking-tight transition-colors duration-300 ${
+                      className={`text-base font-semibold tracking-tight transition-colors duration-300 sm:text-lg ${
                         isActive ? "text-emerald-700" : "text-neutral-900"
                       }`}
                     >
@@ -938,7 +1245,7 @@ function FlowSection() {
                     </div>
                     <pre
                       aria-hidden="true"
-                      className={`mt-2 select-none whitespace-pre font-mono text-xs tracking-tight transition-colors duration-300 ${
+                      className={`mt-2 select-none whitespace-pre-wrap break-words font-mono text-[10px] tracking-tight transition-colors duration-300 sm:text-xs ${
                         isActive ? "text-emerald-700" : "text-neutral-500"
                       }`}
                     >
@@ -957,10 +1264,102 @@ function FlowSection() {
 }
 
 // ---------------------------------------------------------------------------
-// FEATURES — three storytelling rows, alternating image/text orientation
+// FEATURE VISUALS
 // ---------------------------------------------------------------------------
 
-// --- Feature 1 visual: language pill rotation + sample phrase typewriter ---
+// --- A. Knowledge: cycle Q → source → A ------------------------------------
+
+function KnowledgeVisual() {
+  const { t } = useLang();
+  const reduced = usePrefersReducedMotion();
+  const visible = usePageVisible();
+  const queries = t.features.knowledgeQueries;
+  const [qIdx, setQIdx] = useState(0);
+  const [stage, setStage] = useState<"question" | "searching" | "answer">("question");
+
+  useEffect(() => {
+    if (reduced) {
+      setStage("answer");
+      return;
+    }
+    if (!visible) return;
+    let cancelled = false;
+    const run = (idx: number) => {
+      setQIdx(idx);
+      setStage("question");
+      const t1 = window.setTimeout(() => {
+        if (cancelled) return;
+        setStage("searching");
+      }, 1400);
+      const t2 = window.setTimeout(() => {
+        if (cancelled) return;
+        setStage("answer");
+      }, 2400);
+      const t3 = window.setTimeout(() => {
+        if (cancelled) return;
+        run((idx + 1) % queries.length);
+      }, 5800);
+      return () => {
+        window.clearTimeout(t1);
+        window.clearTimeout(t2);
+        window.clearTimeout(t3);
+      };
+    };
+    const cleanup = run(0);
+    return () => {
+      cancelled = true;
+      if (cleanup) cleanup();
+    };
+  }, [reduced, visible, queries.length]);
+
+  const current = queries[qIdx]!;
+
+  return (
+    <div className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-7">
+      <div className="mb-3 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-neutral-500">
+        <span>{t.features.knowledgeLabel}</span>
+        <span
+          aria-hidden="true"
+          className={`inline-block h-1.5 w-1.5 rounded-full ${
+            stage === "searching" ? "animate-pulse bg-emerald-500" : "bg-emerald-200"
+          }`}
+        />
+      </div>
+      <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 sm:text-base">
+        {current.question}
+      </div>
+
+      <div className="mt-4 flex items-baseline justify-between font-mono text-[10px] uppercase tracking-wider text-neutral-500">
+        <span>
+          {stage === "searching" ? t.features.knowledgeStateThinking : "ŹRÓDŁO"}
+        </span>
+      </div>
+      <div className="mt-1 flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className={`shrink-0 ${stage === "searching" ? "animate-pulse text-emerald-500" : "text-emerald-600"}`}
+        >
+          ▸
+        </span>
+        <span className="truncate font-mono text-xs text-neutral-700 sm:text-sm">
+          {current.source}
+        </span>
+      </div>
+
+      <div className="mt-4 font-mono text-[10px] uppercase tracking-wider text-neutral-500">
+        {t.features.knowledgeStateAnswer}
+      </div>
+      <div
+        className="mt-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 transition-opacity duration-500 sm:text-base"
+        style={{ opacity: stage === "answer" ? 1 : 0.35 }}
+      >
+        {stage === "answer" ? current.answer : <span className="text-emerald-700/60">…</span>}
+      </div>
+    </div>
+  );
+}
+
+// --- B. Language: pill rotation + typewriter sample ------------------------
 
 function LanguageVisual() {
   const { t } = useLang();
@@ -984,8 +1383,7 @@ function LanguageVisual() {
     const cycle = () => {
       const current = samples[i % samples.length] ?? "";
       setIdx(i % samples.length);
-      // Type forward over 1.6s.
-      const totalMs = 1600;
+      const totalMs = 1500;
       const charDelay = totalMs / Math.max(1, current.length);
       let charPos = 0;
       setTyped("");
@@ -996,7 +1394,6 @@ function LanguageVisual() {
         if (charPos < current.length) {
           timeout = window.setTimeout(typeStep, charDelay);
         } else {
-          // Hold then advance.
           timeout = window.setTimeout(() => {
             if (cancelled) return;
             i++;
@@ -1007,7 +1404,6 @@ function LanguageVisual() {
       typeStep();
     };
     cycle();
-
     return () => {
       cancelled = true;
       if (timeout !== undefined) window.clearTimeout(timeout);
@@ -1019,10 +1415,6 @@ function LanguageVisual() {
     { code: "EN", lang: "en" },
     { code: "RU", lang: "ru" },
   ];
-  // Which pill matches the currently displayed phrase?
-  // The samples array's index 0 is the user's current lang, then the
-  // remaining two in arbitrary order. We highlight based on `idx` semantically
-  // by mapping current sample text back to a language guess via the prefix.
   const currentPrefix = samples[idx]?.slice(0, 6) ?? "";
   let highlighted: Lang = "pl";
   if (currentPrefix.startsWith("Good") || currentPrefix.startsWith("Hi")) highlighted = "en";
@@ -1050,11 +1442,11 @@ function LanguageVisual() {
       <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-neutral-400">
         {t.features.sampleLabel}
       </div>
-      <div className="min-h-[3.5em] text-lg leading-relaxed text-neutral-900 sm:text-xl">
+      <div className="min-h-[3.5em] text-base leading-relaxed text-neutral-900 sm:text-lg">
         {typed}
         <span
           aria-hidden="true"
-          className="ml-[2px] inline-block h-[1em] w-[6px] translate-y-[3px] bg-emerald-600 align-middle"
+          className="ml-[2px] inline-block h-[1em] w-[5px] translate-y-[3px] bg-emerald-600 align-middle"
           style={{
             opacity: typed.length > 0 && typed.length < (samples[idx]?.length ?? 0) ? 1 : 0.25,
           }}
@@ -1064,7 +1456,7 @@ function LanguageVisual() {
   );
 }
 
-// --- Feature 2 visual: ASCII calendar grid filling slot-by-slot ---
+// --- C. Booking: 18-slot grid filling --------------------------------------
 
 const BOOKING_HOURS: string[] = [
   "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
@@ -1076,13 +1468,11 @@ function BookingVisual() {
   const { t } = useLang();
   const reduced = usePrefersReducedMotion();
   const visible = usePageVisible();
-  // Seed: morning busy, afternoon partially open.
   const seed = useMemo<boolean[]>(
     () => BOOKING_HOURS.map((_, i) => i < 6 || (i > 9 && i % 2 === 0)),
     [],
   );
   const [slots, setSlots] = useState<boolean[]>(seed);
-  // Highlighted slot index: the one that just got booked. -1 means none.
   const [justBooked, setJustBooked] = useState<number>(-1);
 
   useEffect(() => {
@@ -1096,7 +1486,6 @@ function BookingVisual() {
           const empties: number[] = [];
           for (let i = 0; i < prev.length; i++) if (!prev[i]) empties.push(i);
           if (empties.length === 0) {
-            // Reset to seed gradually so it feels alive.
             setJustBooked(-1);
             return seed.slice();
           }
@@ -1124,9 +1513,9 @@ function BookingVisual() {
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-7">
       <div className="mb-4 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-neutral-500">
-        <span>{t.features.bookingLabel}</span>
+        <span className="truncate">{t.features.bookingLabel}</span>
         <span className="tabular-nums">
-          {free} <span className="text-neutral-400">wolnych</span>
+          {free} <span className="text-neutral-400">{t.features.bookingFreeLabel}</span>
         </span>
       </div>
       <div className="grid grid-cols-6 gap-1.5">
@@ -1134,8 +1523,8 @@ function BookingVisual() {
           const isHighlight = i === justBooked;
           return (
             <div
-              key={i}
-              className={`rounded-md border px-1.5 py-2 text-center font-mono text-[10px] tabular-nums transition-colors duration-500 ${
+              key={BOOKING_HOURS[i]}
+              className={`rounded-md border px-1 py-2 text-center font-mono text-[9px] tabular-nums transition-colors duration-500 sm:text-[10px] ${
                 isHighlight
                   ? "border-emerald-400 bg-emerald-500 text-white"
                   : on
@@ -1155,27 +1544,17 @@ function BookingVisual() {
   );
 }
 
-// --- Feature 3 visual: SMS ASCII phone with arriving message ---
+// --- D. SMS: rounded iPhone-style frame with chat bubble -------------------
 
 function SmsVisual() {
   const { t } = useLang();
   const reduced = usePrefersReducedMotion();
   const visible = usePageVisible();
-  // Cycle: empty 0-1s, typing 1-3s, delivered 3-7s, fade 7-8s, repeat.
-  const [phase, setPhase] = useState<"empty" | "typing" | "delivered">("empty");
-  const [typed, setTyped] = useState("");
+  const msg = t.features.smsBody;
+  const phases = t.features.smsPhase;
 
-  const fullMsg = useMemo(() => {
-    // language-aware short SMS body.
-    return {
-      pl: "Czwartek 10:00, dr Kowalska. ICS w wiadomości.",
-      en: "Thursday 10:00, dr Kowalska. ICS in the SMS.",
-      ru: "Четверг 10:00, др Ковальская. ICS в сообщении.",
-    };
-  }, []);
-  const { t: tBundle } = useLang();
-  const langCode: Lang = tBundle.htmlLang === "pl" ? "pl" : tBundle.htmlLang === "ru" ? "ru" : "en";
-  const msg = fullMsg[langCode];
+  const [phase, setPhase] = useState<"empty" | "typing" | "delivered">(reduced ? "delivered" : "empty");
+  const [typed, setTyped] = useState(reduced ? msg : "");
 
   useEffect(() => {
     if (reduced) {
@@ -1185,75 +1564,113 @@ function SmsVisual() {
     }
     if (!visible) return;
     let cancelled = false;
+    let timers: number[] = [];
+
     const run = () => {
       setPhase("empty");
       setTyped("");
-      const t1 = window.setTimeout(() => {
-        if (cancelled) return;
-        setPhase("typing");
-        const totalMs = 1400;
-        const step = totalMs / Math.max(1, msg.length);
-        let i = 0;
-        const tick = () => {
+      timers.push(
+        window.setTimeout(() => {
           if (cancelled) return;
-          i++;
-          setTyped(msg.slice(0, i));
-          if (i < msg.length) {
-            window.setTimeout(tick, step);
-          } else {
-            setPhase("delivered");
-            window.setTimeout(() => {
-              if (!cancelled) run();
-            }, 4000);
-          }
-        };
-        tick();
-      }, 800);
-      return () => window.clearTimeout(t1);
+          setPhase("typing");
+          const totalMs = 1400;
+          const step = totalMs / Math.max(1, msg.length);
+          let i = 0;
+          const tick = () => {
+            if (cancelled) return;
+            i++;
+            setTyped(msg.slice(0, i));
+            if (i < msg.length) {
+              timers.push(window.setTimeout(tick, step));
+            } else {
+              setPhase("delivered");
+              timers.push(
+                window.setTimeout(() => {
+                  if (cancelled) return;
+                  run();
+                }, 4500),
+              );
+            }
+          };
+          tick();
+        }, 700),
+      );
     };
-    const cleanup = run();
+    run();
+
     return () => {
       cancelled = true;
-      if (cleanup) cleanup();
+      for (const id of timers) window.clearTimeout(id);
     };
   }, [reduced, visible, msg]);
 
+  const phaseLabel =
+    phase === "delivered" ? phases.delivered : phase === "typing" ? phases.sending : phases.queued;
+
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-7">
-      <div className="mb-4 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-neutral-500">
-        <span>{t.features.smsLabel}</span>
-        <span className="tabular-nums">
-          {phase === "delivered" ? "DELIVERED" : phase === "typing" ? "SENDING…" : "QUEUED"}
-        </span>
+      <div className="mb-5 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-neutral-500">
+        <span>{t.features.smsHeader}</span>
+        <span className="tabular-nums">{phaseLabel}</span>
       </div>
-      {/* ASCII phone outline */}
-      <pre
-        aria-hidden="true"
-        className="select-none whitespace-pre font-mono text-[10px] leading-tight text-neutral-400 sm:text-xs"
-      >
-{`  ╭──────────────────────────────╮
-  │  ───                          │
-  │                               │
-  │  +48 22 ...                   │`}
-      </pre>
-      <div className="border-x border-neutral-300 bg-neutral-50 px-3 py-3 font-mono text-[11px] leading-snug text-neutral-800 sm:text-xs">
-        {typed || <span className="text-neutral-300">…</span>}
-        {phase === "typing" && (
-          <span
-            aria-hidden="true"
-            className="ml-[2px] inline-block h-[1em] w-[5px] translate-y-[2px] animate-pulse bg-emerald-600 align-middle"
-          />
-        )}
+
+      <div className="mx-auto w-full max-w-[240px]">
+        {/* Phone outer (bezel) */}
+        <div className="rounded-[32px] border border-neutral-800 bg-neutral-900 p-1.5 shadow-lg">
+          {/* Phone screen */}
+          <div
+            className="relative rounded-[26px] bg-neutral-50"
+            style={{ minHeight: "300px" }}
+          >
+            {/* Notch */}
+            <div className="mx-auto h-5 w-24 rounded-b-2xl bg-neutral-900" />
+
+            <div className="px-4 pt-4 pb-6">
+              {/* Sender header */}
+              <div className="mb-4 text-center">
+                <div className="mx-auto mb-1 h-9 w-9 rounded-full border border-neutral-200 bg-white" />
+                <div className="font-mono text-[9px] text-neutral-500">+48 22 555 12 34</div>
+              </div>
+
+              {/* Time pill */}
+              <div className="mb-2 text-center">
+                <span className="rounded-full bg-neutral-200/60 px-2 py-0.5 font-mono text-[8px] text-neutral-500">
+                  {t.features.smsTimePill}
+                </span>
+              </div>
+
+              {/* Message bubble (left-aligned, incoming) */}
+              <div className="flex">
+                <div
+                  className={`relative max-w-[85%] rounded-[18px] rounded-bl-[6px] px-3 py-2 text-[12px] leading-snug shadow-sm transition-colors duration-500 ${
+                    typed.length > 0
+                      ? "bg-emerald-100 text-neutral-900"
+                      : "bg-neutral-200/70 text-neutral-400"
+                  }`}
+                >
+                  <span className="break-words">
+                    {typed || "…"}
+                    {phase === "typing" && (
+                      <span
+                        aria-hidden="true"
+                        className="ml-[2px] inline-block h-[0.9em] w-[4px] translate-y-[1px] animate-pulse bg-emerald-600 align-middle"
+                      />
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Delivered tick */}
+              <div className="mt-1 ml-2 h-[14px] font-mono text-[8px] text-emerald-600">
+                {phase === "delivered" ? "delivered ✓✓" : ""}
+              </div>
+            </div>
+
+            {/* Home indicator */}
+            <div className="absolute bottom-2 left-1/2 h-1 w-20 -translate-x-1/2 rounded-full bg-neutral-300" />
+          </div>
+        </div>
       </div>
-      <pre
-        aria-hidden="true"
-        className="select-none whitespace-pre font-mono text-[10px] leading-tight text-neutral-400 sm:text-xs"
-      >
-{`  │                               │
-  │                               │
-  │                ○              │
-  ╰──────────────────────────────╯`}
-      </pre>
     </div>
   );
 }
@@ -1270,12 +1687,8 @@ function FeatureRow({
   reverse?: boolean;
 }) {
   return (
-    <div
-      className={`grid grid-cols-1 gap-10 md:grid-cols-12 md:items-center md:gap-12 ${
-        reverse ? "md:[&>div:first-child]:order-2" : ""
-      }`}
-    >
-      <div className="md:col-span-6">
+    <div className="grid grid-cols-1 gap-8 md:grid-cols-12 md:items-center md:gap-12">
+      <div className={`md:col-span-6 ${reverse ? "md:order-2" : ""}`}>
         <div className="flex items-baseline gap-3 font-mono text-xs uppercase tracking-wider text-neutral-500">
           <span className="text-neutral-300">{copy.number}</span>
           <span>{copy.eyebrow}</span>
@@ -1290,14 +1703,14 @@ function FeatureRow({
             <li key={i} className="flex items-start gap-3">
               <span
                 aria-hidden="true"
-                className="mt-[7px] inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"
+                className="mt-[7px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
               />
               <span>{b}</span>
             </li>
           ))}
         </ul>
       </div>
-      <div className="md:col-span-6">{visual}</div>
+      <div className={`md:col-span-6 ${reverse ? "md:order-1" : ""}`}>{visual}</div>
     </div>
   );
 }
@@ -1306,7 +1719,7 @@ function FeaturesSection() {
   const { t } = useLang();
   return (
     <section className="border-b border-neutral-200 bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
+      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
         <div className="mb-16 max-w-2xl">
           <div className="font-mono text-xs uppercase tracking-wider text-neutral-500">
             {t.features.eyebrow}
@@ -1317,9 +1730,10 @@ function FeaturesSection() {
           <p className="mt-6 text-base leading-relaxed text-neutral-700">{t.features.body}</p>
         </div>
         <div className="space-y-20 sm:space-y-24">
-          <FeatureRow copy={t.features.rows[0]} visual={<LanguageVisual />} />
-          <FeatureRow copy={t.features.rows[1]} visual={<BookingVisual />} reverse />
-          <FeatureRow copy={t.features.rows[2]} visual={<SmsVisual />} />
+          <FeatureRow copy={t.features.rows[0]} visual={<KnowledgeVisual />} />
+          <FeatureRow copy={t.features.rows[1]} visual={<LanguageVisual />} reverse />
+          <FeatureRow copy={t.features.rows[2]} visual={<BookingVisual />} />
+          <FeatureRow copy={t.features.rows[3]} visual={<SmsVisual />} reverse />
         </div>
       </div>
     </section>
@@ -1327,7 +1741,7 @@ function FeaturesSection() {
 }
 
 // ---------------------------------------------------------------------------
-// LIVE TRANSCRIPT LEDGER — typewriter cadence, ruled paper card
+// LIVE TRANSCRIPT LEDGER
 // ---------------------------------------------------------------------------
 
 const LEDGER_TYPE_MS_PER_CHAR = 32;
@@ -1397,7 +1811,7 @@ function LiveLedger() {
 
   return (
     <section className="border-b border-neutral-200 bg-neutral-50">
-      <div className="mx-auto max-w-4xl px-6 py-20 sm:py-28">
+      <div className="mx-auto max-w-4xl px-4 py-20 sm:px-6 sm:py-28">
         <div className="mb-8 max-w-2xl">
           <div className="font-mono text-xs uppercase tracking-wider text-neutral-500">
             {t.ledger.eyebrow}
@@ -1407,7 +1821,7 @@ function LiveLedger() {
           </h2>
         </div>
         <div
-          className="rounded-2xl border border-neutral-200 bg-white p-7 shadow-sm"
+          className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-7"
           style={{
             backgroundImage:
               "linear-gradient(to bottom, transparent 0, transparent calc(2rem - 1px), rgba(0,0,0,0.04) calc(2rem - 1px), rgba(0,0,0,0.04) 2rem)",
@@ -1417,20 +1831,20 @@ function LiveLedger() {
         >
           <div className="flex flex-col gap-3" style={{ minHeight: `${dialogue.length * 40}px` }}>
             {lines.map((l, i) => (
-              <div key={i} className="flex items-baseline gap-4">
-                <span className="w-16 shrink-0 font-mono text-xs tabular-nums text-neutral-400">
+              <div key={i} className="flex items-baseline gap-2 sm:gap-4">
+                <span className="hidden w-16 shrink-0 font-mono text-xs tabular-nums text-neutral-400 sm:inline">
                   {l.ts}
                 </span>
                 <span
                   className={
                     l.side === "clinic"
-                      ? "min-w-[72px] shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-center font-mono text-xs text-emerald-700"
-                      : "min-w-[72px] shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-center font-mono text-xs text-neutral-600"
+                      ? "min-w-[64px] shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-center font-mono text-[10px] text-emerald-700 sm:min-w-[72px] sm:text-xs"
+                      : "min-w-[64px] shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-center font-mono text-[10px] text-neutral-600 sm:min-w-[72px] sm:text-xs"
                   }
                 >
                   {l.side === "clinic" ? t.ledger.speakerClinic : t.ledger.speakerPatient}
                 </span>
-                <span className="min-w-0 flex-1 break-words text-base text-neutral-800">
+                <span className="min-w-0 flex-1 break-words text-sm text-neutral-800 sm:text-base">
                   {l.text}
                   {!l.done && l.text.length > 0 && (
                     <span
@@ -1449,15 +1863,15 @@ function LiveLedger() {
 }
 
 // ---------------------------------------------------------------------------
-// "WHAT WE DO NOT DO" honesty section
+// "WHAT WE DO NOT DO"
 // ---------------------------------------------------------------------------
 
 function DontSection() {
   const { t } = useLang();
   return (
     <section className="border-b border-neutral-200 bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
-        <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-10">
+      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-10">
           <div className="md:col-span-5">
             <div className="font-mono text-xs uppercase tracking-wider text-neutral-500">
               {t.dont.eyebrow}
@@ -1471,9 +1885,9 @@ function DontSection() {
             {t.dont.items.map((item, i) => (
               <li
                 key={i}
-                className="flex items-start gap-5 border-t border-neutral-200 py-5 first:border-t-0 first:pt-0"
+                className="flex items-start gap-4 border-t border-neutral-200 py-5 first:border-t-0 first:pt-0 sm:gap-5"
               >
-                <span className="mt-1 font-mono text-xs uppercase tracking-wider text-neutral-400 tabular-nums">
+                <span className="mt-1 shrink-0 font-mono text-xs uppercase tracking-wider text-neutral-400 tabular-nums">
                   ✕ 0{i + 1}
                 </span>
                 <span className="text-base leading-relaxed text-neutral-700">{item}</span>
@@ -1487,13 +1901,11 @@ function DontSection() {
 }
 
 // ---------------------------------------------------------------------------
-// Sign-in note — code, not link
+// Sign-in note
 // ---------------------------------------------------------------------------
 
 function SignInNote() {
   const { t } = useLang();
-  // Six-digit code display, animated to swap one digit every ~600ms — purely
-  // illustrative, makes clear it's a numeric code not a link.
   const reduced = usePrefersReducedMotion();
   const visible = usePageVisible();
   const [digits, setDigits] = useState<number[]>([3, 9, 1, 4, 7, 2]);
@@ -1513,8 +1925,8 @@ function SignInNote() {
 
   return (
     <section className="border-b border-neutral-200 bg-neutral-50">
-      <div className="mx-auto max-w-4xl px-6 py-20 sm:py-24">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-8 sm:p-10">
+      <div className="mx-auto max-w-4xl px-4 py-20 sm:px-6 sm:py-24">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-10">
           <div className="flex flex-wrap items-baseline justify-between gap-4">
             <div className="font-mono text-xs uppercase tracking-wider text-neutral-500">
               {t.signin.eyebrow}
@@ -1529,7 +1941,7 @@ function SignInNote() {
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-neutral-700">
             {t.signin.body}
           </p>
-          <div className="mt-8 inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-5 py-4 font-mono text-2xl tabular-nums tracking-[0.4em] text-neutral-900">
+          <div className="mt-7 inline-flex items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3 font-mono text-xl tabular-nums tracking-[0.2em] text-neutral-900 sm:gap-2 sm:px-5 sm:py-4 sm:text-2xl sm:tracking-[0.4em]">
             {digits.map((d, i) => (
               <span key={i} className="transition-opacity duration-200">
                 {d}
@@ -1560,24 +1972,25 @@ function SignInNote() {
 // CTA + Footer
 // ---------------------------------------------------------------------------
 
+// Mailto placeholder — recipient to be wired once a real inbox is set up.
 const MAILTO_DEMO =
-  "mailto:kontakt@odbiera.com?subject=Odbiera%20%E2%80%94%20rozmowa&body=Klinika%3A%20%0AMiasto%3A%20%0ATelefon%3A%20";
+  "mailto:hello@example.com?subject=AI%20Receptionist%20%E2%80%94%20rozmowa&body=Klinika%3A%20%0AMiasto%3A%20%0ATelefon%3A%20";
 
 function CtaSection() {
   const { t } = useLang();
   return (
     <section className="bg-white">
-      <div className="mx-auto max-w-3xl px-6 py-24 text-center md:py-32">
+      <div className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6 sm:py-28 md:py-32">
         <div className="font-mono text-xs uppercase tracking-wider text-neutral-500">
           {t.cta.eyebrow}
         </div>
-        <h2 className="mt-4 text-4xl font-semibold tracking-tight text-neutral-900 sm:text-5xl">
+        <h2 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl md:text-5xl">
           {t.cta.headline}
         </h2>
         <p className="mt-6 text-base leading-relaxed text-neutral-700 sm:text-lg">{t.cta.body}</p>
         <a
           href={MAILTO_DEMO}
-          className="mt-10 inline-flex items-center gap-2 rounded-full bg-neutral-900 px-7 py-3.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-neutral-800"
+          className="mt-10 inline-flex items-center gap-2 rounded-full bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition-colors duration-200 hover:bg-neutral-800 sm:px-7 sm:py-3.5"
         >
           {t.cta.button}
         </a>
@@ -1591,11 +2004,11 @@ function Footer() {
   const { t } = useLang();
   return (
     <footer className="border-t border-neutral-200 bg-white">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-8">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-8 sm:px-6">
         <span className="text-base font-semibold tracking-tight text-neutral-900">
           {t.footer.copyright}
         </span>
-        <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-neutral-500">
+        <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-neutral-500 sm:gap-3 sm:text-xs">
           <span>{t.footer.privacy}</span>
           <span aria-hidden="true" className="text-neutral-300">
             ·

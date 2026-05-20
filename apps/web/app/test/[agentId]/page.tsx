@@ -3,6 +3,7 @@ import { requireOperator } from "@/lib/supabase-server";
 import AgentSettingsPanel from "./agent-settings-panel";
 import AgentManagementPanel from "./agent-management-panel";
 import ConversationStatsStrip from "./conversation-stats-strip";
+import ELAnalysisStatusCard from "./el-analysis-status-card";
 import DemoAccessPanel from "./demo-access-panel";
 import OwnerInvitePanel from "./owner-invite-panel";
 import PhoneNumberPanel from "./phone-number-panel";
@@ -37,6 +38,7 @@ export default async function TestAgentPage({ params }: PageProps) {
   return (
     <div className="flex flex-col gap-8">
       <ConversationStatsStrip agentId={agentId} />
+      <ELAnalysisStatusCard providerAgentId={agentId} />
       <AgentSettingsPanel providerAgentId={agentId} />
       <DemoAccessPanel
         providerAgentId={agentId}

@@ -1,10 +1,18 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { headers } from "next/headers";
-import { requireOperator } from "@/lib/supabase-server";
+import { requireOperator, getServiceRoleSupabase } from "@/lib/supabase-server";
 import AgentDemoActions from "./agent-demo-actions";
+import OutreachStatusSelect from "./outreach-status-select";
 
 export const dynamic = "force-dynamic";
+
+type OutreachStatus =
+  | "created"
+  | "audited"
+  | "contacted"
+  | "positive"
+  | "negative";
 
 interface TenantRow {
   id: string;
@@ -23,6 +31,8 @@ interface AgentRow {
   pin_code: string | null;
   default_language: string;
   status: string;
+  outreach_status: OutreachStatus;
+  provisioned_by_user_id: string | null;
   created_at: string;
   tenant: TenantRow | null;
 }
@@ -32,26 +42,46 @@ export default async function DashboardPage() {
     redirectPath: "/dashboard",
   });
 
-  // Operator bypass on agents_select policy lets us read EVERY agent across
-  // tenants. The join to tenants(...) brings display data along.
   const { data: agents, error } = await supabase
     .from("agents")
     .select(
-      "id, provider_agent_id, phone_number, pin_code, default_language, status, created_at, tenant:tenants(id, name, display_name, source_url, owner_email, provisioned_by_user_id, created_at)",
+      "id, provider_agent_id, phone_number, pin_code, default_language, status, outreach_status, provisioned_by_user_id, created_at, tenant:tenants(id, name, display_name, source_url, owner_email, provisioned_by_user_id, created_at)",
     )
     .order("created_at", { ascending: false });
 
   const rows = (agents ?? []) as unknown as AgentRow[];
 
-  // Build origin for demo URLs (used by the client-side AgentDemoActions
-  // to render the full https://<host>/demo/... clipboard target).
+  // Resolve provisioner display names via service-role read of operators table.
+  // (operators RLS may not be permissive to all operators; service-role
+  // ensures cross-operator dashboards always render owner names.)
+  const provisionerIds = Array.from(
+    new Set(
+      rows
+        .map((r) => r.provisioned_by_user_id)
+        .filter((x): x is string => Boolean(x)),
+    ),
+  );
+  const ownerNames: Record<string, string> = {};
+  if (provisionerIds.length > 0) {
+    const sr = getServiceRoleSupabase();
+    const { data: ops } = await sr
+      .from("operators")
+      .select("user_id, display_name")
+      .in("user_id", provisionerIds);
+    for (const op of ops ?? []) {
+      if (op.display_name) {
+        ownerNames[op.user_id as string] = op.display_name as string;
+      }
+    }
+  }
+
   const h = await headers();
   const host = h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? "https";
   const origin = `${proto}://${host}`;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-10 py-12">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 py-12">
       <header className="flex flex-col gap-3">
         <span className="font-mono text-xs uppercase tracking-wider text-neutral-400">
           Operator console · signed in as {user.email}
@@ -77,8 +107,9 @@ export default async function DashboardPage() {
           </div>
         </div>
         <p className="max-w-2xl text-sm text-neutral-600">
-          Every agent provisioned by you, Sebastian, or Rem. Click an agent to test it in the
-          browser or assign a Polish phone number. Clients never see this page.
+          Every agent provisioned by you, Sebastian, or Rem. Click an agent to
+          test it in the browser or assign a Polish phone number. Clients never
+          see this page.
         </p>
       </header>
 
@@ -92,19 +123,17 @@ export default async function DashboardPage() {
         <EmptyState />
       ) : (
         <>
-          {/* Desktop / tablet: full table. Each row is clickable; the
-              entire row is wrapped in a Link so on mobile users can tap
-              anywhere without needing to reach a far-right "Open" button. */}
           <section className="hidden overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm sm:block">
             <table className="w-full text-left text-sm">
               <thead className="bg-neutral-50 text-xs uppercase tracking-wider text-neutral-500">
                 <tr>
                   <th className="px-4 py-3 font-medium">Clinic</th>
+                  <th className="px-4 py-3 font-medium">Owner</th>
+                  <th className="px-4 py-3 font-medium">Outreach</th>
                   <th className="px-4 py-3 font-medium">Phone</th>
                   <th className="px-4 py-3 font-medium">Demo access</th>
                   <th className="px-4 py-3 font-medium">Lang</th>
                   <th className="px-4 py-3 font-medium">Provisioned</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -121,8 +150,23 @@ export default async function DashboardPage() {
                         </div>
                       ) : null}
                     </td>
+                    <td className="px-4 py-3 text-xs text-neutral-700">
+                      {a.provisioned_by_user_id ? (
+                        (ownerNames[a.provisioned_by_user_id] ?? "—")
+                      ) : (
+                        <span className="text-neutral-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <OutreachStatusSelect
+                        providerAgentId={a.provider_agent_id}
+                        initial={a.outreach_status}
+                      />
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs">
-                      {a.phone_number ?? <span className="text-neutral-300">— unset</span>}
+                      {a.phone_number ?? (
+                        <span className="text-neutral-300">— unset</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <AgentDemoActions
@@ -136,9 +180,6 @@ export default async function DashboardPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-neutral-500">
                       {formatDate(a.created_at)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={a.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link
@@ -155,9 +196,6 @@ export default async function DashboardPage() {
             </table>
           </section>
 
-          {/* Mobile: each agent is a card with multiple action targets
-              (Edit, demo PIN actions). No row-level Link wrapper because
-              the demo buttons need their own click handling. */}
           <section className="flex flex-col gap-3 sm:hidden">
             {rows.map((a) => (
               <div
@@ -175,14 +213,26 @@ export default async function DashboardPage() {
                       </div>
                     ) : null}
                   </div>
-                  <StatusBadge status={a.status} />
+                  <OutreachStatusSelect
+                    providerAgentId={a.provider_agent_id}
+                    initial={a.outreach_status}
+                  />
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
                   <span className="font-mono">
-                    {a.phone_number ?? <span className="text-neutral-300">no phone</span>}
+                    {a.phone_number ?? (
+                      <span className="text-neutral-300">no phone</span>
+                    )}
                   </span>
-                  <span className="uppercase tracking-wider">{a.default_language}</span>
+                  <span className="uppercase tracking-wider">
+                    {a.default_language}
+                  </span>
                   <span>{formatDate(a.created_at)}</span>
+                  {a.provisioned_by_user_id ? (
+                    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-700">
+                      {ownerNames[a.provisioned_by_user_id] ?? "—"}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="border-t border-neutral-100 pt-3">
                   <AgentDemoActions
@@ -209,10 +259,13 @@ export default async function DashboardPage() {
 function EmptyState() {
   return (
     <section className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-neutral-300 bg-white px-6 py-16 text-center">
-      <div className="text-base font-medium text-neutral-800">No agents yet.</div>
+      <div className="text-base font-medium text-neutral-800">
+        No agents yet.
+      </div>
       <p className="max-w-md text-sm text-neutral-500">
-        Provision your first agent: paste a clinic URL, Firecrawl + Gemini build the knowledge base,
-        ElevenLabs spins up the Polish voice agent. About 5 minutes.
+        Provision your first agent: paste a clinic URL, Firecrawl + Gemini build
+        the knowledge base, ElevenLabs spins up the Polish voice agent. About 5
+        minutes.
       </p>
       <Link
         href={"/provision" as Route}
@@ -222,23 +275,6 @@ function EmptyState() {
         <span aria-hidden>→</span>
       </Link>
     </section>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const palette: Record<string, string> = {
-    live: "bg-emerald-100 text-emerald-800",
-    provisioning: "bg-amber-100 text-amber-800",
-    paused: "bg-neutral-200 text-neutral-700",
-    archived: "bg-neutral-100 text-neutral-500 line-through",
-  };
-  const cls = palette[status] ?? "bg-neutral-100 text-neutral-700";
-  return (
-    <span
-      className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cls}`}
-    >
-      {status}
-    </span>
   );
 }
 

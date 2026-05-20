@@ -1,2 +1,2 @@
 export * from "./finalize-handler.js";
-// list-handler is added in Wave 3 (Task 7).
+export * from "./list-handler.js";

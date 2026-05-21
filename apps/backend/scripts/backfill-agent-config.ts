@@ -112,12 +112,12 @@ async function patchAgent(agentId: string, body: Record<string, unknown>): Promi
   }
 }
 
+// 2026-05-22: 3-doc reference set (see elevenlabs-convai.ts for the rationale).
+// Order must match ELEVENLABS_ONTOLOGY_KB_DOC_IDS env CSV.
 const ONTOLOGY_DOC_NAMES = [
   "ontology/services.md",
   "ontology/triage.md",
-  "ontology/scripts.md",
   "ontology/emergency-keywords.md",
-  "ontology/consent.md",
 ];
 
 const ontologyIds = readOntologyDocIds();
@@ -151,7 +151,11 @@ for (const agentId of agentIds) {
       if (!e.id) return false;
       if (ontologySet.has(e.id)) return false;
       const name = e.name ?? "";
-      if (name.startsWith("ontology/")) return false;
+      // Strip stale ontology docs by name prefix. Covers both the canonical
+      // "ontology/<file>.md" naming and the fallback "ontology-<N>" form
+      // emitted by older provisioning runs (which used ontology-${i} when
+      // ONTOLOGY_DOC_NAMES had fewer entries than ontology IDs).
+      if (name.startsWith("ontology/") || name.startsWith("ontology-")) return false;
       return true;
     });
     const ontologyEntries = ontologyIds.map((id, i) => ({

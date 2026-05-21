@@ -81,6 +81,12 @@ export default async function DashboardPage() {
           <h1 className="text-3xl font-semibold tracking-tight">Agents</h1>
           <div className="flex items-center gap-3">
             <Link
+              href={"/dashboard/ontology" as Route}
+              className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-5 py-2.5 text-sm font-medium text-neutral-700 shadow-sm transition hover:border-neutral-300 hover:bg-neutral-50"
+            >
+              Ontology
+            </Link>
+            <Link
               href={"/provision" as Route}
               className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800"
             >

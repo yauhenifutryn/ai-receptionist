@@ -25,13 +25,21 @@ const REPO_ROOT = resolve(import.meta.dirname, "..", "..", "..");
 const ONTOLOGY_DIR = join(REPO_ROOT, "apps", "backend", "ontology");
 const CACHE_PATH = join(REPO_ROOT, "apps", "backend", ".ontology-uploaded.json");
 
-const ONTOLOGY_FILES = [
-  "services.md",
-  "triage.md",
-  "scripts.md",
-  "emergency-keywords.md",
-  "consent.md",
-];
+// 2026-05-22: ontology demoted to REFERENCE-ONLY layer. Only files that are
+// pure terminology / classification reference get uploaded as RAG documents.
+//
+// Excluded by design:
+//   - scripts.md  — conversation flows; behaviour belongs in system prompt
+//   - consent.md  — consent wording; already canonical in system prompt
+//
+// Kept as RAG docs:
+//   - services.md          — Polish dental taxonomy with PL/EN/RU synonyms
+//   - triage.md            — urgency tier classification rules
+//   - emergency-keywords.md — Polish emergency phrase → tier mappings
+//
+// scripts.md + consent.md remain on disk as internal documentation for the
+// engineering team — they are not attached to any agent.
+const ONTOLOGY_FILES = ["services.md", "triage.md", "emergency-keywords.md"];
 
 interface CacheEntry {
   contentHash: string;

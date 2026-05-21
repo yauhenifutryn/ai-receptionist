@@ -165,12 +165,16 @@ export function readOntologyDocIds(): string[] {
     .filter(Boolean);
 }
 
+// 2026-05-22: ontology reduced to reference-only RAG documents (terminology +
+// classification rules). scripts.md and consent.md were demoted out of the
+// RAG attachment set — both lived as behaviour scripts that overlapped with
+// the system prompt and risked drifting the agent off-policy at retrieval
+// time. Order must match the env CSV ELEVENLABS_ONTOLOGY_KB_DOC_IDS produced
+// by `upload-ontology.ts`.
 const ONTOLOGY_DOC_NAMES = [
   "ontology/services.md",
   "ontology/triage.md",
-  "ontology/scripts.md",
   "ontology/emergency-keywords.md",
-  "ontology/consent.md",
 ];
 
 // Tool definitions moved to `./elevenlabs-tools-catalog.ts` (TOOL_SPECS,

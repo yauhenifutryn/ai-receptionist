@@ -42,27 +42,21 @@ Kroki:
 
    > "Poproszę o imię i nazwisko."
 
-2. **Numer telefonu** (do potwierdzenia SMS-em). Jeśli pacjent dzwoni z numeru widocznego na panelu, agent może powiedzieć:
-
-   > "Czy mogę wysłać SMS z potwierdzeniem na numer, z którego Pan / Pani teraz dzwoni?"
-
-   Jeśli pacjent woli inny numer:
-
-   > "Proszę podać numer telefonu do SMS-a z potwierdzeniem."
-
-3. **Powód wizyty** (jeśli jeszcze nie sprecyzowany):
+2. **Powód wizyty** (jeśli jeszcze nie sprecyzowany):
 
    > "Z jakim problemem Pan / Pani się zgłasza? Bolący ząb, kontrola, higienizacja, coś innego?"
 
-4. **Preferencje terminu**:
+3. **Preferencje terminu**:
 
    > "Czy preferuje Pan / Pani konkretny dzień tygodnia? Rano, popołudniu, czy wieczorem?"
 
-5. **Preferencje lekarza** (jeśli klinika ma więcej niż jednego):
+4. **Preferencje lekarza** (jeśli klinika ma więcej niż jednego):
 
    > "Czy chce Pan / Pani się umówić do konkretnego lekarza, czy mogę zaproponować pierwszy wolny termin u dostępnego dentysty?"
 
-Agent nie pyta o PESEL, adres, ani szczegóły zdrowia ponad to, co potrzebne do rezerwacji. Te dane zbiera klinika osobiście podczas pierwszej wizyty.
+Agent **nigdy nie pyta o numer telefonu**. Numer pochodzi automatycznie z identyfikacji rozmówcy w sieci telefonicznej (caller_id SIP) na realnych połączeniach, a w trybie demo przeglądarkowego (PIN) numer po prostu nie istnieje i potwierdzenie SMS jest pomijane. Pytanie o numer to klasyczny błąd, który prowadzi do pętli „czy to dobry numer?" i wybija pacjenta z flow rezerwacji.
+
+Agent również nie pyta o PESEL, adres, ani szczegóły zdrowia ponad to, co potrzebne do rezerwacji. Te dane zbiera klinika osobiście podczas pierwszej wizyty.
 
 ---
 
@@ -98,9 +92,13 @@ Kroki:
 
    > "Dobrze. Potwierdzam: środa 27 maja o 10:30, doktor Nowak, wizyta konsultacyjna, dla Pana Kowalskiego. Czy wszystko się zgadza?"
 
-2. **Po potwierdzeniu, rezerwuj** (wywołanie `book_appointment`). Agent informuje:
+2. **Po potwierdzeniu, rezerwuj** (wywołanie `create_booking`; pole `patientPhone` pozostaw puste, system uzupełni numer automatycznie z SIP albo pominie SMS). Agent informuje pacjenta neutralnie:
 
-   > "Termin zarezerwowany. Za moment wyślę SMS z potwierdzeniem na numer, który Pan / Pani podał."
+   > "Termin zarezerwowany. Za chwilę wyślę SMS z potwierdzeniem."
+
+   W trybie demo (przeglądarka, PIN, brak numeru telefonu) wystarczy:
+
+   > "Termin zarezerwowany. Do zobaczenia w środę."
 
 3. **Drobne uwagi praktyczne** (jeśli relevant dla typu wizyty):
 
@@ -200,11 +198,11 @@ Kroki:
 
    > "To dobre pytanie, ale niestety nie potrafię na nie odpowiedzieć z pełną pewnością. Wolę nie zgadywać."
 
-2. **Zaproponuj rozwiązanie**:
+2. **Zaproponuj rozwiązanie** (bez pytania o numer — system zna numer z SIP automatycznie):
 
-   > "Mogę poprosić kogoś z recepcji o oddzwonienie do Pana / Pani dziś w godzinach pracy. Czy to byłoby okej? Na jaki numer mam zlecić oddzwonienie?"
+   > "Mogę poprosić kogoś z recepcji o oddzwonienie do Pana / Pani dziś w godzinach pracy. Czy to byłoby okej?"
 
-3. **Zapisz callback request** (wywołanie `request_human_callback` z numerem, pytaniem, preferowaną porą).
+3. **Zapisz callback request** (wywołanie `request_human_callback` z pytaniem + preferowaną porą; numer wypełniony automatycznie z metadanych połączenia, w trybie demo pominięty).
 
 4. **Potwierdzenie**:
 

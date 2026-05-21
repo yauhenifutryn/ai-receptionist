@@ -139,15 +139,21 @@ for (const agentId of agentIds) {
     console.error(`\n${agentId}`);
     const existing = await getAgent(agentId);
 
-    // 1. Build the merged knowledge_base: keep all existing entries whose id
-    //    is NOT in the ontology id set, then re-append the canonical ontology
-    //    entries. Filters out any stale ontology docs (e.g. from a previous
-    //    upload that's since been re-uploaded with a new id).
+    // 1. Build the merged knowledge_base: keep all existing entries that are
+    //    NOT ontology docs (by id OR by name prefix "ontology/"), then
+    //    re-append the canonical ontology entries from env. The name-prefix
+    //    filter catches stale ontology IDs left over after a re-upload that
+    //    rotated the document_id — without it, the agent ends up with both
+    //    the old and the new scripts.md attached.
     const ontologySet = new Set(ontologyIds);
     const existingKb = existing.conversation_config?.agent?.prompt?.knowledge_base ?? [];
-    const tenantKb = existingKb.filter(
-      (e) => !!e.id && !ontologySet.has(e.id),
-    );
+    const tenantKb = existingKb.filter((e) => {
+      if (!e.id) return false;
+      if (ontologySet.has(e.id)) return false;
+      const name = e.name ?? "";
+      if (name.startsWith("ontology/")) return false;
+      return true;
+    });
     const ontologyEntries = ontologyIds.map((id, i) => ({
       type: "text" as const,
       id,

@@ -51,7 +51,7 @@ export default function OperatorCodePage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <div className="mx-auto flex max-w-md flex-col gap-8 px-6 py-20">
+      <div className="mx-auto flex max-w-md flex-col gap-8 px-6 py-12 sm:px-8 sm:py-16">
         <header className="flex flex-col gap-2">
           <span className="font-mono text-xs uppercase tracking-wider text-neutral-400">
             Operator console

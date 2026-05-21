@@ -72,7 +72,7 @@ export default async function DashboardPage() {
   const origin = `${proto}://${host}`;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 py-12">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-10 sm:px-8 sm:py-12">
       <header className="flex flex-col gap-3">
         <span className="font-mono text-xs uppercase tracking-wider text-neutral-400">
           Operator console · signed in as {user.email}

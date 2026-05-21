@@ -39,7 +39,7 @@ export default async function TestAgentPage({ params }: PageProps) {
   const origin = `${proto}://${host}`;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10 sm:px-8 sm:py-12">
       <header className="flex flex-col gap-2">
         <Link
           href={"/dashboard" as Route}

@@ -170,15 +170,15 @@ for (const agentId of agentIds) {
           prompt: { knowledge_base: mergedKb },
         },
         tts: {
-          // 2026-05-22 calibration: matches provisioning defaults — flash_v2_5,
-          // expressive off, stability 0.6, speed 0.95. See elevenlabs-convai.ts
-          // for the rationale.
+          // 2026-05-22 final: matches provisioning — flash_v2_5,
+          // stability 0.7, speed 0.9, similarity 0.8. See
+          // elevenlabs-convai.ts for the A/B test that calibrated these.
           model_id: DEFAULT_TTS_MODEL_ID,
           expressive_mode: false,
           suggested_audio_tags: [],
-          stability: 0.6,
-          similarity_boost: 0.75,
-          speed: 0.95,
+          stability: 0.7,
+          similarity_boost: 0.8,
+          speed: 0.9,
         },
       },
       platform_settings: {

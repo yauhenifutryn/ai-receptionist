@@ -145,8 +145,8 @@ const BUNDLES: Record<Lang, LangBundle> = {
       line2: "wąskim gardłem.",
       body:
         "Agent głosowy odbiera za Twoją recepcję. Odpowiada na pytania pacjentów z bazy Twojej kliniki, umawia wizyty w Booksy, potwierdza SMSem w 30 sekund. Po polsku jak rodzimy. Bez szkolenia personelu.",
-      ctaPrimary: "Test w przeglądarce",
-      ctaSecondary: "Umów demo",
+      ctaPrimary: "Umów demo",
+      ctaSecondary: "Zobacz, jak działa",
       metaLeft: "WARSZAWA · PILOT 2026",
       metaCenter: "PL · EN · RU",
       metaRight: "ODPOWIEDŹ < 1 s",
@@ -257,12 +257,12 @@ const BUNDLES: Record<Lang, LangBundle> = {
       ],
     },
     footer: {
-      eyebrow: "PRÓBA",
-      title: "Wpisz adres swojej kliniki.",
+      eyebrow: "KONTAKT",
+      title: "Pokażmy to na Twojej klinice.",
       body:
-        "Sprawdzimy, jak agent zabrzmi z Twoją wiedzą. Bez konta, bez instalacji. Wynik dostajesz w przeglądarce.",
-      inputPlaceholder: "https://www.twoja-klinika.pl",
-      inputCta: "Zobacz w przeglądarce",
+        "30 minut, prywatne demo z agentem skonfigurowanym pod Twój zakres usług, cennik i godziny. Bez umowy, bez konta.",
+      inputPlaceholder: "",
+      inputCta: "Umów demo",
       compliance:
         "Dane pacjentów przechowywane w Unii Europejskiej · Zgodne z RODO · Nagrania rozmów nie są zapisywane",
       sectionLeftLabel: "DOKUMENT",
@@ -281,8 +281,8 @@ const BUNDLES: Record<Lang, LangBundle> = {
       line2: "longer the bottleneck.",
       body:
         "A voice agent answers your reception line. It replies to patients from your clinic's own knowledge base, books appointments in Booksy, and sends an SMS confirmation in thirty seconds. Natural Polish, English, and Russian. No staff training.",
-      ctaPrimary: "Test in browser",
-      ctaSecondary: "Book a demo",
+      ctaPrimary: "Book a demo",
+      ctaSecondary: "Watch it work",
       metaLeft: "WARSAW · 2026 PILOT",
       metaCenter: "PL · EN · RU",
       metaRight: "RESPONSE < 1 s",
@@ -392,12 +392,12 @@ const BUNDLES: Record<Lang, LangBundle> = {
       ],
     },
     footer: {
-      eyebrow: "TRIAL",
-      title: "Paste your clinic's address.",
+      eyebrow: "CONTACT",
+      title: "Let us show you, on your clinic.",
       body:
-        "We will show you how the agent sounds with your knowledge. No account, no install. Result in your browser.",
-      inputPlaceholder: "https://your-clinic.com",
-      inputCta: "Open in browser",
+        "Thirty minutes, a private demo with the agent tuned to your services, pricing and hours. No contract, no account.",
+      inputPlaceholder: "",
+      inputCta: "Book a demo",
       compliance:
         "Patient data stored in the European Union · GDPR compliant · Call recordings never saved",
       sectionLeftLabel: "DOCUMENT",
@@ -416,8 +416,8 @@ const BUNDLES: Record<Lang, LangBundle> = {
       line2: "не узкое место.",
       body:
         "Голосовой агент отвечает за стойку регистрации. Говорит по-польски как родной, отвечает пациентам по базе знаний клиники, бронирует приёмы в Booksy и присылает SMS-подтверждение за тридцать секунд. Без обучения персонала.",
-      ctaPrimary: "Тест в браузере",
-      ctaSecondary: "Записаться на демо",
+      ctaPrimary: "Записаться на демо",
+      ctaSecondary: "Посмотреть, как работает",
       metaLeft: "ВАРШАВА · ПИЛОТ 2026",
       metaCenter: "PL · EN · RU",
       metaRight: "ОТВЕТ < 1 с",
@@ -526,12 +526,12 @@ const BUNDLES: Record<Lang, LangBundle> = {
       ],
     },
     footer: {
-      eyebrow: "ПРОБА",
-      title: "Введите адрес вашей клиники.",
+      eyebrow: "КОНТАКТ",
+      title: "Покажем на вашей клинике.",
       body:
-        "Покажем, как агент звучит с вашими знаниями. Без аккаунта, без установки. Результат в браузере.",
-      inputPlaceholder: "https://www.vasha-klinika.pl",
-      inputCta: "Открыть в браузере",
+        "Тридцать минут, приватное демо с агентом, настроенным под ваш перечень услуг, цены и часы. Без договора, без аккаунта.",
+      inputPlaceholder: "",
+      inputCta: "Записаться на демо",
       compliance:
         "Данные пациентов хранятся в Евросоюзе · Соответствие GDPR · Записи звонков не сохраняются",
       sectionLeftLabel: "ДОКУМЕНТ",
@@ -710,115 +710,104 @@ function HeroSchematic({ reduced }: { reduced: boolean }) {
     return () => cancelAnimationFrame(id);
   }, []);
   const drawIn = !reduced && mounted;
-  // Each path's length is roughly its visible length. stroke-dasharray /
-  // -dashoffset is set to that length so the path draws in cleanly.
   const pathStyle = (length: number, delay: number): React.CSSProperties => ({
     strokeDasharray: length,
     strokeDashoffset: drawIn ? 0 : length,
-    transition: `stroke-dashoffset 1200ms cubic-bezier(0.2,0.7,0.2,1) ${delay}ms`,
+    transition: `stroke-dashoffset 1100ms cubic-bezier(0.2,0.7,0.2,1) ${delay}ms`,
   });
+  // Three nodes only — patient line, agent, confirmation. Cleaner than a
+  // labelled six-node call graph. The fourth element is a faint return arc
+  // in blueprint blue that closes the loop visually without adding labels.
   return (
     <figure className="w-full">
       <svg
-        viewBox="0 0 800 360"
+        viewBox="0 0 600 320"
         className="w-full h-auto"
         role="img"
         aria-label={t.hero.schematicCaption}
       >
         <defs>
           <marker
-            id="arrow"
+            id="arrow-v3"
             viewBox="0 0 10 10"
-            refX="8"
+            refX="9"
             refY="5"
-            markerWidth="6"
-            markerHeight="6"
+            markerWidth="5"
+            markerHeight="5"
             orient="auto-start-reverse"
           >
             <path d="M 0 0 L 10 5 L 0 10 z" fill="#0F1418" />
           </marker>
         </defs>
 
-        {/* Patient → Clinic line */}
+        {/* Node 1 — patient line (left) */}
         <g stroke="#0F1418" strokeWidth="1.25" fill="none">
-          <circle cx="70" cy="60" r="22" style={pathStyle(140, 0)} />
-          <line x1="70" y1="82" x2="70" y2="138" markerEnd="url(#arrow)" style={pathStyle(56, 120)} />
-          <rect x="32" y="138" width="76" height="44" style={pathStyle(240, 220)} />
-          <line x1="108" y1="160" x2="248" y2="160" markerEnd="url(#arrow)" style={pathStyle(140, 360)} />
+          <circle cx="80" cy="160" r="36" style={pathStyle(226, 0)} />
         </g>
-
-        {/* Agent node (centerpiece) */}
+        {/* Patient → Agent */}
         <g stroke="#0F1418" strokeWidth="1.25" fill="none">
-          <rect x="248" y="120" width="180" height="80" style={pathStyle(520, 460)} />
-        </g>
-        <g stroke="#1A4FB8" strokeWidth="1.25" fill="none">
-          <line x1="258" y1="135" x2="418" y2="135" style={pathStyle(160, 580)} />
+          <line
+            x1="118"
+            y1="160"
+            x2="232"
+            y2="160"
+            markerEnd="url(#arrow-v3)"
+            style={pathStyle(114, 200)}
+          />
         </g>
 
-        {/* Agent → Knowledge base (top branch) */}
+        {/* Node 2 — agent (center) */}
         <g stroke="#0F1418" strokeWidth="1.25" fill="none">
-          <line x1="338" y1="120" x2="338" y2="56" markerEnd="url(#arrow)" style={pathStyle(64, 660)} />
-          <rect x="278" y="14" width="120" height="42" style={pathStyle(324, 720)} />
+          <rect x="232" y="118" width="136" height="84" style={pathStyle(440, 340)} />
+        </g>
+        {/* internal hairline */}
+        <g stroke="#1A4FB8" strokeWidth="1" fill="none">
+          <line x1="248" y1="138" x2="352" y2="138" style={pathStyle(104, 480)} />
         </g>
 
-        {/* Agent → Scheduler (right branch) */}
+        {/* Agent → Confirmation */}
         <g stroke="#0F1418" strokeWidth="1.25" fill="none">
-          <line x1="428" y1="160" x2="528" y2="160" markerEnd="url(#arrow)" style={pathStyle(100, 800)} />
-          <rect x="528" y="138" width="120" height="44" style={pathStyle(328, 860)} />
+          <line
+            x1="368"
+            y1="160"
+            x2="482"
+            y2="160"
+            markerEnd="url(#arrow-v3)"
+            style={pathStyle(114, 620)}
+          />
         </g>
 
-        {/* Agent → SMS (bottom-right branch) */}
+        {/* Node 3 — booking + SMS (right) */}
         <g stroke="#0F1418" strokeWidth="1.25" fill="none">
-          <line x1="378" y1="200" x2="378" y2="262" markerEnd="url(#arrow)" style={pathStyle(62, 940)} />
-          <rect x="318" y="262" width="120" height="42" style={pathStyle(324, 1000)} />
+          <rect x="482" y="118" width="80" height="84" style={pathStyle(328, 760)} />
         </g>
 
-        {/* SMS → Patient (closes the loop) */}
-        <g stroke="#1A4FB8" strokeWidth="1.25" fill="none">
-          <line x1="318" y1="284" x2="120" y2="284" style={pathStyle(198, 1080)} />
-          <line x1="120" y1="284" x2="120" y2="182" markerEnd="url(#arrow)" style={pathStyle(102, 1160)} />
+        {/* Quiet return arc — booking back to patient, blueprint blue */}
+        <g stroke="#1A4FB8" strokeWidth="1" fill="none">
+          <path
+            d="M 522 202 C 522 270, 80 270, 80 200"
+            style={pathStyle(640, 900)}
+          />
         </g>
 
-        {/* Text labels — pure type, no animation */}
+        {/* Labels — mono caption beneath each node */}
         <g
           fontFamily="var(--font-mono), ui-monospace, monospace"
           fontSize="10"
           fill="#0F1418"
-          letterSpacing="1.4"
+          letterSpacing="1.6"
           style={{
             opacity: drawIn ? 1 : 0,
-            transition: "opacity 700ms ease 1200ms",
+            transition: "opacity 700ms ease 1100ms",
           }}
         >
-          <text x="70" y="64" textAnchor="middle">PATIENT</text>
-          <text x="70" y="164" textAnchor="middle">PSTN</text>
-          <text x="338" y="166" textAnchor="middle" letterSpacing="2">AGENT</text>
-          <text x="338" y="40" textAnchor="middle" letterSpacing="2">KB</text>
-          <text x="588" y="164" textAnchor="middle" letterSpacing="2">BOOKSY</text>
-          <text x="378" y="288" textAnchor="middle" letterSpacing="2">SMS</text>
-        </g>
-
-        {/* Side captions (Polish/EN/RU localized labels) */}
-        <g
-          fontFamily="var(--font-sans), system-ui"
-          fontSize="11"
-          fill="#4A5358"
-          style={{
-            opacity: drawIn ? 1 : 0,
-            transition: "opacity 700ms ease 1300ms",
-          }}
-        >
-          <text x="70" y="34">{t.hero.schematic.patient}</text>
-          <text x="32" y="200">{t.hero.schematic.phone}</text>
-          <text x="278" y="226">{t.hero.schematic.agent}</text>
-          <text x="278" y="6"></text>
-          <text x="278" y="76"></text>
-          <text x="528" y="200">{t.hero.schematic.schedule}</text>
-          <text x="318" y="326">{t.hero.schematic.sms}</text>
+          <text x="80" y="232" textAnchor="middle">{t.hero.schematic.patient.toUpperCase()}</text>
+          <text x="300" y="232" textAnchor="middle">{t.hero.schematic.agent.toUpperCase()}</text>
+          <text x="522" y="232" textAnchor="middle">{t.hero.schematic.sms.toUpperCase()}</text>
         </g>
       </svg>
       <figcaption
-        className="mt-4 font-mono"
+        className="mt-6 font-mono"
         style={{
           color: "#8E9499",
           fontSize: "0.6875rem",
@@ -907,8 +896,8 @@ function HeroSection() {
               {t.hero.body}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                href="/test/demo-agent"
+              <a
+                href="mailto:hello@ai-receptionist.eu?subject=Demo"
                 className="inline-flex items-center px-6 py-3 font-mono"
                 style={{
                   backgroundColor: "#0F1418",
@@ -920,9 +909,9 @@ function HeroSection() {
                 }}
               >
                 {t.hero.ctaPrimary}
-              </Link>
+              </a>
               <a
-                href="mailto:hello@ai-receptionist.eu?subject=Demo"
+                href="#signature"
                 className="inline-flex items-center px-6 py-3 font-mono"
                 style={{
                   border: "1px solid #0F1418",
@@ -1116,7 +1105,7 @@ function TranscriptPlayer() {
             {t.signature.calendarTitle}
           </div>
           <ul className="mt-4 space-y-1.5 font-mono">
-            {["15:00", "15:15", "15:30", "15:45", "16:00", "16:15"].map((time) => {
+            {["15:00", "15:30", "16:00"].map((time) => {
               const isHit = time === t.signature.calendarSlot;
               const lit = isHit && bookingHit;
               return (
@@ -1218,26 +1207,23 @@ function SmsPanel({ delivered }: { delivered: boolean }) {
 function SignatureSection() {
   const { t } = useLang();
   return (
-    <section style={{ backgroundColor: "#0B0F14", color: "#E8E4D8" }}>
+    <section id="signature" style={{ backgroundColor: "#0B0F14", color: "#E8E4D8" }}>
       <div className="mx-auto max-w-[1240px] px-5 sm:px-8 py-20 sm:py-28">
-        <div
-          className="grid grid-cols-3 font-mono pb-8"
-          style={{
-            color: "#5C6B7A",
-            fontSize: "0.6875rem",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            borderBottom: "1px solid #1F2933",
-          }}
-        >
-          <span>{t.signature.eyebrow}</span>
-          <span className="text-center">SIGNATURE</span>
-          <span className="text-right">FIG 02</span>
-        </div>
-
-        <div className="mt-10 grid gap-8 lg:grid-cols-12 lg:gap-12">
+        <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-5">
+            <p
+              className="font-mono"
+              style={{
+                color: "#5D87E8",
+                fontSize: "0.6875rem",
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+              }}
+            >
+              {t.signature.eyebrow}
+            </p>
             <h2
+              className="mt-5"
               style={{
                 fontFamily: "var(--font-display), ui-serif, Georgia, serif",
                 fontWeight: 400,
@@ -1274,134 +1260,14 @@ function SignatureSection() {
 // Capabilities section (light, three numbered rows with inline schematics)
 // ---------------------------------------------------------------------------
 
-function CapabilityIllustration({ index }: { index: number }) {
-  const reduced = usePrefersReducedMotion();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-  const draw = !reduced && mounted;
-  const t = (length: number, delay: number): React.CSSProperties => ({
-    strokeDasharray: length,
-    strokeDashoffset: draw ? 0 : length,
-    transition: `stroke-dashoffset 1100ms cubic-bezier(0.2,0.7,0.2,1) ${delay}ms`,
-  });
-
-  if (index === 0) {
-    // Ontology — Polish ending diagram: stem + branches
-    return (
-      <svg viewBox="0 0 220 140" className="w-full h-auto" aria-hidden="true">
-        <g stroke="#0F1418" strokeWidth="1.25" fill="none">
-          <line x1="20" y1="120" x2="200" y2="120" style={t(180, 0)} />
-          <line x1="60" y1="120" x2="60" y2="86" style={t(34, 200)} />
-          <line x1="110" y1="120" x2="110" y2="60" style={t(60, 320)} />
-          <line x1="160" y1="120" x2="160" y2="40" style={t(80, 440)} />
-        </g>
-        <g
-          fontFamily="var(--font-mono), ui-monospace, monospace"
-          fontSize="9"
-          fill="#0F1418"
-          letterSpacing="1.2"
-          style={{ opacity: draw ? 1 : 0, transition: "opacity 600ms ease 700ms" }}
-        >
-          <text x="60" y="80" textAnchor="middle">ZĄB</text>
-          <text x="110" y="54" textAnchor="middle">ZĘBY</text>
-          <text x="160" y="34" textAnchor="middle">SIÓDEMKA</text>
-        </g>
-        <g
-          fontFamily="var(--font-sans), system-ui"
-          fontSize="9"
-          fill="#4A5358"
-          style={{ opacity: draw ? 1 : 0, transition: "opacity 600ms ease 850ms" }}
-        >
-          <text x="20" y="134">root</text>
-        </g>
-      </svg>
-    );
-  }
-
-  if (index === 1) {
-    // Knowledge — three stacked KB sources flowing into one
-    return (
-      <svg viewBox="0 0 220 140" className="w-full h-auto" aria-hidden="true">
-        <g stroke="#0F1418" strokeWidth="1.25" fill="none">
-          <rect x="20" y="20" width="60" height="22" style={t(164, 0)} />
-          <rect x="20" y="56" width="60" height="22" style={t(164, 160)} />
-          <rect x="20" y="92" width="60" height="22" style={t(164, 320)} />
-          <line x1="80" y1="31" x2="140" y2="68" style={t(72, 500)} />
-          <line x1="80" y1="67" x2="140" y2="69" style={t(60, 620)} />
-          <line x1="80" y1="103" x2="140" y2="70" style={t(72, 740)} />
-          <rect x="140" y="58" width="60" height="22" style={t(164, 860)} />
-        </g>
-        <g
-          fontFamily="var(--font-mono), ui-monospace, monospace"
-          fontSize="8"
-          fill="#0F1418"
-          letterSpacing="1"
-          style={{ opacity: draw ? 1 : 0, transition: "opacity 600ms ease 1000ms" }}
-        >
-          <text x="50" y="34" textAnchor="middle">ONTOLOGIA</text>
-          <text x="50" y="70" textAnchor="middle">STRONA</text>
-          <text x="50" y="106" textAnchor="middle">FORMULARZ</text>
-          <text x="170" y="72" textAnchor="middle">RAG</text>
-        </g>
-      </svg>
-    );
-  }
-
-  // EU compliance — bounding box around three nodes
-  return (
-    <svg viewBox="0 0 220 140" className="w-full h-auto" aria-hidden="true">
-      <g stroke="#1A4FB8" strokeWidth="1.25" strokeDasharray="4 3" fill="none">
-        <rect x="10" y="14" width="200" height="112" style={t(624, 0)} />
-      </g>
-      <g stroke="#0F1418" strokeWidth="1.25" fill="none">
-        <circle cx="56" cy="70" r="18" style={t(114, 250)} />
-        <circle cx="110" cy="70" r="18" style={t(114, 400)} />
-        <circle cx="164" cy="70" r="18" style={t(114, 550)} />
-        <line x1="74" y1="70" x2="92" y2="70" style={t(18, 700)} />
-        <line x1="128" y1="70" x2="146" y2="70" style={t(18, 800)} />
-      </g>
-      <g
-        fontFamily="var(--font-mono), ui-monospace, monospace"
-        fontSize="8"
-        fill="#0F1418"
-        letterSpacing="1"
-        style={{ opacity: draw ? 1 : 0, transition: "opacity 600ms ease 950ms" }}
-      >
-        <text x="56" y="74" textAnchor="middle">FRA</text>
-        <text x="110" y="74" textAnchor="middle">IRL</text>
-        <text x="164" y="74" textAnchor="middle">PL</text>
-        <text x="20" y="26" letterSpacing="2" fill="#1A4FB8">EU · GDPR</text>
-      </g>
-    </svg>
-  );
-}
-
 function CapabilitiesSection() {
   const { t } = useLang();
   return (
     <section style={{ backgroundColor: "#F6F4EE", color: "#0F1418" }}>
       <div className="mx-auto max-w-[1240px] px-5 sm:px-8 py-20 sm:py-28">
-        <div
-          className="grid grid-cols-3 font-mono pb-8"
-          style={{
-            color: "#8E9499",
-            fontSize: "0.6875rem",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            borderBottom: "1px solid #D6D2C8",
-          }}
-        >
-          <span>{t.capabilities.eyebrow}</span>
-          <span className="text-center">METODOLOGIA</span>
-          <span className="text-right">SECTION 03</span>
-        </div>
-
-        <div className="mt-10 grid gap-10 md:grid-cols-12">
+        <div className="grid gap-10 md:grid-cols-12 md:items-end">
           <h2
-            className="md:col-span-7"
+            className="md:col-span-8"
             style={{
               fontFamily: "var(--font-display), ui-serif, Georgia, serif",
               fontWeight: 400,
@@ -1414,29 +1280,30 @@ function CapabilitiesSection() {
             {t.capabilities.title}
           </h2>
           <p
-            className="md:col-span-5 font-sans"
+            className="md:col-span-4 font-sans"
             style={{
               color: "#4A5358",
-              fontSize: "1.0625rem",
+              fontSize: "1rem",
               lineHeight: 1.65,
-              maxWidth: "40ch",
+              maxWidth: "36ch",
             }}
           >
             {t.capabilities.body}
           </p>
         </div>
 
-        <ol className="mt-16 space-y-0">
+        <ol className="mt-16">
           {t.capabilities.rows.map((row, i) => (
             <li
               key={row.number}
-              className="grid gap-6 md:grid-cols-12 py-12 md:py-16"
+              className="grid gap-6 md:grid-cols-12 py-12 md:py-14"
               style={{
                 borderTop: "1px solid #D6D2C8",
-                borderBottom: i === t.capabilities.rows.length - 1 ? "1px solid #D6D2C8" : "none",
+                borderBottom:
+                  i === t.capabilities.rows.length - 1 ? "1px solid #D6D2C8" : "none",
               }}
             >
-              <div className="md:col-span-2">
+              <div className="md:col-span-3">
                 <span
                   className="font-mono"
                   style={{
@@ -1445,48 +1312,34 @@ function CapabilitiesSection() {
                     letterSpacing: "0.12em",
                   }}
                 >
-                  {row.caption}
+                  {row.number} · {row.caption}
                 </span>
-                <div
-                  className="mt-3"
-                  style={{
-                    fontFamily: "var(--font-display), ui-serif, Georgia, serif",
-                    fontSize: "2.25rem",
-                    lineHeight: 1,
-                    color: "#0F1418",
-                  }}
-                >
-                  {row.number}
-                </div>
               </div>
-              <div className="md:col-span-6">
-                <h3
-                  style={{
-                    fontFamily: "var(--font-display), ui-serif, Georgia, serif",
-                    fontWeight: 400,
-                    fontSize: "clamp(1.375rem, 2.5vw, 1.875rem)",
-                    lineHeight: 1.1,
-                    letterSpacing: "-0.01em",
-                    color: "#0F1418",
-                  }}
-                >
-                  {row.title}
-                </h3>
-                <p
-                  className="mt-4 font-sans"
-                  style={{
-                    color: "#4A5358",
-                    fontSize: "1.0625rem",
-                    lineHeight: 1.65,
-                    maxWidth: "52ch",
-                  }}
-                >
-                  {row.body}
-                </p>
-              </div>
-              <div className="md:col-span-4">
-                <CapabilityIllustration index={i} />
-              </div>
+              <h3
+                className="md:col-span-5"
+                style={{
+                  fontFamily: "var(--font-display), ui-serif, Georgia, serif",
+                  fontWeight: 400,
+                  fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)",
+                  lineHeight: 1.08,
+                  letterSpacing: "-0.015em",
+                  color: "#0F1418",
+                  maxWidth: "22ch",
+                }}
+              >
+                {row.title}
+              </h3>
+              <p
+                className="md:col-span-4 font-sans"
+                style={{
+                  color: "#4A5358",
+                  fontSize: "1rem",
+                  lineHeight: 1.65,
+                  maxWidth: "44ch",
+                }}
+              >
+                {row.body}
+              </p>
             </li>
           ))}
         </ol>
@@ -1502,46 +1355,29 @@ function CapabilitiesSection() {
 function IntegrationsSection() {
   const { t } = useLang();
   return (
-    <section
-      style={{ backgroundColor: "#EBE7DD", color: "#0F1418" }}
-    >
+    <section style={{ backgroundColor: "#EFEBE1", color: "#0F1418" }}>
       <div className="mx-auto max-w-[1240px] px-5 sm:px-8 py-20 sm:py-24">
-        <div
-          className="grid grid-cols-3 font-mono pb-8"
-          style={{
-            color: "#8E9499",
-            fontSize: "0.6875rem",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            borderBottom: "1px solid #D6D2C8",
-          }}
-        >
-          <span>{t.integrations.eyebrow}</span>
-          <span className="text-center">CONNECTORS</span>
-          <span className="text-right">SECTION 04</span>
-        </div>
-
-        <div className="mt-10 grid gap-10 md:grid-cols-12">
+        <div className="grid gap-10 md:grid-cols-12 md:items-end">
           <h2
-            className="md:col-span-7"
+            className="md:col-span-8"
             style={{
               fontFamily: "var(--font-display), ui-serif, Georgia, serif",
               fontWeight: 400,
               fontSize: "clamp(1.75rem, 4vw, 3rem)",
               lineHeight: 1.04,
               letterSpacing: "-0.02em",
-              maxWidth: "22ch",
+              maxWidth: "20ch",
             }}
           >
             {t.integrations.title}
           </h2>
           <p
-            className="md:col-span-5 font-sans"
+            className="md:col-span-4 font-sans"
             style={{
               color: "#4A5358",
-              fontSize: "1.0625rem",
+              fontSize: "1rem",
               lineHeight: 1.65,
-              maxWidth: "40ch",
+              maxWidth: "36ch",
             }}
           >
             {t.integrations.body}
@@ -1560,17 +1396,7 @@ function IntegrationsSection() {
               }}
             >
               <span
-                className="col-span-1 font-mono"
-                style={{
-                  color: "#8E9499",
-                  fontSize: "0.6875rem",
-                  letterSpacing: "0.08em",
-                }}
-              >
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span
-                className="col-span-4 md:col-span-3"
+                className="col-span-5 sm:col-span-4 md:col-span-3"
                 style={{
                   fontFamily: "var(--font-display), ui-serif, Georgia, serif",
                   fontSize: "clamp(1.25rem, 2vw, 1.75rem)",
@@ -1581,7 +1407,7 @@ function IntegrationsSection() {
                 {row.name}
               </span>
               <span
-                className="col-span-7 md:col-span-7 font-sans"
+                className="col-span-7 sm:col-span-8 md:col-span-9 font-sans"
                 style={{
                   color: "#4A5358",
                   fontSize: "1rem",
@@ -1589,17 +1415,6 @@ function IntegrationsSection() {
                 }}
               >
                 {row.detail}
-              </span>
-              <span
-                className="hidden md:inline-block md:col-span-1 text-right font-mono"
-                style={{
-                  color: "#1A4FB8",
-                  fontSize: "0.6875rem",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                }}
-              >
-                ▌ {row.status}
               </span>
             </li>
           ))}
@@ -1615,41 +1430,36 @@ function IntegrationsSection() {
 
 function FooterSection() {
   const { t } = useLang();
-  const [url, setUrl] = useState("");
   return (
-    <section
-      style={{ backgroundColor: "#F6F4EE", color: "#0F1418" }}
-    >
-      <div className="mx-auto max-w-[1240px] px-5 sm:px-8 py-20 sm:py-28">
-        <div
-          className="grid grid-cols-3 font-mono pb-8"
-          style={{
-            color: "#8E9499",
-            fontSize: "0.6875rem",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            borderBottom: "1px solid #D6D2C8",
-          }}
-        >
-          <span>{t.footer.eyebrow}</span>
-          <span className="text-center">CALL TO ACTION</span>
-          <span className="text-right">SECTION 05</span>
-        </div>
-
-        <div className="mt-10 grid gap-10 md:grid-cols-12">
-          <h2
-            className="md:col-span-7"
-            style={{
-              fontFamily: "var(--font-display), ui-serif, Georgia, serif",
-              fontWeight: 400,
-              fontSize: "clamp(2.25rem, 6vw, 4.5rem)",
-              lineHeight: 0.98,
-              letterSpacing: "-0.025em",
-              maxWidth: "16ch",
-            }}
-          >
-            {t.footer.title}
-          </h2>
+    <section style={{ backgroundColor: "#F6F4EE", color: "#0F1418" }}>
+      <div className="mx-auto max-w-[1240px] px-5 sm:px-8 pt-20 pb-16 sm:pt-28 sm:pb-20">
+        <div className="grid gap-10 md:grid-cols-12 md:items-end">
+          <div className="md:col-span-7">
+            <p
+              className="font-mono"
+              style={{
+                color: "#1A4FB8",
+                fontSize: "0.6875rem",
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+              }}
+            >
+              {t.footer.eyebrow}
+            </p>
+            <h2
+              className="mt-5"
+              style={{
+                fontFamily: "var(--font-display), ui-serif, Georgia, serif",
+                fontWeight: 400,
+                fontSize: "clamp(2.25rem, 6vw, 4.5rem)",
+                lineHeight: 0.98,
+                letterSpacing: "-0.025em",
+                maxWidth: "16ch",
+              }}
+            >
+              {t.footer.title}
+            </h2>
+          </div>
           <div className="md:col-span-5">
             <p
               className="font-sans"
@@ -1662,194 +1472,53 @@ function FooterSection() {
             >
               {t.footer.body}
             </p>
-            <form
-              className="mt-6 flex flex-col gap-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const target = url.trim()
-                  ? `/test/demo-agent?url=${encodeURIComponent(url.trim())}`
-                  : "/test/demo-agent";
-                window.location.href = target;
+            <a
+              href="mailto:hello@ai-receptionist.eu?subject=Demo"
+              className="mt-6 inline-flex items-center px-6 py-3 font-mono"
+              style={{
+                backgroundColor: "#0F1418",
+                color: "#F6F4EE",
+                borderRadius: 9999,
+                fontSize: "0.6875rem",
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
               }}
             >
-              <label
-                className="font-mono"
-                style={{
-                  color: "#8E9499",
-                  fontSize: "0.6875rem",
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                }}
-              >
-                {t.footer.eyebrow}
-              </label>
-              <input
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder={t.footer.inputPlaceholder}
-                className="font-sans"
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  borderBottom: "1px solid #0F1418",
-                  padding: "0.5rem 0",
-                  fontSize: "1.0625rem",
-                  outline: "none",
-                  color: "#0F1418",
-                }}
-              />
-              <button
-                type="submit"
-                className="self-start mt-2 inline-flex items-center px-6 py-3 font-mono"
-                style={{
-                  backgroundColor: "#0F1418",
-                  color: "#F6F4EE",
-                  borderRadius: 9999,
-                  fontSize: "0.6875rem",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                }}
-              >
-                {t.footer.inputCta}
-              </button>
-            </form>
+              {t.footer.inputCta}
+            </a>
           </div>
         </div>
 
-        {/* EU compliance block */}
-        <div
-          className="mt-20 px-5 py-4 font-mono"
+        {/* EU compliance pull */}
+        <p
+          className="mt-20 font-mono"
           style={{
-            border: "1px solid #1A4FB8",
-            backgroundColor: "#E6ECF6",
-            color: "#0F3690",
+            color: "#1A4FB8",
             fontSize: "0.75rem",
-            letterSpacing: "0.04em",
-            lineHeight: 1.5,
+            letterSpacing: "0.06em",
+            lineHeight: 1.6,
+            maxWidth: "78ch",
+            paddingLeft: "1rem",
+            borderLeft: "2px solid #1A4FB8",
           }}
         >
           {t.footer.compliance}
-        </div>
+        </p>
 
-        {/* Footer block */}
+        {/* Colophon */}
         <div
-          className="mt-16 grid gap-10 md:grid-cols-12 pt-10"
-          style={{ borderTop: "2px solid #1A1F24" }}
+          className="mt-20 flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-4 pt-8 font-mono"
+          style={{
+            borderTop: "1px solid #D6D2C8",
+            color: "#8E9499",
+            fontSize: "0.6875rem",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+          }}
         >
-          <div className="md:col-span-4">
-            <p
-              className="font-mono"
-              style={{
-                color: "#8E9499",
-                fontSize: "0.6875rem",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              {t.footer.sectionLeftLabel}
-            </p>
-            <p
-              className="mt-3 font-sans"
-              style={{
-                color: "#0F1418",
-                fontSize: "0.9375rem",
-                fontWeight: 600,
-                letterSpacing: "0.02em",
-              }}
-            >
-              {t.wordmark}
-            </p>
-            <p
-              className="mt-1 font-mono"
-              style={{
-                color: "#8E9499",
-                fontSize: "0.6875rem",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              {t.serial}
-            </p>
-            <p
-              className="mt-6 font-mono"
-              style={{
-                color: "#8E9499",
-                fontSize: "0.6875rem",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              {t.footer.copyright}
-            </p>
-          </div>
-          <div className="md:col-span-4">
-            <p
-              className="font-mono"
-              style={{
-                color: "#8E9499",
-                fontSize: "0.6875rem",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              {t.footer.sectionRightLabel}
-            </p>
-            <div className="mt-3 flex flex-col gap-3 items-start">
-              <Link
-                href={"/auth/sign-in?as=client" as Route}
-                className="inline-flex items-center px-5 py-2.5 font-mono"
-                style={{
-                  border: "1px solid #0F1418",
-                  color: "#0F1418",
-                  borderRadius: 9999,
-                  fontSize: "0.6875rem",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                }}
-              >
-                {t.nav.client}
-              </Link>
-              <Link
-                href={"/auth/sign-in?as=operator" as Route}
-                className="inline-flex items-center px-5 py-2.5 font-mono"
-                style={{
-                  backgroundColor: "#0F1418",
-                  color: "#F6F4EE",
-                  borderRadius: 9999,
-                  fontSize: "0.6875rem",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                }}
-              >
-                {t.nav.operator}
-              </Link>
-            </div>
-          </div>
-          <div className="md:col-span-4">
-            <p
-              className="font-mono"
-              style={{
-                color: "#8E9499",
-                fontSize: "0.6875rem",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              FIG · ROUTES
-            </p>
-            <ul
-              className="mt-3 space-y-2 font-mono"
-              style={{
-                color: "#4A5358",
-                fontSize: "0.75rem",
-              }}
-            >
-              <li>/ · main</li>
-              <li>/v2 · schematic print</li>
-              <li>/v3-ambitious · this page</li>
-            </ul>
-          </div>
+          <span style={{ color: "#0F1418" }}>{t.wordmark}</span>
+          <span>{t.serial}</span>
+          <span>{t.footer.copyright}</span>
         </div>
       </div>
     </section>

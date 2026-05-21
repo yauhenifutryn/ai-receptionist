@@ -67,8 +67,11 @@ export const CreateBookingRequestSchema = z
     slotId: z.string(),
     /** Caller's name as they said it. PII — redacted in logs. */
     patientName: z.string().min(1),
-    /** E.164 if possible. PII — redacted in logs. */
-    patientPhone: z.string().min(1),
+    /** E.164 if possible. PII, redacted in logs. Optional: when present in
+     *  the PSTN call metadata (caller_id), the agent passes it through.
+     *  When absent (browser / PIN demo, or test calls), the handler stores
+     *  the booking without a callback phone and skips SMS confirmation. */
+    patientPhone: z.string().optional(),
     serviceCategory: AppointmentCategorySchema,
     notes: z.string().optional(),
     language: z.enum(["pl", "en", "ru"]).default("pl"),

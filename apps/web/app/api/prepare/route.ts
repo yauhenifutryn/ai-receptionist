@@ -21,7 +21,13 @@ import { openTestSession, openExistingSession } from "@/lib/test-session-logger"
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Firecrawl scrape of up to 35 pages at concurrency 3 plus Gemini consolidate
+// regularly takes 60–180s for larger clinic sites. Vercel's current default
+// function ceiling is 300s; setting it explicitly avoids the "Stream ended
+// without a result" timeout on slow sites. If Hobby tier enforces a lower
+// hard cap, we fall back to client-driven batching (map → scrape-batch →
+// consolidate as separate fast calls). See git log for the batched design.
+export const maxDuration = 300;
 
 const DEFAULT_CONCURRENCY = 3;
 const FIRECRAWL_MAP_LIMIT = 150;

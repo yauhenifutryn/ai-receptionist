@@ -111,7 +111,7 @@ export function buildToolSpecs(serverToolBaseUrl: string): ToolSpec[] {
           patientPhone: {
             type: "string",
             description:
-              "Caller's callback phone number in E.164 (e.g. +48501234567). Confirm with the caller verbally before submitting.",
+              "DO NOT ask the caller for their phone number. Pass an empty string ''. The system fills the phone number automatically from the inbound SIP caller_id, or skips SMS confirmation when there is no caller_id (browser test / PIN demo). Only include a non-empty value if the caller volunteered the number unprompted and you confirmed it back to them.",
           },
           serviceCategory: {
             type: "string",
@@ -124,12 +124,7 @@ export function buildToolSpecs(serverToolBaseUrl: string): ToolSpec[] {
               "Optional short note from the caller (chief complaint, preferred doctor, etc.).",
           },
         },
-        required: [
-          "slotId",
-          "patientName",
-          "patientPhone",
-          "serviceCategory",
-        ],
+        required: ["slotId", "patientName", "serviceCategory"],
       },
     },
   ];

@@ -123,7 +123,11 @@ export async function handleCreateBooking(
       tenantId: tenant.tenantId,
       slotId: req.slotId,
       patientName: req.patientName,
-      patientPhone: req.patientPhone,
+      // patientPhone is optional now: agent must NOT ask the caller for it.
+      // When absent, downstream SMS confirmation is skipped (see below).
+      // The string fallback "" keeps the legacy CalendarProvider signature
+      // unchanged while signalling "no phone" cleanly to the provider impl.
+      patientPhone: req.patientPhone ?? "",
       category: req.serviceCategory,
       ...(req.notes !== undefined ? { notes: req.notes } : {}),
     });
@@ -149,7 +153,7 @@ export async function handleCreateBooking(
     externalId: providerResult.externalId,
     shortToken,
     patientName: req.patientName,
-    patientPhone: req.patientPhone,
+    patientPhone: req.patientPhone ?? "",
     appointmentCategory: req.serviceCategory,
     startsAt: providerResult.startsAt.toISOString(),
     endsAt: providerResult.endsAt.toISOString(),
@@ -171,7 +175,28 @@ export async function handleCreateBooking(
       }),
     );
   }
-  if (smsToggleOn && deps.smsClient && deps.smsFailureLogger && deps.clinicName) {
+  // SMS only when we actually have a phone number. The agent is instructed
+  // to NEVER ask the caller for one; the number comes from SIP caller_id at
+  // call time. Browser / PIN demo calls have no caller_id, so we skip SMS
+  // and the booking is still committed (visible in the operator panel).
+  const hasPhone = !!req.patientPhone && req.patientPhone.trim().length > 0;
+  if (!hasPhone) {
+    console.log(
+      JSON.stringify({
+        level: "info",
+        event: "sms_skipped_no_phone",
+        tenantId: tenant.tenantId,
+        bookingId: row.id,
+      }),
+    );
+  }
+  if (
+    hasPhone &&
+    smsToggleOn &&
+    deps.smsClient &&
+    deps.smsFailureLogger &&
+    deps.clinicName
+  ) {
     const smsBody = formatConfirmationSms({
       clinicName: deps.clinicName,
       startsAt: providerResult.startsAt,
@@ -182,7 +207,7 @@ export async function handleCreateBooking(
     await sendBookingConfirmation({
       client: deps.smsClient,
       logger: deps.smsFailureLogger,
-      to: req.patientPhone,
+      to: req.patientPhone!,
       body: smsBody,
       tenantId: tenant.tenantId,
       bookingId: row.id,

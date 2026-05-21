@@ -126,12 +126,6 @@ interface LangBundle {
     body: string;
     items: [string, string, string, string];
   };
-  signin: {
-    eyebrow: string;
-    title: string;
-    body: string;
-    badge: string;
-  };
   cta: {
     eyebrow: string;
     headline: string;
@@ -234,8 +228,8 @@ const STRINGS: Record<Lang, LangBundle> = {
           eyebrow: "JĘZYK",
           title: "Mówi po polsku jak człowiek. Po angielsku i rosyjsku tak samo.",
           paragraphs: [
-            "Pacjent nie musi przełączać języka. Recepcjonistka rozpoznaje, w jakim języku zaczęto rozmowę, i odpowiada w tym samym. Polski jako pierwszy, angielski i rosyjski równolegle.",
-            "Nie używa drętwych zwrotów typu „proszę powtórzyć\". Jeśli czegoś nie rozumie, dopytuje naturalnie, dokładnie tak, jak zrobiłaby to żywa osoba przy słuchawce.",
+            "Pacjent nie musi wybierać języka. Recepcjonistka słyszy, w jakim języku do niej dzwonisz, i w nim odpowiada. Polski jest domyślny. Angielski i rosyjski działają tak samo dobrze, nie są tłumaczeniem.",
+            "Bez drętwych zwrotów w stylu „proszę powtórzyć\". Jeśli czegoś nie rozumie, dopytuje tak, jak zrobiłaby to osoba siedząca w recepcji.",
           ],
           bullets: [
             "Naturalna polszczyzna, nie tłumaczenie z angielskiego.",
@@ -248,8 +242,8 @@ const STRINGS: Record<Lang, LangBundle> = {
           eyebrow: "REZERWACJE",
           title: "Pyta o dogodny termin, sprawdza grafik, rezerwuje od razu.",
           paragraphs: [
-            "Bez kartki, bez „zadzwonię z grafikem później\". System widzi wolne sloty w czasie rzeczywistym i potwierdza termin w trakcie tej samej rozmowy.",
-            "Działa o trzeciej w nocy tak samo jak o jedenastej rano. Recepcjonistka nie chodzi na lunch i nie zapomina, że pan Kowalski prosił o godzinę po szesnastej.",
+            "Bez kartki, bez „sprawdzę grafik i oddzwonię\". System widzi wolne terminy na żywo i potwierdza wizytę jeszcze w tej samej rozmowie.",
+            "O trzeciej w nocy działa tak samo jak o jedenastej rano. Nie idzie na lunch i nie zapomina, że pan Kowalski prosił o godzinę po szesnastej.",
           ],
           bullets: [
             "Integracja z Booksy, Medfile, Google Calendar.",
@@ -324,12 +318,6 @@ const STRINGS: Record<Lang, LangBundle> = {
         "Nie obsługuje skarg, zwrotów, ani spraw rozliczeniowych. Eskaluje do żywego pracownika.",
       ],
     },
-    signin: {
-      eyebrow: "LOGOWANIE",
-      title: "Bez haseł. Bez linków do klikania. Kod z e-maila.",
-      body: "Operator klikający „Operator\" oraz właściciel kliniki klikający „Klient\" trafią do tego samego formularza. Wpisujesz adres e-mail, dostajesz sześciocyfrowy kod, wklejasz go w formularz. Tyle. Linki z e-maila bywały blokowane przez Safari ITP, więc się ich pozbyliśmy.",
-      badge: "KOD JEDNORAZOWY · 1 H",
-    },
     cta: {
       eyebrow: "NASTĘPNY KROK",
       headline: "Posłuchaj, jak brzmi w Twojej klinice.",
@@ -351,7 +339,7 @@ const STRINGS: Record<Lang, LangBundle> = {
     hero: {
       line1: "The phone rings.",
       line2: "Someone answers.",
-      body: "Phone reception for dental practices. Speaks Polish, English, and Russian. Answers live questions about the clinic, books appointments, confirms by SMS. Works the hours your clinic is closed too.",
+      body: "Phone reception for dental clinics. Speaks Polish, English, and Russian. Takes patient questions live, books appointments, confirms by SMS. Works after hours too.",
       statusLanguages: "PL · EN · RU",
       statusUptime: "24 / 7",
       statusLatency: "ANSWER < 1 s",
@@ -388,15 +376,15 @@ const STRINGS: Record<Lang, LangBundle> = {
     features: {
       eyebrow: "CAPABILITIES",
       title: "Four things a reception desk has to actually do.",
-      body: "Everything else is detail. First understand. Then answer questions. Then not screw up the date. Then remind the patient.",
+      body: "Everything else is detail. Understand the patient. Answer their questions. Get the date right. Confirm by SMS.",
       rows: [
         {
           number: "01",
           eyebrow: "KNOWLEDGE",
           title: "Answers questions about the clinic. No staff briefing required.",
           paragraphs: [
-            "When you connect a clinic, the receptionist reads its website, combines it with our Polish dental ontology, and answers patient questions live. Public/private insurance? Implant prices? Saturday hours? Is Dr Nowak taking new patients? All of it, on the day you onboard.",
-            "If it doesn't know, it says so explicitly and offers a callback to a human. No hallucinations, no invented prices, no \"I think\". Updates are trivial: drop in a markdown FAQ, the receptionist picks it up immediately.",
+            "We read your clinic's website, layer it on our Polish dental ontology, and the receptionist answers patient questions live. Do you take NFZ? What does an implant cost? Are you open Saturday? Is Dr Nowak taking new patients? All of it, from day one.",
+            "If it doesn't know, it says so plainly and offers a callback. No hallucinations, no invented prices, no hedging. Updates are trivial: drop a markdown FAQ in, the receptionist picks it up immediately.",
           ],
           bullets: [
             "Clinic website plus our ontology, as a RAG base.",
@@ -409,8 +397,8 @@ const STRINGS: Record<Lang, LangBundle> = {
           eyebrow: "LANGUAGE",
           title: "Speaks Polish like a person. English and Russian, equally.",
           paragraphs: [
-            "Patients don't switch language. The receptionist detects the language a call opens in and stays there. Polish first; English and Russian on parity, not as a translation layer.",
-            "No stilted phrasing, no \"please repeat that.\" If something isn't clear, it asks back naturally, exactly the way a person at the desk would.",
+            "Patients don't have to choose a language. The receptionist hears which language they're in and stays there. Polish is the default; English and Russian work the same way, not as translations on top.",
+            "No stilted phrasing, no \"please repeat that.\" If something isn't clear, it asks again the way a person at the desk would.",
           ],
           bullets: [
             "Native Polish, not translated from English.",
@@ -423,8 +411,8 @@ const STRINGS: Record<Lang, LangBundle> = {
           eyebrow: "BOOKINGS",
           title: "Asks for a time, checks the schedule, books on the spot.",
           paragraphs: [
-            "No callbacks, no \"I'll get back to you with the schedule.\" The system reads live availability and confirms a slot during the same call.",
-            "Works at 03:00 the same way it works at 11:00. It doesn't take lunch and doesn't forget that Mr Kowalski asked for after four.",
+            "No callbacks, no \"I'll check the calendar and ring you back.\" The system reads live availability and confirms a slot in the same call.",
+            "Works at 3am the same way it works at 11am. It doesn't take lunch and doesn't forget that Mr Kowalski asked for a slot after four.",
           ],
           bullets: [
             "Booksy, Medfile, Google Calendar.",
@@ -437,8 +425,8 @@ const STRINGS: Record<Lang, LangBundle> = {
           eyebrow: "CONFIRMATION",
           title: "SMS goes out within 30 seconds of hangup.",
           paragraphs: [
-            "Date, time, doctor, address. ICS link to add to a calendar. Callback number to reschedule. No spam, no marketing footer.",
-            "No impersonation. Sender is the project default by default, or your clinic's brand on the premium tier.",
+            "Date, time, doctor, address. An ICS link to add to a calendar. A callback number to reschedule. No spam, no marketing footer.",
+            "No impersonating the clinic. The SMS goes from a shared sender by default, or under your clinic's name on the premium tier.",
           ],
           bullets: [
             "Polish copy, short, polite.",
@@ -498,12 +486,6 @@ const STRINGS: Record<Lang, LangBundle> = {
         "Does not collect email addresses during the call. Only the phone number for the confirmation SMS.",
         "Does not handle complaints, refunds, or billing disputes. Escalates to a human.",
       ],
-    },
-    signin: {
-      eyebrow: "SIGN-IN",
-      title: "No passwords. No clickable links. Code from email.",
-      body: "Both \"Operator\" and \"Client\" buttons lead to the same form. You enter your email, receive a six-digit code, paste it in. That's it. Email links kept getting blocked by Safari ITP, so we removed them entirely.",
-      badge: "ONE-TIME CODE · 1 H",
     },
     cta: {
       eyebrow: "NEXT STEP",
@@ -584,8 +566,8 @@ const STRINGS: Record<Lang, LangBundle> = {
           eyebrow: "ЯЗЫК",
           title: "Говорит по-польски как человек. Английский и русский — на том же уровне.",
           paragraphs: [
-            "Пациент не переключает язык. Администратор определяет язык по первым словам и отвечает в нём же. Польский — основной; английский и русский — без перевода.",
-            "Без шаблонных фраз. Если что-то неясно, переспрашивает естественно, ровно так, как сделал бы живой человек.",
+            "Пациенту не нужно выбирать язык. Администратор слышит, на каком языке к нему обратились, и отвечает на нём. Польский — по умолчанию. Английский и русский работают так же, не как перевод сверху.",
+            "Без шаблонных фраз вроде «повторите, пожалуйста». Если что-то непонятно, переспрашивает так, как сделал бы живой администратор за стойкой.",
           ],
           bullets: [
             "Естественная польская речь, не калька с английского.",
@@ -598,8 +580,8 @@ const STRINGS: Record<Lang, LangBundle> = {
           eyebrow: "БРОНИРОВАНИЕ",
           title: "Спрашивает удобное время, сверяется с графиком, сразу бронирует.",
           paragraphs: [
-            "Без перезвонов, без «уточню график и наберу». Система видит свободные слоты в реальном времени и подтверждает приём в той же беседе.",
-            "В три ночи работает так же, как в одиннадцать утра. Не уходит на обед и не забывает, что пациент просил после шестнадцати.",
+            "Без перезвонов, без «сверюсь с графиком и перезвоню». Система видит свободные слоты в реальном времени и подтверждает приём прямо в этом же разговоре.",
+            "В три ночи работает так же, как в одиннадцать утра. Не уходит на обед и не забывает, что пациент просил время после четырёх.",
           ],
           bullets: [
             "Booksy, Medfile, Google Calendar.",
@@ -673,12 +655,6 @@ const STRINGS: Record<Lang, LangBundle> = {
         "Не собирает e-mail во время звонка. Только номер телефона для подтверждения.",
         "Не разбирается с жалобами, возвратами и оплатой. Передаёт живому сотруднику.",
       ],
-    },
-    signin: {
-      eyebrow: "ВХОД",
-      title: "Без паролей. Без ссылок. Код из письма.",
-      body: "И «Оператор», и «Клиент» ведут на одну форму. Вводите e-mail, получаете шестизначный код, вставляете обратно в форму. Всё. Ссылки из писем регулярно блокировались Safari ITP, поэтому мы их убрали.",
-      badge: "РАЗОВЫЙ КОД · 1 Ч",
     },
     cta: {
       eyebrow: "СЛЕДУЮЩИЙ ШАГ",
@@ -1614,18 +1590,18 @@ function SmsVisual() {
         <span className="tabular-nums">{phaseLabel}</span>
       </div>
 
-      <div className="mx-auto w-full max-w-[240px]">
-        {/* Phone outer (bezel) */}
-        <div className="rounded-[32px] border border-neutral-800 bg-neutral-900 p-1.5 shadow-lg">
+      <div className="mx-auto w-full max-w-[230px]">
+        {/* Phone outer (bezel) — real-iPhone-ish 9:19.5 portrait ratio. */}
+        <div className="rounded-[34px] border border-neutral-800 bg-neutral-900 p-1.5 shadow-lg">
           {/* Phone screen */}
           <div
-            className="relative rounded-[26px] bg-neutral-50"
-            style={{ minHeight: "300px" }}
+            className="relative overflow-hidden rounded-[28px] bg-neutral-50"
+            style={{ aspectRatio: "9 / 19.5" }}
           >
             {/* Notch */}
-            <div className="mx-auto h-5 w-24 rounded-b-2xl bg-neutral-900" />
+            <div className="mx-auto h-5 w-28 rounded-b-2xl bg-neutral-900" />
 
-            <div className="px-4 pt-4 pb-6">
+            <div className="px-4 pt-6 pb-6">
               {/* Sender header */}
               <div className="mb-4 text-center">
                 <div className="mx-auto mb-1 h-9 w-9 rounded-full border border-neutral-200 bg-white" />
@@ -1901,74 +1877,6 @@ function DontSection() {
 }
 
 // ---------------------------------------------------------------------------
-// Sign-in note
-// ---------------------------------------------------------------------------
-
-function SignInNote() {
-  const { t } = useLang();
-  const reduced = usePrefersReducedMotion();
-  const visible = usePageVisible();
-  const [digits, setDigits] = useState<number[]>([3, 9, 1, 4, 7, 2]);
-
-  useEffect(() => {
-    if (reduced || !visible) return;
-    const id = window.setInterval(() => {
-      setDigits((prev) => {
-        const next = prev.slice();
-        const i = Math.floor(Math.random() * 6);
-        next[i] = (next[i]! + 1 + Math.floor(Math.random() * 8)) % 10;
-        return next;
-      });
-    }, 600);
-    return () => window.clearInterval(id);
-  }, [reduced, visible]);
-
-  return (
-    <section className="border-b border-neutral-200 bg-neutral-50">
-      <div className="mx-auto max-w-4xl px-4 py-20 sm:px-6 sm:py-24">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-10">
-          <div className="flex flex-wrap items-baseline justify-between gap-4">
-            <div className="font-mono text-xs uppercase tracking-wider text-neutral-500">
-              {t.signin.eyebrow}
-            </div>
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-emerald-700">
-              {t.signin.badge}
-            </span>
-          </div>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            {t.signin.title}
-          </h2>
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-neutral-700">
-            {t.signin.body}
-          </p>
-          <div className="mt-7 inline-flex items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3 font-mono text-xl tabular-nums tracking-[0.2em] text-neutral-900 sm:gap-2 sm:px-5 sm:py-4 sm:text-2xl sm:tracking-[0.4em]">
-            {digits.map((d, i) => (
-              <span key={i} className="transition-opacity duration-200">
-                {d}
-              </span>
-            ))}
-          </div>
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link
-              href={"/auth/sign-in?as=client" as Route}
-              className="rounded-full border border-neutral-200 px-5 py-2 font-mono text-xs uppercase tracking-wider text-neutral-700 transition-colors duration-200 hover:border-neutral-300 hover:text-neutral-900"
-            >
-              {t.nav.client} →
-            </Link>
-            <Link
-              href={"/auth/sign-in?as=operator" as Route}
-              className="rounded-full bg-neutral-900 px-5 py-2 font-mono text-xs uppercase tracking-wider text-white transition-colors duration-200 hover:bg-neutral-800"
-            >
-              {t.nav.operator} →
-            </Link>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // CTA + Footer
 // ---------------------------------------------------------------------------
 
@@ -2038,7 +1946,6 @@ function LandingInner() {
         <FeaturesSection />
         <LiveLedger />
         <DontSection />
-        <SignInNote />
         <CtaSection />
       </main>
       <Footer />

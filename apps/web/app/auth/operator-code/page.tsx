@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 
@@ -52,6 +53,12 @@ export default function OperatorCodePage() {
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="mx-auto flex max-w-md flex-col gap-8 px-6 py-12 sm:px-8 sm:py-16">
+        <Link
+          href={"/" as Route}
+          className="inline-flex w-fit items-center gap-1.5 text-sm text-neutral-500 transition hover:text-neutral-900"
+        >
+          <span aria-hidden>←</span> Strona główna
+        </Link>
         <header className="flex flex-col gap-2">
           <span className="font-mono text-xs uppercase tracking-wider text-neutral-400">
             Operator console

@@ -47,11 +47,19 @@ function isPrefetch(req: NextRequest): boolean {
 async function performSignOut(req: NextRequest): Promise<NextResponse> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Status 303 ("See Other") is the canonical POST-redirect-GET status.
+  // Without it, NextResponse.redirect defaults to 307 which PRESERVES the
+  // POST method on the redirect target — the browser would then POST to
+  // /auth/sign-in (a page route with no POST handler), surfacing a blank
+  // screen and the "resubmit form?" popup on reload.
   if (!supabaseUrl || !anonKey) {
-    return NextResponse.redirect(`${req.nextUrl.origin}/auth/sign-in`);
+    return NextResponse.redirect(`${req.nextUrl.origin}/auth/sign-in`, 303);
   }
 
-  const response = NextResponse.redirect(`${req.nextUrl.origin}/auth/sign-in`);
+  const response = NextResponse.redirect(
+    `${req.nextUrl.origin}/auth/sign-in`,
+    303,
+  );
 
   const supabase = createServerClient(supabaseUrl, anonKey, {
     cookies: {

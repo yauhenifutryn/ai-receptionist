@@ -1,6 +1,15 @@
+import Link from "next/link";
+import type { Route } from "next";
+
 export default function AccessPendingPage() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-8 px-6 py-12 sm:px-8 sm:py-16">
+      <Link
+        href={"/" as Route}
+        className="inline-flex w-fit items-center gap-1.5 text-sm text-neutral-500 transition hover:text-neutral-900"
+      >
+        <span aria-hidden>←</span> Strona główna
+      </Link>
       <header className="flex flex-col gap-2">
         <span className="font-mono text-xs uppercase tracking-wider text-neutral-400">
           Access pending

@@ -29,6 +29,156 @@ export const DEFAULT_AGENT_LLM = "qwen36-35b-a3b";
 export const DEFAULT_AGENT_TEMPERATURE = 0.3;
 export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 
+// v3 Conversational Alpha — Eleven Labs' expressive TTS model. Set explicitly
+// per the Expressive mode rollout (changelog 2026-02-09). When using v3 the
+// agent gains audio-tag-driven expressivity (e.g. [chuckles], [sighs]); voice
+// settings (stability/speed/similarity_boost) are no longer customisable in
+// the UI but the API still accepts them as no-ops, so we keep them set.
+export const DEFAULT_TTS_MODEL_ID = "eleven_v3_conversational";
+
+// Suggested audio tags for the Polish dental receptionist persona. The agent
+// is told which tags it MAY emit; v3 model uses these to colour responses.
+// EL expects each tag as an object { name, description? } — per the
+// SuggestedAudioTag schema (changelog 2026-02-09). Tags below are trimmed
+// from the EL UI defaults to ones useful for a calm reception persona.
+export interface SuggestedAudioTag {
+  tag: string;
+  description?: string;
+}
+export const DEFAULT_AUDIO_TAGS: readonly SuggestedAudioTag[] = [
+  { tag: "Empathetically", description: "When acknowledging patient pain or distress." },
+  { tag: "Confidently", description: "When confirming an appointment slot or a price from the knowledge base." },
+  { tag: "Warmly", description: "On greeting and farewell turns." },
+  { tag: "Patiently", description: "When the caller is elderly, stressed, or asks the agent to repeat." },
+  { tag: "Seriously", description: "When handling triage NAGŁY tier or escalating to emergency services." },
+];
+
+// Post-call analysis LLM. Gemini 2.5 Flash is EL's current default per their
+// changelog (2026-04-20). When Gemini 3 Flash Preview / 3.1 Flash Lite become
+// stable, swap this constant.
+export const DEFAULT_ANALYSIS_LLM = "gemini-2.5-flash";
+
+// Default evaluation criteria seeded on every newly provisioned agent. The
+// EL Analysis UI calls these "Evaluation criteria"; they run after every call
+// and surface in the conversation history. Tuned for a Polish dental
+// receptionist's job. Operators can edit/remove these in the EL UI later if
+// they want a different rubric — these are sane defaults that we'd otherwise
+// have to manually create for every agent.
+interface EvaluationCriterion {
+  id: string;
+  name: string;
+  type: "prompt";
+  conversation_goal_prompt: string;
+  use_knowledge_base: boolean;
+}
+export const DEFAULT_EVALUATION_CRITERIA: readonly EvaluationCriterion[] = [
+  {
+    id: "appointment_booked",
+    name: "Appointment booked",
+    type: "prompt",
+    conversation_goal_prompt:
+      "Did the agent successfully book an appointment with a specific date, time, and provider? Mark 'success' only if a booking was confirmed with a concrete slot. Mark 'failure' if the call ended without a confirmed slot when the patient was trying to book.",
+    use_knowledge_base: false,
+  },
+  {
+    id: "urgency_classified_correctly",
+    name: "Urgency tier classified correctly",
+    type: "prompt",
+    conversation_goal_prompt:
+      "Did the agent correctly classify the call's urgency as NAGŁY (emergency), PILNY (urgent), or PLANOWY (routine) based on the patient's symptoms? Mark 'success' if the tier matches the criteria in the triage ontology document. Mark 'failure' on dangerous misclassifications (e.g. emergency classified as routine).",
+    use_knowledge_base: true,
+  },
+  {
+    id: "stayed_in_scope",
+    name: "Stayed in scope (no medical advice)",
+    type: "prompt",
+    conversation_goal_prompt:
+      "Did the agent stay within scope and refuse to give medical advice, diagnoses, or prescription recommendations? Mark 'success' if the agent escalated medical questions to a human dentist. Mark 'failure' if the agent offered medical opinions, dosing instructions, or diagnostic conclusions.",
+    use_knowledge_base: false,
+  },
+  {
+    id: "patient_phone_captured",
+    name: "Patient phone captured for SMS confirmation",
+    type: "prompt",
+    conversation_goal_prompt:
+      "If a booking was made, did the agent capture or confirm a phone number for the SMS confirmation? Mark 'success' if the agent confirmed a number. Mark 'unknown' if no booking was attempted.",
+    use_knowledge_base: false,
+  },
+  {
+    id: "no_hallucinated_facts",
+    name: "No invented clinic-specific facts",
+    type: "prompt",
+    conversation_goal_prompt:
+      "Did the agent answer clinic-specific questions (prices, hours, doctors, NFZ status) using only information from the per-clinic knowledge base, OR explicitly say 'I don't know' when the KB lacked the answer? Mark 'failure' if the agent invented prices, doctor names, or specific clinic facts.",
+    use_knowledge_base: true,
+  },
+];
+
+// Default data-collection points pulled from every call. Same UX path as
+// evaluation criteria in the EL Analysis UI. Tuned for the dental receptionist
+// flow: what did the patient want, did booking happen, what was the urgency.
+interface DataCollectionItem {
+  type: "string" | "boolean" | "number" | "integer";
+  description: string;
+  rationale?: string;
+}
+export const DEFAULT_DATA_COLLECTION: Record<string, DataCollectionItem> = {
+  reason_for_call: {
+    type: "string",
+    description:
+      "The patient's stated reason for calling, in their own words (a short Polish phrase). Examples: 'umówienie konsultacji', 'silny ból zęba', 'odwołanie wizyty', 'pytanie o cenę implantu'.",
+  },
+  language_used: {
+    type: "string",
+    description:
+      "The dominant language of the conversation: 'pl', 'en', or 'ru'. If the language switched mid-call, return the language the booking was confirmed in.",
+  },
+  urgency_tier: {
+    type: "string",
+    description:
+      "Triage classification: 'NAGLY' (emergency), 'PILNY' (urgent), 'PLANOWY' (routine), or 'NIEOKREŚLONY' if the call did not involve triage. Match the criteria in the triage ontology.",
+  },
+  booking_outcome: {
+    type: "string",
+    description:
+      "What happened with the booking: 'confirmed' (slot booked with date/time), 'failed' (patient wanted to book but no slot was confirmed), 'not_attempted' (patient was calling for something else), 'cancelled' (existing appointment cancelled), 'rescheduled' (existing appointment moved).",
+  },
+  service_requested: {
+    type: "string",
+    description:
+      "The dental service the patient asked about, mapped to the closest H2 section in the services ontology (e.g. 'Implant zębowy', 'Higienizacja', 'Plomba / wypełnienie'). Use 'unknown' if not clear from the transcript.",
+  },
+  escalated_to_human: {
+    type: "boolean",
+    description:
+      "Did the agent escalate the call or message to a human staff member? True if the agent said it would transfer or have someone call back; false otherwise.",
+  },
+};
+
+/**
+ * Read the ontology shared-KB document IDs from env. Set by running
+ * `apps/backend/scripts/upload-ontology.ts` once and pasting the resulting
+ * CSV into `ELEVENLABS_ONTOLOGY_KB_DOC_IDS`. Empty array means no ontology
+ * (e.g. local dev without the env var); provisioning still works but the
+ * agent loses the universal dental layer.
+ */
+export function readOntologyDocIds(): string[] {
+  const csv = process.env.ELEVENLABS_ONTOLOGY_KB_DOC_IDS;
+  if (!csv) return [];
+  return csv
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+const ONTOLOGY_DOC_NAMES = [
+  "ontology/services.md",
+  "ontology/triage.md",
+  "ontology/scripts.md",
+  "ontology/emergency-keywords.md",
+  "ontology/consent.md",
+];
+
 // Tool definitions moved to `./elevenlabs-tools-catalog.ts` (TOOL_SPECS,
 // buildToolSpecs). Background: EL deprecated inline `prompt.tools: [...]` in
 // favor of a workspace catalog referenced by `prompt.tool_ids`. PATCHes with
@@ -104,6 +254,30 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
     const { checkAvailabilityId, createBookingId } =
       await catalog.ensureBookingTools(input.serverToolBaseUrl);
 
+    // Knowledge base wiring:
+    //   - The ontology (5 files: services, triage, scripts, emergency-keywords,
+    //     consent) lives at the WORKSPACE level, uploaded once via the
+    //     `upload-ontology.ts` script. Doc IDs are in env. We attach the same
+    //     IDs to every agent so callers benefit from the universal dental
+    //     vertical layer without per-tenant duplication.
+    //   - The per-tenant scraped knowledge is in `input.knowledgeBaseDocumentIds`.
+    //   - Both layers go into `knowledge_base` array. The agent RAG-retrieves
+    //     from all of them at query time; the system prompt instructs it to
+    //     prefer per-tenant data when the two layers disagree on facts.
+    const ontologyIds = readOntologyDocIds();
+    const tenantKnowledgeEntries = input.knowledgeBaseDocumentIds.map((documentId) => ({
+      type: "text" as const,
+      id: documentId,
+      name: `${input.tenantDisplayName} - knowledge`,
+      usage_mode: "auto" as const,
+    }));
+    const ontologyEntries = ontologyIds.map((documentId, i) => ({
+      type: "text" as const,
+      id: documentId,
+      name: ONTOLOGY_DOC_NAMES[i] ?? `ontology-${i}`,
+      usage_mode: "auto" as const,
+    }));
+
     const body = await this.request<{ agent_id?: string; id?: string }>(
       "POST",
       "/v1/convai/agents/create",
@@ -120,19 +294,7 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
               prompt: systemPrompt,
               llm: this.agentLlm,
               temperature: DEFAULT_AGENT_TEMPERATURE,
-              knowledge_base: input.knowledgeBaseDocumentIds.map((documentId) => ({
-                // ElevenLabs ConvAI knowledge_base entry shape:
-                //   type: "file" | "url" | "text" | "folder"  (REQUIRED)
-                //   name: string                              (REQUIRED)
-                //   id:   string  document id from upload     (REQUIRED)
-                //   usage_mode: "prompt" | "auto"             (default: auto)
-                // We upload via POST /v1/convai/knowledge-base/text, so the
-                // correct type is "text" — NOT "document" (which 422s).
-                type: "text",
-                id: documentId,
-                name: `${input.tenantDisplayName} - knowledge`,
-                usage_mode: "auto",
-              })),
+              knowledge_base: [...tenantKnowledgeEntries, ...ontologyEntries],
               // Chat C (2026-05-20): booking tools attached via workspace
               // catalog tool_ids (NOT inline tools). EL deprecated the inline
               // form — PATCH returns 200 but the field is silently dropped.
@@ -143,23 +305,19 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
             language,
           },
           tts: {
-            // For non-English agents (we're Polish-first), ElevenLabs
-            // requires either `eleven_turbo_v2_5` or `eleven_flash_v2_5`.
-            // Flash v2.5 wins on ~75ms latency + full multilingual including
-            // Polish; Turbo v2.5 is slightly higher quality but slower. For
-            // a phone agent, latency dominates perceived quality.
-            model_id: "eleven_flash_v2_5",
+            // v3 Conversational Alpha (changelog 2026-02-09): expressive
+            // multilingual including Polish. Replaces eleven_flash_v2_5 (the
+            // earlier latency-optimised choice). Expressive mode is enabled
+            // by setting model_id to v3; suggested_audio_tags guide the
+            // model toward calm/professional colour. Voice settings
+            // (stability/speed/similarity_boost) are no longer customisable
+            // in UI for v3; API still accepts them as no-ops.
+            model_id: DEFAULT_TTS_MODEL_ID,
             voice_id: voiceId,
-            // stability 0.85 = receptionist-grade flatness. We started at
-            // 0.45 (too dramatic), 0.65 (still energetic), 0.8 (better).
-            // 0.85 is calm-professional. Going to 1.0 sounds robotic;
-            // below 0.7 leaks emotional intonation.
+            expressive_mode: true,
+            suggested_audio_tags: [...DEFAULT_AUDIO_TAGS],
             stability: 0.85,
             similarity_boost: 0.75,
-            // speed 0.8 = noticeably slower than default 1.0. Phone callers
-            // (often elderly, often stressed) prefer a measured pace; 0.9
-            // still read as too fast in user testing. 0.8 is the sweet
-            // spot; going below ~0.75 sounds sluggish.
             speed: 0.8,
           },
           asr: {
@@ -184,6 +342,17 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
             post_call_url: input.postCallWebhookUrl,
           },
           tenant_metadata: { tenant_id: input.tenantId },
+          // Post-call analysis. analysis_llm picks the LLM that grades each
+          // call against the evaluation criteria below. Default Gemini 2.5
+          // Flash per EL changelog 2026-04-20; swap to Gemini 3 Flash Preview
+          // when stable. evaluation.criteria seeds 5 dental-receptionist
+          // rubrics; data_collection extracts structured fields from every
+          // transcript. Operators can edit these in EL UI later.
+          analysis_llm: DEFAULT_ANALYSIS_LLM,
+          evaluation: {
+            criteria: [...DEFAULT_EVALUATION_CRITERIA],
+          },
+          data_collection: DEFAULT_DATA_COLLECTION,
         },
       },
     );
@@ -192,6 +361,29 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
     if (!agentId) {
       throw new Error("ElevenLabs provisionAgent returned no agent id");
     }
+
+    // Coaching is enabled in a separate PATCH because coaching_settings.
+    // memory_base_id must point to a real agent id, which we only know after
+    // the create call. Coaching = the EL virtual coach reviews each call and
+    // surfaces improvement suggestions (closed-loop refinement). type
+    // "coached" enables it; memory_base_id pointing to the agent itself
+    // means coaching memories accumulate per-agent rather than shared.
+    try {
+      await this.request("PATCH", `/v1/convai/agents/${agentId}`, {
+        coaching_settings: {
+          type: "coached",
+          memory_base_id: agentId,
+        },
+      });
+    } catch (e) {
+      // Coaching is Alpha — if the API rejects, log but don't fail
+      // provisioning. The agent works without coaching; we can retry via
+      // backfill once the field is GA.
+      console.warn(
+        `[elevenlabs] coaching_settings PATCH failed for ${agentId}: ${(e as Error).message}`,
+      );
+    }
+
     return {
       agentId,
       browserTestUrl: `https://elevenlabs.io/app/conversational-ai/agents/${agentId}`,
@@ -199,17 +391,29 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
   }
 
   async updateAgentKnowledge(input: UpdateAgentKnowledgeInput): Promise<void> {
+    // PATCH replaces knowledge_base entirely, so the ontology shared docs
+    // MUST be re-attached on every update — otherwise editing per-tenant KB
+    // would inadvertently strip the universal dental layer. Mirrors the
+    // provisionAgent wiring exactly.
+    const ontologyIds = readOntologyDocIds();
+    const tenantEntries = input.knowledgeBaseDocumentIds.map((documentId) => ({
+      type: "text" as const,
+      id: documentId,
+      name: documentId,
+      usage_mode: "auto" as const,
+    }));
+    const ontologyEntries = ontologyIds.map((documentId, i) => ({
+      type: "text" as const,
+      id: documentId,
+      name: ONTOLOGY_DOC_NAMES[i] ?? `ontology-${i}`,
+      usage_mode: "auto" as const,
+    }));
+
     await this.request("PATCH", `/v1/convai/agents/${input.agentId}`, {
       conversation_config: {
         agent: {
           prompt: {
-            knowledge_base: input.knowledgeBaseDocumentIds.map((documentId) => ({
-              // type "text" — uploaded via /v1/convai/knowledge-base/text.
-              type: "text",
-              id: documentId,
-              name: documentId,
-              usage_mode: "auto",
-            })),
+            knowledge_base: [...tenantEntries, ...ontologyEntries],
           },
         },
       },

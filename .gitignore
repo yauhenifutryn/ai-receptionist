@@ -82,3 +82,4 @@ REVIEW.md
 apps/backend/scripts/probe-*.mjs
 apps/backend/scripts/admin-magic-link.mjs
 apps/backend/scripts/patch-agent-prompt.mjs
+apps/backend/.ontology-uploaded.json

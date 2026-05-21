@@ -302,16 +302,21 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
             // flash_v2_5 — same model EL's voice preview uses for Polish
             // multilingual. Lowest first-byte latency in the multilingual
             // family. expressive_mode false + no audio tags = the voice's
-            // natural register (what the operator heard in the EL preview).
-            // stability 0.5 = EL default; speed 1.0 = natural pace (was 0.8,
-            // which sounded sluggish even before v3 was layered on top).
+            // natural register.
+            //
+            // 2026-05-22 calibration: stability 0.6 (slightly more consistent
+            // than EL default 0.5 — reduces emotional variance call-to-call),
+            // speed 0.95 (a touch slower than natural so older Polish callers
+            // can follow without strain). EL's dashboard hides these sliders
+            // for flash_v2_5 ("Using default", greyed out) but the API still
+            // honours them — confirmed by PATCH + GET round-trip on Dynasty.
             model_id: DEFAULT_TTS_MODEL_ID,
             voice_id: voiceId,
             expressive_mode: false,
             suggested_audio_tags: [],
-            stability: 0.5,
+            stability: 0.6,
             similarity_boost: 0.75,
-            speed: 1.0,
+            speed: 0.95,
           },
           asr: {
             // `scribe_realtime` is ElevenLabs' streaming ASR (their newest):

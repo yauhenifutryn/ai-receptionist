@@ -170,15 +170,15 @@ for (const agentId of agentIds) {
           prompt: { knowledge_base: mergedKb },
         },
         tts: {
-          // 2026-05-21: matches provisioning defaults — flash_v2_5, no
-          // expressive, natural speed. Strips the literary-calm v3 register
-          // and the 0.8 speed slowdown from earlier provisioned agents.
+          // 2026-05-22 calibration: matches provisioning defaults — flash_v2_5,
+          // expressive off, stability 0.6, speed 0.95. See elevenlabs-convai.ts
+          // for the rationale.
           model_id: DEFAULT_TTS_MODEL_ID,
           expressive_mode: false,
           suggested_audio_tags: [],
-          stability: 0.5,
+          stability: 0.6,
           similarity_boost: 0.75,
-          speed: 1.0,
+          speed: 0.95,
         },
       },
       platform_settings: {

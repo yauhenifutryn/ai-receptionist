@@ -131,12 +131,9 @@ interface LangBundle {
     headline: string;
     body: string;
     button: string;
-    contact: string;
   };
   footer: {
-    privacy: string;
     copyright: string;
-    region: string;
   };
 }
 
@@ -323,12 +320,9 @@ const STRINGS: Record<Lang, LangBundle> = {
       headline: "Posłuchaj, jak brzmi w Twojej klinice.",
       body: "15 minut, rozmowa wideo, na żywo testujemy recepcjonistkę dla Twojej kliniki. Bez handlowca, bez slajdów.",
       button: "Umów rozmowę →",
-      contact: "Warszawa",
     },
     footer: {
-      privacy: "Dane pacjentów przechowywane w Unii Europejskiej.",
       copyright: "AI Receptionist",
-      region: "Frankfurt · Irlandia · UE",
     },
   },
   en: {
@@ -492,12 +486,9 @@ const STRINGS: Record<Lang, LangBundle> = {
       headline: "Hear how it sounds inside your practice.",
       body: "15 minutes, video call, we run the receptionist live against your clinic's details. No salesperson, no slides.",
       button: "Book a call →",
-      contact: "Warsaw",
     },
     footer: {
-      privacy: "Patient data stored within the European Union.",
       copyright: "AI Receptionist",
-      region: "Frankfurt · Ireland · EU",
     },
   },
   ru: {
@@ -661,12 +652,9 @@ const STRINGS: Record<Lang, LangBundle> = {
       headline: "Послушайте, как это звучит у вас в клинике.",
       body: "15 минут, видеозвонок, прогон администратора по реальным данным вашей клиники. Без продавцов и слайдов.",
       button: "Заказать звонок →",
-      contact: "Варшава",
     },
     footer: {
-      privacy: "Данные пациентов хранятся в пределах Европейского союза.",
       copyright: "AI Receptionist",
-      region: "Франкфурт · Ирландия · ЕС",
     },
   },
 };
@@ -1902,7 +1890,6 @@ function CtaSection() {
         >
           {t.cta.button}
         </a>
-        <p className="mt-6 font-mono text-xs text-neutral-500">{t.cta.contact}</p>
       </div>
     </section>
   );
@@ -1916,17 +1903,9 @@ function Footer() {
         <span className="text-base font-semibold tracking-tight text-neutral-900">
           {t.footer.copyright}
         </span>
-        <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-neutral-500 sm:gap-3 sm:text-xs">
-          <span>{t.footer.privacy}</span>
-          <span aria-hidden="true" className="text-neutral-300">
-            ·
-          </span>
-          <span>{t.footer.region}</span>
-          <span aria-hidden="true" className="text-neutral-300">
-            ·
-          </span>
-          <span>&copy; {new Date().getFullYear()}</span>
-        </div>
+        <span className="font-mono text-[10px] text-neutral-500 sm:text-xs">
+          &copy; {new Date().getFullYear()}
+        </span>
       </div>
     </footer>
   );

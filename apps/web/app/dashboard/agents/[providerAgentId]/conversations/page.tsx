@@ -49,10 +49,15 @@ export default async function Page({ params, searchParams }: PageProps) {
   const dateToParam = typeof sp.dateTo === "string" ? sp.dateTo : "";
   const bookedOnlyParam = sp.bookedOnly === "1" || sp.bookedOnly === "true";
 
+  // raw_jsonb is included to compute the per-row KB hit count on the fly.
+  // For the 100-row cap that's typically <1.5 MB of payload — acceptable for
+  // an operator surface. If this list ever grows beyond a few hundred rows
+  // we'd persist conversations.rag_hit_count at finalize time and drop the
+  // raw_jsonb pull here.
   let query = supabase
     .from("conversations")
     .select(
-      "conversation_id, source, started_at, duration_seconds, caller_language, consent_flag, tool_call_count, booked_booking_id",
+      "conversation_id, source, started_at, duration_seconds, caller_language, consent_flag, tool_call_count, booked_booking_id, raw_jsonb",
     )
     .eq("provider_agent_id", providerAgentId);
 

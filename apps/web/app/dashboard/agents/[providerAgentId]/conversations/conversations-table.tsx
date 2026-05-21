@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
+import { extractRagStats } from "@/lib/rag-stats";
 
 export interface ConversationRow {
   conversation_id: string;
@@ -12,6 +13,9 @@ export interface ConversationRow {
   consent_flag: boolean | null;
   tool_call_count: number;
   booked_booking_id: string | null;
+  /** Optional EL payload — when present, used to compute RAG hit counts in
+   *  the KB column. Server may omit it for lightweight list pages. */
+  raw_jsonb?: unknown;
 }
 
 const sourceLabel: Record<ConversationRow["source"], string> = {
@@ -57,42 +61,61 @@ export default function ConversationsTable({
             <th className="px-4 py-3">Lang</th>
             <th className="px-4 py-3">Consent</th>
             <th className="px-4 py-3">Tools</th>
+            <th className="px-4 py-3" title="Agent turns that pulled from the knowledge base on this call">KB</th>
             <th className="px-4 py-3">Booked</th>
             <th className="px-4 py-3" />
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-100">
-          {rows.map((r) => (
-            <tr key={r.conversation_id} className="hover:bg-neutral-50">
-              <td className="px-4 py-3 font-mono text-xs">
-                {new Date(r.started_at).toLocaleString("pl-PL")}
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sourceColor[r.source]}`}
-                >
-                  {sourceLabel[r.source]}
-                </span>
-              </td>
-              <td className="px-4 py-3">{formatDuration(r.duration_seconds)}</td>
-              <td className="px-4 py-3">{r.caller_language ?? "—"}</td>
-              <td className="px-4 py-3">
-                {r.consent_flag === null ? "—" : r.consent_flag ? "✓" : "✗"}
-              </td>
-              <td className="px-4 py-3">{r.tool_call_count}</td>
-              <td className="px-4 py-3">{r.booked_booking_id ? "✓" : ""}</td>
-              <td className="px-4 py-3 text-right">
-                <Link
-                  href={
-                    `/dashboard/agents/${providerAgentId}/conversations/${r.conversation_id}` as Route
-                  }
-                  className="text-emerald-700 hover:text-emerald-900"
-                >
-                  Open →
-                </Link>
-              </td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const ragStats = r.raw_jsonb ? extractRagStats(r.raw_jsonb) : null;
+            const kbHits = ragStats?.turnsWithRetrieval ?? null;
+            return (
+              <tr key={r.conversation_id} className="hover:bg-neutral-50">
+                <td className="px-4 py-3 font-mono text-xs">
+                  {new Date(r.started_at).toLocaleString("pl-PL")}
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sourceColor[r.source]}`}
+                  >
+                    {sourceLabel[r.source]}
+                  </span>
+                </td>
+                <td className="px-4 py-3">{formatDuration(r.duration_seconds)}</td>
+                <td className="px-4 py-3">{r.caller_language ?? "—"}</td>
+                <td className="px-4 py-3">
+                  {r.consent_flag === null ? "—" : r.consent_flag ? "✓" : "✗"}
+                </td>
+                <td className="px-4 py-3">{r.tool_call_count}</td>
+                <td className="px-4 py-3 tabular-nums">
+                  {kbHits === null ? (
+                    <span className="text-neutral-300">—</span>
+                  ) : kbHits === 0 ? (
+                    <span className="text-neutral-400">0</span>
+                  ) : (
+                    <span
+                      className="font-medium text-neutral-900"
+                      title={`${kbHits} agent turn(s) referenced the KB`}
+                    >
+                      {kbHits}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3">{r.booked_booking_id ? "✓" : ""}</td>
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    href={
+                      `/dashboard/agents/${providerAgentId}/conversations/${r.conversation_id}` as Route
+                    }
+                    className="text-emerald-700 hover:text-emerald-900"
+                  >
+                    Open →
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

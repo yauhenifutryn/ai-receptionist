@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireOperator } from "@/lib/supabase-server";
+import { aggregateRagStats } from "@/lib/rag-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -232,6 +233,31 @@ export default async function AnalyticsPage({ params }: PageProps) {
       toolMap.set(name, existing);
     }
   }
+  // ── Section F — Knowledge-layer (RAG retrieval) — last 30 days ──────────
+  // Aggregate across the same 30d window the rest of the page uses.
+  const ragAgg = aggregateRagStats(rows30.map((r) => r.raw_jsonb));
+  const ontologyIdsCsv = process.env.ELEVENLABS_ONTOLOGY_KB_DOC_IDS ?? "";
+  const ontologyIds = ontologyIdsCsv
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  // Order must mirror ONTOLOGY_DOC_NAMES in backend/orchestration. Hard-coded
+  // here as the friendly labels are not exposed via API.
+  const ontologyLabels = [
+    "ontology/services.md",
+    "ontology/triage.md",
+    "ontology/emergency-keywords.md",
+  ];
+  const ontologyIdToLabel = new Map<string, string>(
+    ontologyIds.map((id, i) => [id, ontologyLabels[i] ?? `ontology-${i}`]),
+  );
+  const ragByDoc = ragAgg.byDoc.map(({ docId, count }) => ({
+    docId,
+    count,
+    label: ontologyIdToLabel.get(docId) ?? "per-clinic / unknown",
+    isOntology: ontologyIdToLabel.has(docId),
+  }));
+
   const toolStats = Array.from(toolMap.entries())
     .map(([name, v]) => {
       const sorted = [...v.latencies].sort((a, b) => a - b);
@@ -378,6 +404,135 @@ export default async function AnalyticsPage({ params }: PageProps) {
             </tbody>
           </table>
         )}
+      </section>
+
+      {/* ── Section F — Knowledge layer / RAG ──────────────────────────── */}
+      <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-neutral-900">Knowledge layer</h2>
+            <p className="text-xs text-neutral-500">
+              Last 30 days · what the agent had loaded each turn
+            </p>
+          </div>
+          <Link
+            href={"/dashboard/ontology" as Route}
+            className="text-xs text-neutral-500 hover:text-neutral-800"
+          >
+            Ontology dashboard →
+          </Link>
+        </div>
+
+        {/* Always-on context — system prompt + tools never change per turn */}
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-neutral-100 bg-neutral-50 p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                System prompt
+              </span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-800">
+                Always on
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-neutral-700">
+              Personality, language mirroring, goal flow, guardrails, tool usage
+              policy. Loaded on every agent turn.
+            </p>
+            <p className="mt-1 font-mono text-[11px] text-neutral-400">
+              source: apps/backend/src/prompts/system-prompt.ts
+            </p>
+          </div>
+          <div className="rounded-lg border border-neutral-100 bg-neutral-50 p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                Tools attached
+              </span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-800">
+                Always on
+              </span>
+            </div>
+            <ul className="mt-2 space-y-1 text-sm text-neutral-700">
+              <li>
+                <code className="font-mono text-xs">check_availability</code>
+                <span className="ml-2 text-neutral-500">
+                  proposes up to 3 slots
+                </span>
+              </li>
+              <li>
+                <code className="font-mono text-xs">create_booking</code>
+                <span className="ml-2 text-neutral-500">
+                  confirms a slot to a booking
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Variable — RAG retrieval from KB documents */}
+        <div className="mt-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
+              RAG retrieval
+            </h3>
+            <span className="font-mono text-xs text-neutral-400">
+              {ragAgg.turnsWithRetrieval} / {ragAgg.totalAgentTurns} agent turns
+              ·{" "}
+              {ragAgg.conversationsWithRetrieval} / {ragAgg.totalConversations}{" "}
+              calls
+            </span>
+          </div>
+          {ragAgg.byDoc.length === 0 ? (
+            <p className="mt-3 text-sm text-neutral-500">
+              No knowledge retrievals in the last 30 days. Either no patient
+              asked an information-seeking question, or every reply was served
+              by the system prompt alone.
+            </p>
+          ) : (
+            <table className="mt-3 min-w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wider text-neutral-500">
+                <tr>
+                  <th className="py-2">Document</th>
+                  <th className="py-2">Layer</th>
+                  <th className="py-2">Turn hits</th>
+                  <th className="py-2">Share</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {ragByDoc.map((d) => {
+                  const share =
+                    ragAgg.turnsWithRetrieval > 0
+                      ? Math.round((d.count / ragAgg.turnsWithRetrieval) * 100)
+                      : 0;
+                  return (
+                    <tr key={d.docId}>
+                      <td className="py-2 font-mono text-xs text-neutral-700">
+                        {d.label}
+                        <span className="ml-2 text-neutral-400">
+                          {d.docId.slice(0, 12)}…
+                        </span>
+                      </td>
+                      <td className="py-2">
+                        <span
+                          className={
+                            d.isOntology
+                              ? "rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-700"
+                              : "rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-800"
+                          }
+                        >
+                          {d.isOntology ? "Ontology" : "Tenant / unknown"}
+                        </span>
+                      </td>
+                      <td className="py-2 tabular-nums">{d.count}</td>
+                      <td className="py-2 tabular-nums text-neutral-600">
+                        {share}%
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       </section>
 
       {/* ── Section E — Per-tool latency ───────────────────────────────── */}

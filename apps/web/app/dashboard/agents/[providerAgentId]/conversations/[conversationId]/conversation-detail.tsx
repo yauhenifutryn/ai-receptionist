@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useState } from "react";
+import { extractRagStats } from "@/lib/rag-stats";
 
 /**
  * Two shapes coexist in raw_jsonb depending on the call surface:
@@ -90,6 +91,10 @@ export default function ConversationDetail({ row }: { row: ConversationRow }) {
     : Array.isArray(raw.tool_calls)
       ? raw.tool_calls
       : [];
+  const ragStats = extractRagStats(row.raw_jsonb);
+  const perDocList = Object.entries(ragStats.perDocCounts)
+    .map(([docId, count]) => ({ docId, count }))
+    .sort((a, b) => b.count - a.count);
 
   return (
     <div className="flex flex-col gap-6">
@@ -151,6 +156,80 @@ export default function ConversationDetail({ row }: { row: ConversationRow }) {
               </li>
             ))}
           </ol>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
+            Knowledge retrieval
+          </h2>
+          <p className="font-mono text-xs text-neutral-400">
+            {ragStats.turnsWithRetrieval} / {ragStats.totalAgentTurns} agent
+            turns used RAG
+          </p>
+        </div>
+        {ragStats.turnsWithRetrieval === 0 ? (
+          <p className="text-sm text-neutral-400">
+            No knowledge base documents were referenced during this call.
+            Either the agent answered from the system prompt alone (small talk,
+            consent, language switching) or EL did not populate retrieval
+            attribution for these turns.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              {perDocList.map(({ docId, count }) => (
+                <span
+                  key={docId}
+                  className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 font-mono text-xs text-neutral-800"
+                  title={docId}
+                >
+                  <span>{docId.slice(0, 14)}…</span>
+                  <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] text-white tabular-nums">
+                    {count}
+                  </span>
+                </span>
+              ))}
+            </div>
+            <ul className="flex flex-col gap-2">
+              {ragStats.turnRefs.map((ref) => (
+                <li
+                  key={ref.turnIndex}
+                  className="rounded-lg border border-neutral-100 bg-neutral-50 p-3 text-sm"
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="font-mono text-xs text-neutral-400">
+                      turn {ref.turnIndex}
+                      {ref.timeSec != null
+                        ? ` · ${Math.floor(ref.timeSec)}s`
+                        : ""}
+                    </span>
+                    <span className="font-mono text-[11px] text-neutral-500">
+                      {ref.docIds.length} doc(s)
+                      {ref.chunkCount != null
+                        ? ` · ${ref.chunkCount} chunks`
+                        : ""}
+                    </span>
+                  </div>
+                  {ref.preview ? (
+                    <p className="mt-1 text-neutral-800">{ref.preview}</p>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {ref.docIds.map((id) => (
+                      <code
+                        key={id}
+                        className="rounded bg-white px-2 py-0.5 font-mono text-[10px] text-neutral-700"
+                        title={id}
+                      >
+                        {id.slice(0, 12)}…
+                      </code>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
 

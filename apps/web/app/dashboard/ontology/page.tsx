@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { requireOperator } from "@/lib/supabase-server";
+import { aggregateRagStats } from "@/lib/rag-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -80,10 +81,59 @@ async function loadOntology(): Promise<OntologyFile[]> {
   return out;
 }
 
+// Pull the last 30 days of conversations, scope to operator-visible rows via
+// RLS, and aggregate RAG retrievals so the operator can see whether the
+// ontology layer is actually earning its place.
+const RAG_WINDOW_DAYS = 30;
+
+async function loadRagAggregate(
+  supabase: Awaited<ReturnType<typeof requireOperator>>["supabase"],
+) {
+  const since = new Date(Date.now() - RAG_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString();
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("raw_jsonb")
+    .gte("started_at", since)
+    .not("raw_jsonb", "is", null)
+    .limit(2000);
+  if (error || !data) {
+    return { agg: aggregateRagStats([]), error: error?.message ?? null };
+  }
+  const bodies = data.map((r) => (r as { raw_jsonb: unknown }).raw_jsonb);
+  return { agg: aggregateRagStats(bodies), error: null };
+}
+
 export default async function OntologyPage() {
-  await requireOperator({ redirectPath: "/dashboard/ontology" });
+  const { supabase } = await requireOperator({
+    redirectPath: "/dashboard/ontology",
+  });
   const ontology = await loadOntology();
   const attachedCount = ontology.filter((f) => f.documentId).length;
+
+  const { agg, error: ragError } = await loadRagAggregate(supabase);
+  const ontologyIds = new Set(
+    ontology.map((d) => d.documentId).filter((x): x is string => Boolean(x)),
+  );
+  // Map per-doc counts onto our 3 known ontology files; remaining hits are
+  // tenant KB or unknown legacy attachments.
+  const usageByFilename: Record<string, number> = {};
+  let tenantKbHits = 0;
+  let unknownHits = 0;
+  for (const { docId, count } of agg.byDoc) {
+    if (!ontologyIds.has(docId)) {
+      // Best-effort split: tenant KB doc IDs aren't enumerated here so we
+      // bucket non-ontology as "tenant KB / other" without per-clinic detail.
+      // For now bucket all non-ontology as "tenant or unknown".
+      tenantKbHits += count;
+      continue;
+    }
+    const match = ontology.find((d) => d.documentId === docId);
+    if (match) usageByFilename[match.filename] = count;
+  }
+  // Distinguish unknown if we had IDs not matching any known doc — currently
+  // collapsed into tenantKbHits above. Leaving placeholder for future split.
+  void unknownHits;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-10 sm:px-8 sm:py-12">
@@ -109,6 +159,45 @@ export default async function OntologyPage() {
           </div>
         </div>
       </header>
+
+      <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
+            Retrieval activity · last {RAG_WINDOW_DAYS} days
+          </h2>
+          <p className="font-mono text-xs text-neutral-400">
+            {agg.totalConversations.toLocaleString()} conversations scanned
+          </p>
+        </div>
+        {ragError ? (
+          <p className="mt-3 text-sm text-rose-700">
+            Failed to load retrieval stats: {ragError}
+          </p>
+        ) : agg.totalConversations === 0 ? (
+          <p className="mt-3 text-sm text-neutral-500">
+            No conversations with stored payloads yet. Once calls land, this
+            section will show per-document retrieval counts.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-6 sm:grid-cols-3">
+            <Stat
+              label="Conversations with retrieval"
+              value={`${agg.conversationsWithRetrieval} / ${agg.totalConversations}`}
+              hint="calls where the agent referenced at least one KB doc"
+            />
+            <Stat
+              label="Agent turns with retrieval"
+              value={`${agg.turnsWithRetrieval} / ${agg.totalAgentTurns}`}
+              hint="reply turns that pulled from RAG"
+            />
+            <Stat
+              label="Non-ontology KB hits"
+              value={tenantKbHits.toString()}
+              hint="per-clinic KB or legacy doc references"
+            />
+          </div>
+        )}
+      </section>
 
       <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
@@ -174,15 +263,29 @@ export default async function OntologyPage() {
                   <p className="max-w-3xl text-sm text-neutral-600">{doc.summary}</p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  {doc.documentId ? (
-                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium uppercase tracking-wider text-emerald-700">
-                      Live
+                  <div className="flex items-center gap-2">
+                    {doc.documentId ? (
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium uppercase tracking-wider text-emerald-700">
+                        Live
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-medium uppercase tracking-wider text-rose-700">
+                        Missing
+                      </span>
+                    )}
+                    <span
+                      className={
+                        "rounded-full px-3 py-1 font-mono text-[11px] font-medium tabular-nums " +
+                        ((usageByFilename[doc.filename] ?? 0) > 0
+                          ? "bg-neutral-900 text-white"
+                          : "bg-neutral-100 text-neutral-500")
+                      }
+                      title={`Retrieved on ${usageByFilename[doc.filename] ?? 0} agent turn(s) in the last ${RAG_WINDOW_DAYS} days`}
+                    >
+                      {(usageByFilename[doc.filename] ?? 0).toLocaleString()}× ·{" "}
+                      {RAG_WINDOW_DAYS}d
                     </span>
-                  ) : (
-                    <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-medium uppercase tracking-wider text-rose-700">
-                      Missing
-                    </span>
-                  )}
+                  </div>
                   {doc.documentId ? (
                     <code className="font-mono text-[10px] text-neutral-400">
                       {doc.documentId.slice(0, 16)}…
@@ -215,7 +318,7 @@ export default async function OntologyPage() {
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
           Demoted documents (not attached)
-        </h2>
+        </h2>{/* below stat block ends */}
         <p className="text-sm text-neutral-600">
           These files exist on disk as internal documentation but are no longer
           attached to agents. They were behavior scripts that overlapped with
@@ -241,6 +344,28 @@ export default async function OntologyPage() {
           ))}
         </ul>
       </section>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="font-mono text-[11px] uppercase tracking-wider text-neutral-500">
+        {label}
+      </span>
+      <span className="text-2xl font-semibold tabular-nums text-neutral-900">
+        {value}
+      </span>
+      {hint ? <span className="text-xs text-neutral-500">{hint}</span> : null}
     </div>
   );
 }

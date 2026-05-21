@@ -29,29 +29,23 @@ export const DEFAULT_AGENT_LLM = "qwen36-35b-a3b";
 export const DEFAULT_AGENT_TEMPERATURE = 0.3;
 export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 
-// v3 Conversational Alpha — Eleven Labs' expressive TTS model. Set explicitly
-// per the Expressive mode rollout (changelog 2026-02-09). When using v3 the
-// agent gains audio-tag-driven expressivity (e.g. [chuckles], [sighs]); voice
-// settings (stability/speed/similarity_boost) are no longer customisable in
-// the UI but the API still accepts them as no-ops, so we keep them set.
-export const DEFAULT_TTS_MODEL_ID = "eleven_v3_conversational";
+// 2026-05-21: reverted from `eleven_v3_conversational` + expressive_mode +
+// suggested_audio_tags. v3 expressive sounded "literary calm" in our demo
+// (slower, over-modulated) compared to EL's native voice preview which uses
+// flash_v2_5. v3 also adds ~200-400ms first-byte latency over flash. For a
+// PSTN receptionist where latency drives interrupt-handling quality, flash
+// is the right pick. Expressive mode + audio tags removed — they were the
+// audible cause of the "calm in literature" register the user disliked.
+export const DEFAULT_TTS_MODEL_ID = "eleven_flash_v2_5";
 
-// Suggested audio tags for the Polish dental receptionist persona. The agent
-// is told which tags it MAY emit; v3 model uses these to colour responses.
-// EL expects each tag as an object { name, description? } — per the
-// SuggestedAudioTag schema (changelog 2026-02-09). Tags below are trimmed
-// from the EL UI defaults to ones useful for a calm reception persona.
+// Kept as an exported interface so older imports (backfill script, tests)
+// don't break. We no longer ship any tags by default — the empty array is
+// passed through to EL so the agent uses the voice's natural register.
 export interface SuggestedAudioTag {
   tag: string;
   description?: string;
 }
-export const DEFAULT_AUDIO_TAGS: readonly SuggestedAudioTag[] = [
-  { tag: "Empathetically", description: "When acknowledging patient pain or distress." },
-  { tag: "Confidently", description: "When confirming an appointment slot or a price from the knowledge base." },
-  { tag: "Warmly", description: "On greeting and farewell turns." },
-  { tag: "Patiently", description: "When the caller is elderly, stressed, or asks the agent to repeat." },
-  { tag: "Seriously", description: "When handling triage NAGŁY tier or escalating to emergency services." },
-];
+export const DEFAULT_AUDIO_TAGS: readonly SuggestedAudioTag[] = [];
 
 // Post-call analysis LLM. Gemini 2.5 Flash is EL's current default per their
 // changelog (2026-04-20). When Gemini 3 Flash Preview / 3.1 Flash Lite become
@@ -305,20 +299,19 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
             language,
           },
           tts: {
-            // v3 Conversational Alpha (changelog 2026-02-09): expressive
-            // multilingual including Polish. Replaces eleven_flash_v2_5 (the
-            // earlier latency-optimised choice). Expressive mode is enabled
-            // by setting model_id to v3; suggested_audio_tags guide the
-            // model toward calm/professional colour. Voice settings
-            // (stability/speed/similarity_boost) are no longer customisable
-            // in UI for v3; API still accepts them as no-ops.
+            // flash_v2_5 — same model EL's voice preview uses for Polish
+            // multilingual. Lowest first-byte latency in the multilingual
+            // family. expressive_mode false + no audio tags = the voice's
+            // natural register (what the operator heard in the EL preview).
+            // stability 0.5 = EL default; speed 1.0 = natural pace (was 0.8,
+            // which sounded sluggish even before v3 was layered on top).
             model_id: DEFAULT_TTS_MODEL_ID,
             voice_id: voiceId,
-            expressive_mode: true,
-            suggested_audio_tags: [...DEFAULT_AUDIO_TAGS],
-            stability: 0.85,
+            expressive_mode: false,
+            suggested_audio_tags: [],
+            stability: 0.5,
             similarity_boost: 0.75,
-            speed: 0.8,
+            speed: 1.0,
           },
           asr: {
             // `scribe_realtime` is ElevenLabs' streaming ASR (their newest):

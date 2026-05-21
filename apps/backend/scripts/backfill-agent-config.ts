@@ -170,9 +170,15 @@ for (const agentId of agentIds) {
           prompt: { knowledge_base: mergedKb },
         },
         tts: {
+          // 2026-05-21: matches provisioning defaults — flash_v2_5, no
+          // expressive, natural speed. Strips the literary-calm v3 register
+          // and the 0.8 speed slowdown from earlier provisioned agents.
           model_id: DEFAULT_TTS_MODEL_ID,
-          expressive_mode: true,
-          suggested_audio_tags: [...DEFAULT_AUDIO_TAGS],
+          expressive_mode: false,
+          suggested_audio_tags: [],
+          stability: 0.5,
+          similarity_boost: 0.75,
+          speed: 1.0,
         },
       },
       platform_settings: {
@@ -188,7 +194,7 @@ for (const agentId of agentIds) {
 
     await patchAgent(agentId, patchBody);
     console.error(
-      `  ok: tts=v3, ontology=${ontologyEntries.length}, tenant_kb_kept=${tenantKb.length}, evaluation_criteria=${DEFAULT_EVALUATION_CRITERIA.length}, coaching=on`,
+      `  ok: tts=${DEFAULT_TTS_MODEL_ID}, expressive=off, ontology=${ontologyEntries.length}, tenant_kb_kept=${tenantKb.length}, evaluation_criteria=${DEFAULT_EVALUATION_CRITERIA.length}, coaching=on`,
     );
     okCount++;
   } catch (e) {

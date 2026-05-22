@@ -100,6 +100,7 @@ export const ServerToolErrorSchema = z
       "slot_no_longer_available",
       "calendar_unreachable",
       "tenant_not_found",
+      "consent_required",
       "internal",
     ]),
     /** Plain-language message the agent reads to the caller. */

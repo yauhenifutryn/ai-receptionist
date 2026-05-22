@@ -260,4 +260,155 @@ describe("handleCreateBooking (W2.3, CalendarProvider DI)", () => {
     });
     expect((insertSpy.mock.calls[0]![0] as InsertBookingArgs).conversationId).toBe("conv-xyz");
   });
+
+  describe("consent gate (RODO defense-in-depth)", () => {
+    it("refuses booking with consent_required when checker returns 'no'", async () => {
+      const insertSpy = vi.fn();
+      const repo = buildRepo({ insertBooking: insertSpy });
+      const checker = vi.fn(async () => "no" as const);
+
+      const out = await handleCreateBooking(baseRequest, {
+        provider,
+        repo,
+        smsShortUrlBase: "https://app.example.com",
+        conversationId: "conv-no-consent",
+        consentChecker: checker,
+      });
+
+      expect(out.ok).toBe(false);
+      if (out.ok) return;
+      expect(out.status).toBe(403);
+      expect(out.error.code).toBe("consent_required");
+      expect(out.error.callerSafeMessage).toMatch(/zgod|consent|соглас/i);
+      expect(checker).toHaveBeenCalledWith("conv-no-consent");
+      expect(insertSpy).not.toHaveBeenCalled();
+    });
+
+    it("refuses booking with consent_required when checker returns 'unknown' (fail-closed)", async () => {
+      const insertSpy = vi.fn();
+      const repo = buildRepo({ insertBooking: insertSpy });
+      const checker = vi.fn(async () => "unknown" as const);
+
+      const out = await handleCreateBooking(baseRequest, {
+        provider,
+        repo,
+        smsShortUrlBase: "https://app.example.com",
+        conversationId: "conv-ambig",
+        consentChecker: checker,
+      });
+
+      expect(out.ok).toBe(false);
+      if (out.ok) return;
+      expect(out.error.code).toBe("consent_required");
+      expect(insertSpy).not.toHaveBeenCalled();
+    });
+
+    it("proceeds when checker returns 'yes'", async () => {
+      const insertSpy = vi.fn().mockImplementation(
+        async (args: InsertBookingArgs): Promise<BookingRow> => ({
+          id: "booking-consent-ok",
+          tenantId: args.tenantId,
+          requestId: args.requestId,
+          shortToken: args.shortToken,
+          startsAt: args.startsAt,
+          endsAt: args.endsAt,
+        }),
+      );
+      const repo = buildRepo({ insertBooking: insertSpy });
+      const checker = vi.fn(async () => "yes" as const);
+
+      const out = await handleCreateBooking(baseRequest, {
+        provider,
+        repo,
+        smsShortUrlBase: "https://app.example.com",
+        conversationId: "conv-consent-yes",
+        consentChecker: checker,
+      });
+
+      expect(out.ok).toBe(true);
+      if (!out.ok) return;
+      expect(checker).toHaveBeenCalledOnce();
+      expect(insertSpy).toHaveBeenCalledOnce();
+    });
+
+    it("skips the gate when consentChecker is not provided (tests / dev)", async () => {
+      const insertSpy = vi.fn().mockImplementation(
+        async (args: InsertBookingArgs): Promise<BookingRow> => ({
+          id: "booking-no-gate",
+          tenantId: args.tenantId,
+          requestId: args.requestId,
+          shortToken: args.shortToken,
+          startsAt: args.startsAt,
+          endsAt: args.endsAt,
+        }),
+      );
+      const repo = buildRepo({ insertBooking: insertSpy });
+
+      const out = await handleCreateBooking(baseRequest, {
+        provider,
+        repo,
+        smsShortUrlBase: "https://app.example.com",
+        conversationId: "conv-no-checker",
+      });
+
+      expect(out.ok).toBe(true);
+      expect(insertSpy).toHaveBeenCalledOnce();
+    });
+
+    it("skips the gate when conversationId is missing even if checker is provided", async () => {
+      const insertSpy = vi.fn().mockImplementation(
+        async (args: InsertBookingArgs): Promise<BookingRow> => ({
+          id: "booking-no-conv-id",
+          tenantId: args.tenantId,
+          requestId: args.requestId,
+          shortToken: args.shortToken,
+          startsAt: args.startsAt,
+          endsAt: args.endsAt,
+        }),
+      );
+      const repo = buildRepo({ insertBooking: insertSpy });
+      const checker = vi.fn();
+
+      const out = await handleCreateBooking(baseRequest, {
+        provider,
+        repo,
+        smsShortUrlBase: "https://app.example.com",
+        consentChecker: checker as never,
+      });
+
+      expect(out.ok).toBe(true);
+      expect(checker).not.toHaveBeenCalled();
+    });
+
+    it("returns localized message in EN and RU", async () => {
+      const repo = buildRepo();
+      const checker = vi.fn(async () => "no" as const);
+
+      const outEn = await handleCreateBooking(
+        { ...baseRequest, language: "en" as const },
+        {
+          provider,
+          repo,
+          smsShortUrlBase: "https://app.example.com",
+          conversationId: "conv-en",
+          consentChecker: checker,
+        },
+      );
+      expect(outEn.ok).toBe(false);
+      if (!outEn.ok) expect(outEn.error.callerSafeMessage).toMatch(/consent/i);
+
+      const outRu = await handleCreateBooking(
+        { ...baseRequest, language: "ru" as const },
+        {
+          provider,
+          repo,
+          smsShortUrlBase: "https://app.example.com",
+          conversationId: "conv-ru",
+          consentChecker: checker,
+        },
+      );
+      expect(outRu.ok).toBe(false);
+      if (!outRu.ok) expect(outRu.error.callerSafeMessage).toMatch(/соглас/i);
+    });
+  });
 });

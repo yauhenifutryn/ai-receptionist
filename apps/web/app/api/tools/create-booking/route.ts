@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     clinicName: cfg.clinicName,
     contactPhone: cfg.contactPhone,
     ...(conversationId ? { conversationId } : {}),
+    ...(deps.consentChecker ? { consentChecker: deps.consentChecker } : {}),
   });
   if (result.ok) {
     return NextResponse.json(result.response, { status: 200 });

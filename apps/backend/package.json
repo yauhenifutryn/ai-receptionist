@@ -45,8 +45,8 @@
       "default": "./dist/scraper/index.js"
     },
     "./consent": {
-      "types": "./dist/consent/classifier.d.ts",
-      "default": "./dist/consent/classifier.js"
+      "types": "./dist/consent/index.d.ts",
+      "default": "./dist/consent/index.js"
     },
     "./lib/logger": {
       "types": "./dist/lib/logger.d.ts",

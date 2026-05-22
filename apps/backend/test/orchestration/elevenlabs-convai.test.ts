@@ -134,8 +134,10 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
       "Dzień dobry, mówi asystent sztucznej inteligencji w Klinika Łapka. W czym mogę pomóc?",
     );
     expect((conv.tts as Record<string, unknown>).model_id).toBe("eleven_flash_v2_5");
-    expect((conv.tts as Record<string, unknown>).stability).toBe(0.85);
-    expect((conv.tts as Record<string, unknown>).speed).toBe(0.8);
+    // 2026-05-22 final calibration after A/B vs extreme test on Dynasty.
+    expect((conv.tts as Record<string, unknown>).stability).toBe(0.7);
+    expect((conv.tts as Record<string, unknown>).speed).toBe(0.9);
+    expect((conv.tts as Record<string, unknown>).similarity_boost).toBe(0.8);
     expect((conv.asr as Record<string, unknown>).provider).toBe("scribe_realtime");
 
     expect((prompt.prompt as string).toLowerCase()).toContain("klinika łapka");

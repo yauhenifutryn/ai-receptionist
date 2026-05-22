@@ -4,7 +4,6 @@ export { handleCreateBooking } from "./create-booking.js";
 export type {
   CreateBookingDeps,
   CreateBookingOutcome,
-  LiveConsentChecker,
 } from "./create-booking.js";
 export { createToolsRouter } from "./router.js";
 export type { CreateToolsRouterArgs, TenantConfig } from "./router.js";

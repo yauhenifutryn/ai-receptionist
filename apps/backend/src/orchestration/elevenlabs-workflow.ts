@@ -1,4 +1,19 @@
 /**
+ * DEPRECATED 2026-05-22 (Option B consent pivot).
+ *
+ * This file defines the structural EL workflow that was attached to every
+ * agent to enforce an in-call RODO consent gate. The gate was dropped on
+ * 2026-05-22 in favor of the lighter compliance posture documented in
+ * docs/plans/2026-05-22-option-b-consent-pivot.md: Article 6(1)(f) legitimate
+ * interest + website notice for transcript retention, plus the agent's AI
+ * disclosure on first turn for the EU AI Act transparency obligation.
+ *
+ * The file is RETAINED, not deleted, because the workflow research is real
+ * IP — a hospital partner or larger pilot may later require the strict
+ * structural gate. Bringing it back is a ~4-file revert (re-import in
+ * elevenlabs-convai.ts provisionAgent + backfill-agent-config.ts + a fresh
+ * push script). Nothing else imports it as of the pivot.
+ *
  * EL ConvAI agent workflow definitions.
  *
  * Why this file exists: prompt-level rules ("ask consent before booking") are

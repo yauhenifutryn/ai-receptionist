@@ -247,6 +247,11 @@ function TestAgentInner({ agentId }: { agentId: string }) {
             Microphone is blocked. Open browser site settings, allow microphone, then reload.
           </div>
         ) : null}
+
+        <p className="text-xs leading-relaxed text-neutral-500">
+          You are testing an AI assistant. The conversation may be transcribed for service-quality
+          purposes; voice recordings are not stored.
+        </p>
       </section>
 
       <section className="flex flex-col gap-3">

@@ -3,10 +3,8 @@ import type {
   TenantConfig,
   SmsFailureLogger,
   SmsFailureLogInput,
-  LiveConsentChecker,
 } from "@ai-receptionist/backend/tools";
 import { createSupabaseBookingsRepository } from "@ai-receptionist/backend/tools";
-import { createLiveConsentChecker } from "@ai-receptionist/backend/consent";
 import type { CalendarProvider } from "@ai-receptionist/contracts";
 import { createSimulatedCalendarProvider } from "@ai-receptionist/backend/integrations/calendar";
 import { createZadarmaSmsClient, type SmsClient } from "@ai-receptionist/backend/integrations/sms";
@@ -63,28 +61,11 @@ function getRepo(): BookingsRepository {
   return cachedRepo;
 }
 
-let cachedConsentChecker: LiveConsentChecker | undefined;
-/**
- * Returns the live consent checker bound to the project's EL key. Returns
- * undefined when ELEVENLABS_API_KEY is missing (local dev / preview deploys
- * without the secret) — create_booking treats undefined as "skip the gate"
- * to keep tests + previews unblocked. Production deploys always have the key
- * set, so the gate is always live in real environments.
- */
-function getConsentChecker(): LiveConsentChecker | undefined {
-  if (cachedConsentChecker) return cachedConsentChecker;
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) return undefined;
-  cachedConsentChecker = createLiveConsentChecker({ apiKey });
-  return cachedConsentChecker;
-}
-
 export interface BookingDeps {
   provider: CalendarProvider;
   repo: BookingsRepository;
   smsClient: SmsClient | undefined;
   smsFailureLogger: SmsFailureLogger;
-  consentChecker: LiveConsentChecker | undefined;
   resolveTenantConfig: (providerAgentId: string) => Promise<TenantConfig | null>;
 }
 
@@ -94,7 +75,6 @@ export function getBookingDeps(): BookingDeps {
     repo: getRepo(),
     smsClient: getSmsClient(),
     smsFailureLogger: createSupabaseSmsFailureLogger(),
-    consentChecker: getConsentChecker(),
     resolveTenantConfig: async (providerAgentId: string) => {
       const sb = getServiceRoleSupabase();
       const { data, error } = await sb

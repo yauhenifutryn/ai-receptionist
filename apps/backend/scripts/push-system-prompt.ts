@@ -91,9 +91,10 @@ for (const row of rows) {
           },
           // Push the opening turn AND the interrupt guard at the same time.
           // Both are per-tenant strings tied to the prompt — keeping them in
-          // one PATCH guarantees they stay in sync across rollouts.
+          // one PATCH guarantees they stay in sync across rollouts. Guard is
+          // false post Option B pivot (caller can interrupt the opener).
           first_message: firstMessage,
-          disable_first_message_interruptions: true,
+          disable_first_message_interruptions: false,
         },
       },
     }),

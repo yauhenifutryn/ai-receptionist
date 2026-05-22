@@ -60,6 +60,11 @@ export interface DemoStrings {
   pastSessionsBooked: string;
   pastSessionsViewToggle: string;
 
+  // Privacy notice (rendered near the Start call button so it lands in
+  // the caller's eye before they speak). EU AI Act transparency + GDPR
+  // Article 6(1)(f) legitimate-interest basis for transcript retention.
+  privacyNotice: string;
+
   // Footer
   poweredBy: string;
 }
@@ -135,6 +140,8 @@ const PL: DemoStrings = {
   pastSessionsLanguage: "Język",
   pastSessionsBooked: "Umówiona wizyta",
   pastSessionsViewToggle: "Pokaż transkrypcję",
+  privacyNotice:
+    "Rozmawiasz z asystentem AI. Połączenie może być transkrybowane w celu zapewnienia jakości obsługi; nagranie głosu nie jest przechowywane.",
   poweredBy: "Powered by AI Receptionist",
 };
 
@@ -208,6 +215,8 @@ const EN: DemoStrings = {
   pastSessionsLanguage: "Language",
   pastSessionsBooked: "Booked",
   pastSessionsViewToggle: "Show transcript",
+  privacyNotice:
+    "You are talking to an AI assistant. The conversation may be transcribed for service-quality purposes; voice recordings are not stored.",
   poweredBy: "Powered by AI Receptionist",
 };
 
@@ -282,6 +291,8 @@ const RU: DemoStrings = {
   pastSessionsLanguage: "Язык",
   pastSessionsBooked: "Запись",
   pastSessionsViewToggle: "Показать стенограмму",
+  privacyNotice:
+    "Вы разговариваете с AI-ассистентом. Разговор может транскрибироваться для контроля качества обслуживания; запись голоса не сохраняется.",
   poweredBy: "Powered by AI Receptionist",
 };
 

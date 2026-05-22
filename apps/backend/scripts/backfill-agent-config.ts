@@ -31,7 +31,6 @@ import {
   DEFAULT_DATA_COLLECTION,
   readOntologyDocIds,
 } from "../src/orchestration/elevenlabs-convai.js";
-import { CONSENT_GATE_WORKFLOW } from "../src/orchestration/elevenlabs-workflow.js";
 import { createClient } from "@supabase/supabase-js";
 
 const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -169,17 +168,16 @@ for (const agentId of agentIds) {
 
     // 2. Single PATCH with everything except coaching (coaching needs the
     //    agent_id which we already know — emit it in the same call).
-    //    Note workflow is top-level on the agent, NOT under conversation_config
-    //    — proven by PATCH+GET roundtrip against Dynasty; EL silently drops
-    //    workflow if nested.
-    //    disable_first_message_interruptions guards against the browser
-    //    widget's mis-timed barge-in that truncated opening phonemes.
+    //    2026-05-22 (Option B consent pivot): workflow no longer pushed —
+    //    in-call consent gate dropped in favor of website-notice +
+    //    legitimate-interest model. See docs/plans/2026-05-22-option-b-consent-pivot.md.
+    //    disable_first_message_interruptions also flipped to false so the
+    //    caller can interrupt the opening turn.
     const patchBody: Record<string, unknown> = {
-      workflow: CONSENT_GATE_WORKFLOW,
       conversation_config: {
         agent: {
           prompt: { knowledge_base: mergedKb },
-          disable_first_message_interruptions: true,
+          disable_first_message_interruptions: false,
         },
         tts: {
           // 2026-05-22 final: matches provisioning — flash_v2_5,
@@ -205,9 +203,8 @@ for (const agentId of agentIds) {
     };
 
     await patchAgent(agentId, patchBody);
-    const workflowNodeCount = Object.keys(CONSENT_GATE_WORKFLOW.nodes).length;
     console.error(
-      `  ok: tts=${DEFAULT_TTS_MODEL_ID}, expressive=off, ontology=${ontologyEntries.length}, tenant_kb_kept=${tenantKb.length}, eval=${DEFAULT_EVALUATION_CRITERIA.length}, coaching=on, workflow=${workflowNodeCount} nodes, interrupt_guard=on`,
+      `  ok: tts=${DEFAULT_TTS_MODEL_ID}, expressive=off, ontology=${ontologyEntries.length}, tenant_kb_kept=${tenantKb.length}, eval=${DEFAULT_EVALUATION_CRITERIA.length}, coaching=on, interrupt_guard=off`,
     );
     okCount++;
   } catch (e) {

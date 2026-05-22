@@ -8,20 +8,11 @@ import {
 import type { BookingsRepository } from "./repository.js";
 import { generateShortToken } from "../lib/short-token.js";
 import type { SmsClient } from "../integrations/sms/index.js";
-import type { LiveConsentStatus } from "../consent/live-check.js";
 import {
   formatConfirmationSms,
   sendBookingConfirmation,
   type SmsFailureLogger,
 } from "./sms-confirmation.js";
-
-/**
- * Live consent checker: reads the in-flight EL transcript and returns whether
- * the caller answered "yes" to the consent question. Server-side enforcement
- * of the prompt-level consent gate — see ../consent/live-check.ts. Optional
- * dep so unit tests can omit it; production wire MUST supply it.
- */
-export type LiveConsentChecker = (conversationId: string) => Promise<LiveConsentStatus>;
 
 export interface CreateBookingDeps {
   provider: CalendarProvider;
@@ -50,18 +41,6 @@ export interface CreateBookingDeps {
   smsConfirmationsEnabled?: boolean;
   /** Optional conversationId pulled from the webhook envelope. Falls back to requestId. */
   conversationId?: string;
-  /**
-   * Server-side consent gate. When provided AND a conversationId is on the
-   * request, the handler reads the live EL transcript and refuses the booking
-   * with code "consent_required" unless the caller affirmatively answered the
-   * consent question. Belt-and-braces on top of the system-prompt rule.
-   *
-   * Unit tests can omit this dep (handler short-circuits the check); production
-   * wire MUST supply it via createLiveConsentChecker in consent/live-check.ts.
-   * A future structural workflow-level gate inside EL would not replace this
-   * fail-safe — defense in depth.
-   */
-  consentChecker?: LiveConsentChecker;
 }
 
 export type CreateBookingOutcome =
@@ -121,41 +100,6 @@ export async function handleCreateBooking(
         callerSafeMessage: "Wystąpił problem techniczny po naszej stronie. Łączę z zespołem.",
       },
     };
-  }
-
-  // Consent gate (RODO defense-in-depth). Only fires when both a checker and
-  // a conversationId are present. Idempotent re-entries (same requestId) skip
-  // the gate because the booking already exists from a prior call that did
-  // pass consent — see findBookingByRequestId below. Locale-aware caller-safe
-  // message defaults to Polish; the LLM will surface it as the next agent turn
-  // and is also instructed to fall back to asking the consent question again.
-  if (deps.consentChecker && deps.conversationId) {
-    const consentStatus = await deps.consentChecker(deps.conversationId);
-    if (consentStatus !== "yes") {
-      console.log(
-        JSON.stringify({
-          level: "warn",
-          event: "create_booking_consent_gate_blocked",
-          tenantId: tenant.tenantId,
-          conversationId: deps.conversationId,
-          consentStatus,
-        }),
-      );
-      return {
-        ok: false,
-        status: 403,
-        error: {
-          requestId: req.requestId,
-          code: "consent_required",
-          callerSafeMessage:
-            req.language === "ru"
-              ? "Прежде чем записывать на приём, мне нужно ваше согласие на сохранение записи разговора. Согласны?"
-              : req.language === "en"
-                ? "Before I book the appointment, I need your consent to keep a transcript of this call. Do you agree?"
-                : "Zanim zarezerwuję wizytę, potrzebuję Pana/Pani zgody na zachowanie zapisu rozmowy. Czy się Pan/Pani zgadza?",
-        },
-      };
-    }
   }
 
   const existing = await deps.repo.findBookingByRequestId(req.requestId);

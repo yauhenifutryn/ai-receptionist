@@ -1,4 +1,15 @@
 /**
+ * DEPRECATED 2026-05-22 (Option B consent pivot).
+ *
+ * This was the tool-layer consent gate for create_booking. Dropped on
+ * 2026-05-22 in favor of the website-notice + legitimate-interest model
+ * documented in docs/plans/2026-05-22-option-b-consent-pivot.md.
+ *
+ * File RETAINED for potential reuse if a hospital partner or larger pilot
+ * later requires the strict gate. The classifier and EL transcript fetcher
+ * are useful infra; bringing the gate back is a small re-wire in
+ * apps/web/lib/booking-deps.ts + a re-export.
+ *
  * Live consent gate — server-side enforcement for create_booking.
  *
  * Why this exists: consent was prompt-only. The system prompt instructs the

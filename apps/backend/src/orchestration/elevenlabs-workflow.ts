@@ -115,21 +115,17 @@ export const CONSENT_GATE_WORKFLOW: WorkflowDefinition = {
     },
     consent_subagent: {
       type: "override_agent",
-      label: "Consent gate",
+      label: "Consent listener",
       position: { x: 300, y: 0 },
       edge_order: ["consent_yes", "consent_no"],
       additional_prompt: [
-        "WORKFLOW NODE: CONSENT GATE.",
-        "Your only job in this node is to ask the consent question once and wait for the caller's reply. After one user turn you MUST stop — do not continue the conversation, do not ask for a name, do not call any tool. Routing to the next node is handled by the workflow engine based on the caller's reply.",
+        "WORKFLOW NODE: CONSENT LISTENER.",
+        "The first_message ALREADY asked the consent question. Your only job here is to listen for the caller's reply. Say nothing. Do not re-ask, do not greet, do not introduce yourself again, do not ask 'how can I help'.",
         "",
-        "Step 1 — identify the language the caller spoke in their last turn.",
-        "Step 2 — ask the consent question verbatim in that language:",
-        "  - Polish: \"Czy zgadza się Pan / Pani na zachowanie zapisu tej rozmowy w celu poprawy jakości obsługi? Nagranie głosu nigdy nie jest przechowywane.\"",
-        "  - English: \"Do you consent to a transcript of this call being kept for service-quality purposes? Voice audio is never stored regardless.\"",
-        "  - Russian: \"Согласны ли вы на сохранение записи этого разговора для улучшения качества обслуживания? Голосовая запись не сохраняется в любом случае.\"",
-        "Step 3 — wait for the caller's reply, then STOP. Do not ack, do not say anything else. The workflow routes based on the reply.",
+        "If the caller answered in a different language from Polish, the language-mirror rule in your main system prompt still applies for everything that comes after this node — but DO NOT speak in this node. Just wait.",
         "",
-        "Do NOT re-greet, do NOT introduce yourself again — the first_message already did that.",
+        "After ONE user turn, the workflow engine routes you based on the caller's reply. Affirmative → main receptionist. Negative or ambiguous → refused-consent node. You do not need to make a decision yourself; just stay silent and wait.",
+        "",
         "Do NOT proceed to booking, do NOT ask for a name, do NOT call tools — those happen only after this gate passes.",
       ].join("\n"),
     },
@@ -151,11 +147,20 @@ export const CONSENT_GATE_WORKFLOW: WorkflowDefinition = {
       edge_order: ["refused_to_end"],
       additional_prompt: [
         "WORKFLOW NODE: CONSENT REFUSED.",
-        "The caller declined or did not clearly agree to the transcript-retention consent. Acknowledge politely once in their language, offer to help WITHOUT recording any transcript, and end the call gracefully after the next user turn.",
-        "Polish: \"Rozumiem, nie zachowam zapisu rozmowy. W czym mogę krótko pomóc?\"",
-        "English: \"Understood, I won't keep a transcript. How can I briefly help you?\"",
-        "Russian: \"Понял, запись сохранять не буду. Чем могу коротко помочь?\"",
-        "Do NOT call create_booking — bookings require consent. If the caller wants to book, say they need to call back during clinic hours, or that you can take a quick message for the reception to call back. Then end politely.",
+        "The caller did not clearly consent to transcript retention. This node MUST speak before the call ends — say a polite apology, explain that you cannot continue without consent because the booking system requires it, and offer to have a human from reception call them back. THEN end with a goodbye.",
+        "",
+        "Mirror the caller's last language. Use the matching script:",
+        "",
+        "Polish:",
+        "  \"Rozumiem, w takim razie nie mogę kontynuować, bo system rezerwacji wymaga zgody na zachowanie zapisu rozmowy. Jeśli chciałby Pan lub Pani umówić wizytę, proszę zadzwonić w godzinach pracy recepcji albo zostawić numer, a recepcja oddzwoni. Dziękuję za telefon, do usłyszenia.\"",
+        "",
+        "English:",
+        "  \"Understood, in that case I can't continue because the booking system requires consent to keep a transcript. If you'd like to book a visit, please call back during reception hours, or leave your number and someone will call you back. Thank you for calling, goodbye.\"",
+        "",
+        "Russian:",
+        "  \"Понял, в таком случае я не могу продолжить, потому что система записи требует согласия на сохранение разговора. Если хотите записаться на приём, перезвоните в часы работы регистратуры или оставьте номер, и вам перезвонят. Спасибо за звонок, до свидания.\"",
+        "",
+        "Do NOT call create_booking. Do NOT push back, do NOT try to convince the caller to consent. Say the goodbye line and wait — the workflow will end the call once you're done speaking.",
       ].join("\n"),
     },
     end_node: {
@@ -209,7 +214,15 @@ export const CONSENT_GATE_WORKFLOW: WorkflowDefinition = {
     refused_to_end: {
       source: "consent_refused_subagent",
       target: "end_node",
-      forward_condition: { type: "unconditional" },
+      // LLM-conditional, NOT unconditional. With unconditional, EL routed
+      // straight to end_node without letting the subagent get a turn — the
+      // call dropped with no apology. The condition below holds the
+      // transition until the subagent has actually spoken its goodbye line.
+      forward_condition: {
+        type: "llm",
+        condition:
+          "The agent has finished speaking its polite refusal-and-goodbye line, OR the caller has acknowledged and is also wrapping up the call. Do not transition before the agent has had a chance to deliver the full apology + callback offer + goodbye.",
+      },
     },
   },
 };

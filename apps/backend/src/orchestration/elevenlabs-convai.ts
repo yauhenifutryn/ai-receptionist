@@ -9,6 +9,35 @@ import type {
 } from "@ai-receptionist/contracts";
 import { buildSystemPrompt } from "../prompts/system-prompt.js";
 import { ElevenLabsToolsCatalog } from "./elevenlabs-tools-catalog.js";
+import { CONSENT_GATE_WORKFLOW } from "./elevenlabs-workflow.js";
+
+/**
+ * The agent's persona name. Used in the opening message so the caller hears
+ * a named entity rather than the abstract "asystent AI". Matches the
+ * personality section of the system prompt where Michał is established.
+ */
+export const AGENT_PERSONA_NAME = "Michał";
+
+/**
+ * Opening turn the agent speaks the moment a call connects. Combines:
+ *   1. AI disclosure (required by EU AI Act limited-risk transparency).
+ *   2. Persona introduction (Michał, named to make the agent feel like a
+ *      person rather than an interface — operator's "soul" requirement).
+ *   3. Tenant identity (so the caller knows which clinic answered).
+ *   4. Consent question (RODO — moved up from a separate turn so it lands
+ *      BEFORE the caller can start describing a problem). Voice-storage
+ *      reassurance baked in so callers don't feel surveilled.
+ *
+ * Polish only here because Polish is the default greeting language. The
+ * language-mirror rule in the system prompt covers EN/RU switching after
+ * the caller's first turn.
+ */
+export function buildOpeningMessage(tenantDisplayName: string): string {
+  return [
+    `Dzień dobry, jestem ${AGENT_PERSONA_NAME}, asystent sztucznej inteligencji w ${tenantDisplayName}.`,
+    "Zanim zaczniemy: czy zgadza się Pan lub Pani na zachowanie zapisu tej rozmowy w celu poprawy jakości obsługi? Nagranie głosu nigdy nie jest przechowywane.",
+  ].join(" ");
+}
 
 /**
  * ElevenLabs ConvAI implementation of the VoiceAgentProvider contract.
@@ -281,13 +310,31 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
       "/v1/convai/agents/create",
       {
         name: `${input.tenantDisplayName} - receptionist`,
+        // Workflow attached at create time. Layer-B consent gate. See
+        // elevenlabs-workflow.ts for the graph.
+        workflow: CONSENT_GATE_WORKFLOW,
         conversation_config: {
           agent: {
-            // The agent speaks first when the call connects (otherwise it
-            // waits silently for the caller to say something, which broke
-            // user expectations in testing). Polish opener with AI
-            // disclosure baked in so it's correct on the very first turn.
-            first_message: `Dzień dobry, mówi asystent sztucznej inteligencji w ${input.tenantDisplayName}. W czym mogę pomóc?`,
+            // The agent speaks first when the call connects with greeting +
+            // identity + the consent question all in ONE turn. Three reasons
+            // for this packing:
+            //  - Greeting + AI disclosure must arrive before any caller turn
+            //    (EU AI Act).
+            //  - Consent question must arrive before the caller has time to
+            //    say anything substantive (RODO best practice).
+            //  - One turn means no inter-turn audio gap that the browser
+            //    widget mis-times and truncates.
+            // The workflow's consent_subagent then listens for the reply and
+            // branches — it does NOT re-ask. See CONSENT_LISTENER_PROMPT
+            // in elevenlabs-workflow.ts.
+            first_message: buildOpeningMessage(input.tenantDisplayName),
+            // Prevent the caller from interrupting the opening message
+            // mid-sentence. Without this, the @elevenlabs/react widget
+            // sometimes barges in before audio is fully buffered, causing
+            // the dropped first phoneme the operator reported in browser
+            // testing. EL field documented under
+            // conversation_config.agent.disable_first_message_interruptions.
+            disable_first_message_interruptions: true,
             prompt: {
               prompt: systemPrompt,
               llm: this.agentLlm,

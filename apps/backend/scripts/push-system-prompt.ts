@@ -16,6 +16,7 @@
  */
 
 import { buildSystemPrompt, extractPolishCity } from "../src/prompts/system-prompt.js";
+import { buildOpeningMessage } from "../src/orchestration/elevenlabs-convai.js";
 import { createClient } from "@supabase/supabase-js";
 
 const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -70,10 +71,11 @@ for (const row of rows) {
   const systemPrompt = buildSystemPrompt({
     tenantDisplayName: tenant.display_name,
   });
+  const firstMessage = buildOpeningMessage(tenant.display_name);
   void extractPolishCity; // keep import resolvable for future use
 
   console.error(`${agentId} (${tenant.display_name})`);
-  console.error(`  prompt: ${systemPrompt.length} chars`);
+  console.error(`  prompt: ${systemPrompt.length} chars · first_message: ${firstMessage.length} chars`);
 
   const res = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${agentId}`, {
     method: "PATCH",
@@ -87,6 +89,11 @@ for (const row of rows) {
           prompt: {
             prompt: systemPrompt,
           },
+          // Push the opening turn AND the interrupt guard at the same time.
+          // Both are per-tenant strings tied to the prompt — keeping them in
+          // one PATCH guarantees they stay in sync across rollouts.
+          first_message: firstMessage,
+          disable_first_message_interruptions: true,
         },
       },
     }),

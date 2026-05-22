@@ -130,9 +130,14 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     // regress, calls either 400 (non-English TTS without flash/turbo model)
     // or deliver a degraded experience (default voice, default first
     // message). See memory project_ai_receptionist_agent_config.
-    expect(agent.first_message).toBe(
-      "Dzień dobry, mówi asystent sztucznej inteligencji w Klinika Łapka. W czym mogę pomóc?",
-    );
+    // The opening turn now packs greeting + persona (Michał) + tenant
+    // identity + the consent question into one utterance. Avoids inter-turn
+    // truncation in the browser widget and lands consent before any caller
+    // turn can describe a problem.
+    expect(agent.first_message).toContain("Michał");
+    expect(agent.first_message).toContain("Klinika Łapka");
+    expect(agent.first_message).toContain("zachowanie zapisu tej rozmowy");
+    expect(agent.disable_first_message_interruptions).toBe(true);
     expect((conv.tts as Record<string, unknown>).model_id).toBe("eleven_flash_v2_5");
     // 2026-05-22 final calibration after A/B vs extreme test on Dynasty.
     expect((conv.tts as Record<string, unknown>).stability).toBe(0.7);

@@ -31,6 +31,7 @@ import {
   DEFAULT_DATA_COLLECTION,
   readOntologyDocIds,
 } from "../src/orchestration/elevenlabs-convai.js";
+import { CONSENT_GATE_WORKFLOW } from "../src/orchestration/elevenlabs-workflow.js";
 import { createClient } from "@supabase/supabase-js";
 
 const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -168,10 +169,17 @@ for (const agentId of agentIds) {
 
     // 2. Single PATCH with everything except coaching (coaching needs the
     //    agent_id which we already know — emit it in the same call).
+    //    Note workflow is top-level on the agent, NOT under conversation_config
+    //    — proven by PATCH+GET roundtrip against Dynasty; EL silently drops
+    //    workflow if nested.
+    //    disable_first_message_interruptions guards against the browser
+    //    widget's mis-timed barge-in that truncated opening phonemes.
     const patchBody: Record<string, unknown> = {
+      workflow: CONSENT_GATE_WORKFLOW,
       conversation_config: {
         agent: {
           prompt: { knowledge_base: mergedKb },
+          disable_first_message_interruptions: true,
         },
         tts: {
           // 2026-05-22 final: matches provisioning — flash_v2_5,
@@ -197,8 +205,9 @@ for (const agentId of agentIds) {
     };
 
     await patchAgent(agentId, patchBody);
+    const workflowNodeCount = Object.keys(CONSENT_GATE_WORKFLOW.nodes).length;
     console.error(
-      `  ok: tts=${DEFAULT_TTS_MODEL_ID}, expressive=off, ontology=${ontologyEntries.length}, tenant_kb_kept=${tenantKb.length}, evaluation_criteria=${DEFAULT_EVALUATION_CRITERIA.length}, coaching=on`,
+      `  ok: tts=${DEFAULT_TTS_MODEL_ID}, expressive=off, ontology=${ontologyEntries.length}, tenant_kb_kept=${tenantKb.length}, eval=${DEFAULT_EVALUATION_CRITERIA.length}, coaching=on, workflow=${workflowNodeCount} nodes, interrupt_guard=on`,
     );
     okCount++;
   } catch (e) {

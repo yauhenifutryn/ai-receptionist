@@ -66,14 +66,10 @@ interface ConversationRow {
 }
 
 function fmtTs(turn: Turn): string {
-  const secs =
-    typeof turn.time_in_call_secs === "number"
-      ? turn.time_in_call_secs
-      : typeof turn.startMs === "number"
-        ? turn.startMs / 1000
-        : typeof turn.start_ms === "number"
-          ? turn.start_ms / 1000
-          : null;
+  let secs: number | null = null;
+  if (typeof turn.time_in_call_secs === "number") secs = turn.time_in_call_secs;
+  else if (typeof turn.startMs === "number") secs = turn.startMs / 1000;
+  else if (typeof turn.start_ms === "number") secs = turn.start_ms / 1000;
   if (secs == null) return "";
   const s = Math.floor(secs);
   return `[${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}]`;
@@ -234,12 +230,9 @@ export default function ConversationDetail({ row }: { row: ConversationRow }) {
             {tools.map((t, i) => {
               const name = t.toolName ?? t.tool_name ?? "(unnamed)";
               const lat = t.latencyMs ?? t.latency_ms;
-              const ok =
-                typeof t.succeeded === "boolean"
-                  ? t.succeeded
-                  : t.is_error === true
-                    ? false
-                    : undefined;
+              let ok: boolean | undefined;
+              if (typeof t.succeeded === "boolean") ok = t.succeeded;
+              else if (t.is_error === true) ok = false;
               const args = t.argsJson ?? t.args_json ?? t.params_as_json;
               const resp = t.responseJson ?? t.response_json ?? t.result_value;
               return (

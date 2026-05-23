@@ -179,16 +179,6 @@ function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
 export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput> {
   const now = args.now ?? (() => new Date());
   const result = await args.llm.generateStructured({
-    // Primary: `gemini-2.5-flash`. Direct vanilla-node probe confirms 60s
-    // end-to-end on this exact prompt with Zod passing. `gemini-3-flash-preview`
-    // is moved to fallback because the preview endpoint produces transient
-    // `fetch failed` errors (undici connection-level, not a 4xx/5xx Gemini
-    // response). Once promoted out of preview we can re-evaluate.
-    //
-    // maxRetries=0: this is a long, expensive call. If the primary throws
-    // a transport error we want to fall through to the next model IMMEDIATELY
-    // — never retry the same model on the same giant prompt, which can
-    // double or triple the wall-clock with no quality win.
     // Primary `gemini-3-flash-preview`: quality is dramatically better
     // on Polish dental sites — on dynastystomatology.pl it captured 44
     // priced services + 69 FAQ entries vs 2.5-flash's 0 priced services
@@ -200,6 +190,11 @@ export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput>
     // Fallback to `gemini-2.5-flash` so a transient 3-preview failure
     // (the model sometimes throws `fetch failed`) still produces SOME
     // result, even if of lower quality.
+    //
+    // maxRetries=0: this is a long, expensive call. If the primary throws
+    // a transport error we want to fall through to the next model IMMEDIATELY
+    // — never retry the same model on the same giant prompt, which can
+    // double or triple the wall-clock with no quality win.
     model: "gemini-3-flash-preview",
     fallbackChain: ["gemini-2.5-flash"],
     maxRetries: 0,

@@ -34,8 +34,10 @@ function getSmsClient(): SmsClient | undefined {
   return cachedSmsClient;
 }
 
-function createSupabaseSmsFailureLogger(): SmsFailureLogger {
-  return {
+let cachedSmsFailureLogger: SmsFailureLogger | null = null;
+function getSmsFailureLogger(): SmsFailureLogger {
+  if (cachedSmsFailureLogger) return cachedSmsFailureLogger;
+  cachedSmsFailureLogger = {
     async logFailure(input: SmsFailureLogInput): Promise<void> {
       const sb = getServiceRoleSupabase();
       const { error } = await sb.from("sms_send_failures").insert({
@@ -52,6 +54,7 @@ function createSupabaseSmsFailureLogger(): SmsFailureLogger {
       }
     },
   };
+  return cachedSmsFailureLogger;
 }
 
 let cachedRepo: BookingsRepository | null = null;
@@ -74,7 +77,7 @@ export function getBookingDeps(): BookingDeps {
     provider: getProvider(),
     repo: getRepo(),
     smsClient: getSmsClient(),
-    smsFailureLogger: createSupabaseSmsFailureLogger(),
+    smsFailureLogger: getSmsFailureLogger(),
     resolveTenantConfig: async (providerAgentId: string) => {
       const sb = getServiceRoleSupabase();
       const { data, error } = await sb

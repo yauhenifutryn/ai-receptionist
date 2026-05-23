@@ -28,7 +28,7 @@ export function createSupabasePostCallRepository(client: SupabaseClient): PostCa
         },
         { onConflict: "conversation_id" },
       );
-      if (error) throw new Error(`consent_log upsert failed: ${error.message}`);
+      if (error) throw new Error(`consent_log upsert failed: ${error.message}`, { cause: error });
     },
 
     async insertTranscript(args: InsertTranscriptArgs): Promise<void> {
@@ -37,7 +37,7 @@ export function createSupabasePostCallRepository(client: SupabaseClient): PostCa
         conversation_id: args.conversationId,
         turns: args.turns,
       });
-      if (error) throw new Error(`transcripts insert failed: ${error.message}`);
+      if (error) throw new Error(`transcripts insert failed: ${error.message}`, { cause: error });
     },
 
     async lookupServiceValue(
@@ -49,7 +49,7 @@ export function createSupabasePostCallRepository(client: SupabaseClient): PostCa
         .eq("tenant_id", args.tenantId)
         .eq("category", args.category)
         .maybeSingle();
-      if (error) throw new Error(`service_value lookup failed: ${error.message}`);
+      if (error) throw new Error(`service_value lookup failed: ${error.message}`, { cause: error });
       if (!data) return null;
       return {
         expectedRevenuePln: Number(data.expected_revenue_pln),
@@ -62,7 +62,8 @@ export function createSupabasePostCallRepository(client: SupabaseClient): PostCa
         .from("bookings")
         .update({ recovered_revenue_pln: args.recoveredRevenuePln })
         .eq("conversation_id", args.conversationId);
-      if (error) throw new Error(`booking revenue update failed: ${error.message}`);
+      if (error)
+        throw new Error(`booking revenue update failed: ${error.message}`, { cause: error });
     },
 
     async upsertConversation(args: UpsertConversationArgs): Promise<void> {
@@ -93,7 +94,7 @@ export function createSupabasePostCallRepository(client: SupabaseClient): PostCa
         },
         { onConflict: "conversation_id" },
       );
-      if (error) throw new Error(`conversations upsert failed: ${error.message}`);
+      if (error) throw new Error(`conversations upsert failed: ${error.message}`, { cause: error });
     },
 
     async findBookingIdByConversation(conversationId: string): Promise<string | null> {
@@ -102,7 +103,7 @@ export function createSupabasePostCallRepository(client: SupabaseClient): PostCa
         .select("id")
         .eq("conversation_id", conversationId)
         .maybeSingle();
-      if (error) throw new Error(`bookings lookup failed: ${error.message}`);
+      if (error) throw new Error(`bookings lookup failed: ${error.message}`, { cause: error });
       return (data?.id as string | undefined) ?? null;
     },
 
@@ -112,7 +113,7 @@ export function createSupabasePostCallRepository(client: SupabaseClient): PostCa
         .select("pin_code")
         .eq("provider_agent_id", providerAgentId)
         .maybeSingle();
-      if (error) throw new Error(`agents pin lookup failed: ${error.message}`);
+      if (error) throw new Error(`agents pin lookup failed: ${error.message}`, { cause: error });
       return (data?.pin_code as string | null | undefined) ?? null;
     },
   };

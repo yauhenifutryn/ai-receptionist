@@ -16,7 +16,7 @@ export async function resolveTenantByAgent(
     .select("id, tenant_id")
     .eq("provider_agent_id", providerAgentId)
     .maybeSingle();
-  if (error) throw new Error(`agents lookup failed: ${error.message}`);
+  if (error) throw new Error(`agents lookup failed: ${error.message}`, { cause: error });
   if (!data) return null;
   return { tenantId: data.tenant_id, agentRowId: data.id };
 }

@@ -1,11 +1,13 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUserSupabase } from "@/lib/supabase-server";
 
 /**
- * Shared owner-scope resolver. Three /api/owner/* routes (kb, voice, settings)
+ * Shared owner-scope resolver. /api/owner/* routes (kb, voice, settings)
  * walk the same chain: user session → tenant_members → first agent for tenant.
- * Pack A flagged the duplication; settings (item 7) is the third caller, so
- * the resolver lives here. RLS scopes tenant_members to the signed-in user,
- * so we don't need an explicit .eq("user_id", uid).
+ * RLS scopes tenant_members to the signed-in user, so we don't need an
+ * explicit .eq("user_id", uid). The resolved supabase client is returned in
+ * the ok branch so callers don't have to construct a second one for their
+ * own queries (one cookie-bound client per request is enough).
  */
 
 export interface OwnerAgentContext {
@@ -14,7 +16,7 @@ export interface OwnerAgentContext {
 }
 
 export type OwnerAgentResolution =
-  | { ok: true; ctx: OwnerAgentContext }
+  | { ok: true; ctx: OwnerAgentContext; supabase: SupabaseClient }
   | { ok: false; status: number; body: { error: string } };
 
 export async function resolveOwnerAgent(): Promise<OwnerAgentResolution> {
@@ -46,5 +48,6 @@ export async function resolveOwnerAgent(): Promise<OwnerAgentResolution> {
       tenantId: membership.tenant_id as string,
       providerAgentId: agent.provider_agent_id as string,
     },
+    supabase,
   };
 }

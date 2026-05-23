@@ -331,9 +331,9 @@ export async function POST(req: NextRequest) {
             return { url: p.url, markdownLength: p.markdown.length, file };
           });
           await session?.write("04-firecrawl-pages.json", JSON.stringify(manifest, null, 2));
-          for (let i = 0; i < validPages.length; i++) {
-            await session?.write(`pages/${manifest[i]!.file}`, validPages[i]!.markdown);
-          }
+          await Promise.all(
+            validPages.map((p, i) => session?.write(`pages/${manifest[i]!.file}`, p.markdown)),
+          );
           if (validPages.length === 0) {
             emit({
               type: "error",
@@ -433,14 +433,15 @@ export async function POST(req: NextRequest) {
                   );
                   if (aborted()) return;
                   const moreValid = morePages.filter((p) => p.markdown.length > 0);
-                  for (let i = 0; i < moreValid.length; i++) {
-                    const p = moreValid[i]!;
-                    const safe = p.url.replace(/[^a-zA-Z0-9-]+/g, "-").slice(0, 100);
-                    await session?.write(
-                      `pages/discover-${String(i + 1).padStart(2, "0")}-${safe}.md`,
-                      p.markdown,
-                    );
-                  }
+                  await Promise.all(
+                    moreValid.map((p, i) => {
+                      const safe = p.url.replace(/[^a-zA-Z0-9-]+/g, "-").slice(0, 100);
+                      return session?.write(
+                        `pages/discover-${String(i + 1).padStart(2, "0")}-${safe}.md`,
+                        p.markdown,
+                      );
+                    }),
+                  );
                   validPages = [...validPages, ...moreValid];
                   emit({
                     type: "log",

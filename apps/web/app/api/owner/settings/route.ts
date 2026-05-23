@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { resolveOwnerAgent } from "@/lib/owner-agent-context";
-import { getUserSupabase } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,8 +29,7 @@ export async function GET(_req: NextRequest) {
   const ctx = await resolveOwnerAgent();
   if (!ctx.ok) return NextResponse.json(ctx.body, { status: ctx.status });
 
-  const supabase = await getUserSupabase();
-  const { data, error } = await supabase
+  const { data, error } = await ctx.supabase
     .from("tenants")
     .select("sms_confirmations_enabled")
     .eq("id", ctx.ctx.tenantId)
@@ -67,8 +65,7 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const supabase = await getUserSupabase();
-  const { error } = await supabase
+  const { error } = await ctx.supabase
     .from("tenants")
     .update({ sms_confirmations_enabled: parsed.data.sms_confirmations_enabled })
     .eq("id", ctx.ctx.tenantId);

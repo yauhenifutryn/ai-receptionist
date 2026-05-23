@@ -18,7 +18,7 @@ export function createSupabaseBookingsRepository(client: SupabaseClient): Bookin
         .select("id, tenant_id, request_id, short_token, starts_at, ends_at")
         .eq("request_id", requestId)
         .maybeSingle();
-      if (error) throw new Error(`bookings lookup failed: ${error.message}`);
+      if (error) throw new Error(`bookings lookup failed: ${error.message}`, { cause: error });
       if (!data) return null;
       return {
         id: data.id,
@@ -51,7 +51,7 @@ export function createSupabaseBookingsRepository(client: SupabaseClient): Bookin
         })
         .select("id, tenant_id, request_id, short_token, starts_at, ends_at")
         .single();
-      if (error) throw new Error(`booking insert failed: ${error.message}`);
+      if (error) throw new Error(`booking insert failed: ${error.message}`, { cause: error });
       return {
         id: data.id,
         tenantId: data.tenant_id,

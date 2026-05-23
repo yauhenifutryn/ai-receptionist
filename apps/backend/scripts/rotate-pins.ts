@@ -1,15 +1,14 @@
 #!/usr/bin/env tsx
 /**
- * Force-rotate every `agents.pin_code` to a fresh 6-digit PIN generated with
- * `crypto.randomInt`. Closes TM-001 in `rls_threat_model_report.md`: any
- * surviving 4-digit legacy PIN narrows the brute-force namespace to 10k,
- * which is feasible against the per-IP rate limiter under IP rotation.
+ * Force-rotate every `agents.pin_code` to a fresh 6-digit PIN. Any surviving
+ * 4-digit legacy PIN narrows the brute-force namespace to 10k, which is
+ * feasible against the per-IP rate limiter under IP rotation.
  *
  * Behavior:
  *   - Reads `agents` rows where `pin_code IS NOT NULL`.
  *   - By default rotates ONLY rows whose current PIN has length < 6
  *     (the legacy 4-digit cohort). Pass `--all` to rotate every PIN.
- *   - Per-row retry up to 5 attempts on Postgres unique-violation (23505).
+ *   - Per-row retry up to 5 attempts on Postgres unique-violation.
  *   - Idempotent across runs: rerunning when zero candidates exist is a no-op.
  *
  * Usage:
@@ -24,6 +23,8 @@
 
 import { randomInt } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+
+const PG_UNIQUE_VIOLATION = "23505";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -84,8 +85,7 @@ for (const row of candidates as Array<{
       );
       okCount += 1;
       rotated = true;
-    } else if ((updErr as { code?: string }).code === "23505") {
-      // Unique violation — try a fresh PIN.
+    } else if ((updErr as { code?: string }).code === PG_UNIQUE_VIOLATION) {
       continue;
     } else {
       console.error(`  FAIL: ${row.provider_agent_id}  ${updErr.message}`);
@@ -99,18 +99,12 @@ for (const row of candidates as Array<{
   }
 }
 
-const { data: postCheckRows } = await sb
-  .from("agents")
-  .select("pin_code")
-  .not("pin_code", "is", null);
-const remainingShort = (postCheckRows ?? []).filter(
-  (r) => ((r as { pin_code: string }).pin_code ?? "").length < 6,
-).length;
-
+// Any failed row still has its original short PIN; every ok row is now 6-digit.
+// Tracked directly from the loop so we don't re-pull pin_code values across
+// the wire just to recount.
+const remainingShort = failCount;
 console.error(`\nrotated=${okCount}  failed=${failCount}  pin_code<6 remaining=${remainingShort}`);
 if (remainingShort > 0) {
-  console.error(
-    "WARNING: legacy PINs still remain. Re-run without --all to retry only those rows.",
-  );
+  console.error("WARNING: legacy PINs still remain. Re-run to retry the failed rows.");
 }
-process.exit(failCount > 0 || remainingShort > 0 ? 1 : 0);
+process.exit(failCount > 0 ? 1 : 0);

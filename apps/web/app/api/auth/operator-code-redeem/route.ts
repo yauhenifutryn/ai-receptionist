@@ -37,23 +37,27 @@ const BodySchema = z.object({
   code: z.string().min(8).max(64),
 });
 
-/**
- * Constant-time compare of the submitted code against each known env code.
- * Always iterates the full candidate set so a hit on the first slot doesn't
- * time-leak vs a miss on the second slot. SHA-256 buffers normalise length
- * so timingSafeEqual doesn't bail on the length-mismatch fast path.
- */
-function mapCodeToEmail(code: string): string | null {
-  const candidates: Array<[string | undefined, string]> = [
+// Env codes are constant per process; hash once at module load so each
+// request hashes only the submitted code, never the env values.
+const CANDIDATES: ReadonlyArray<readonly [Buffer, string]> = (
+  [
     [process.env.OPERATOR_CODE_REM, "grednep@gmail.com"],
     [process.env.OPERATOR_CODE_SEBASTIAN, "wodecki.sg@gmail.com"],
-  ];
-  const submitted = createHash("sha256").update(code).digest();
+  ] as ReadonlyArray<readonly [string | undefined, string]>
+).flatMap(([code, email]) =>
+  code ? [[createHash("sha256").update(code).digest(), email] as const] : [],
+);
+
+/**
+ * Constant-time compare. Always iterates the full candidate set so a hit on
+ * the first slot doesn't time-leak vs a miss on the second slot. SHA-256
+ * buffers normalise length so timingSafeEqual doesn't bail on the length-
+ * mismatch fast path.
+ */
+function lookupEmail(submitted: Buffer): string | null {
   let match: string | null = null;
-  for (const [expected, email] of candidates) {
-    if (!expected) continue;
-    const expectedHash = createHash("sha256").update(expected).digest();
-    if (timingSafeEqual(submitted, expectedHash)) {
+  for (const [expected, email] of CANDIDATES) {
+    if (timingSafeEqual(submitted, expected)) {
       match = email;
       // No early return — keep iterating so total time is constant.
     }
@@ -62,9 +66,7 @@ function mapCodeToEmail(code: string): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  // F5/F10: per-IP rate limit caps the cost of a single source spraying codes.
-  // TM-002 adds a SECOND per-code bucket below so even a distributed spray
-  // from N residential IPs can't multiply the global attempt budget.
+  // Per-IP throttle runs first (before body parsing) so spray costs nothing.
   const rl = checkRateLimit({
     key: `auth:operator-code:${callerIp(req)}`,
     maxAttempts: 5,
@@ -86,14 +88,14 @@ export async function POST(req: NextRequest) {
   }
   const code = parsed.data.code.trim();
 
-  // TM-002: global per-code bucket. Keyed by the SHA-256 of the submitted
-  // code so an attacker spraying random codes spreads themselves thin across
-  // 2^256 buckets and never builds up enough attempts against any one bucket
-  // to crack it — while a credible attacker hammering a SHORT list of guessed
-  // codes still hits this cap regardless of how many IPs they spread across.
-  // Hash-keyed so the in-memory map never stores the raw submitted code.
+  // Per-code (hash-keyed) bucket caps any single guessed code globally,
+  // independent of source IP. Random spray spreads attempts across 2^256
+  // buckets so cost stays bounded; a focused dictionary attack on a short
+  // candidate list hits this cap fast. Hash-keyed so the in-memory Map
+  // never stores the raw submitted code.
+  const submitted = createHash("sha256").update(code).digest();
   const codeBucket = checkRateLimit({
-    key: `auth:operator-code:hash:${createHash("sha256").update(code).digest("hex")}`,
+    key: `auth:operator-code:hash:${submitted.toString("hex")}`,
     maxAttempts: 10,
     windowSec: 3600,
   });
@@ -104,7 +106,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const email = mapCodeToEmail(code);
+  const email = lookupEmail(submitted);
   if (!email) {
     return NextResponse.json(
       { error: "invalid_code", message: "Code not recognised." },

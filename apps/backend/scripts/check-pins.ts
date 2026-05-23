@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Read-only audit of agents.pin_code lengths. Tells you whether rotate-pins.ts
- * has anything to do without mutating anything.
+ * Read-only audit of agents.pin_code lengths.
  *
  * Usage:
  *   set -a; . apps/web/.env.local; set +a
@@ -39,9 +38,11 @@ const rows = (data ?? []) as Array<{
 }>;
 
 const byLen = new Map<number, number>();
+const legacy: typeof rows = [];
 for (const r of rows) {
   const n = (r.pin_code ?? "").length;
   byLen.set(n, (byLen.get(n) ?? 0) + 1);
+  if (n < 6) legacy.push(r);
 }
 
 console.error(`Total agents with a PIN: ${rows.length}`);
@@ -50,9 +51,8 @@ for (const [len, count] of [...byLen.entries()].sort(([a], [b]) => a - b)) {
   console.error(`  ${len} digits: ${count}`);
 }
 
-const legacy = rows.filter((r) => (r.pin_code ?? "").length < 6);
 if (legacy.length === 0) {
-  console.error(`\nNo legacy PINs — rotate-pins.ts has nothing to do.`);
+  console.error(`\nAll PINs are 6+ digits.`);
   process.exit(0);
 }
 console.error(`\nLegacy (<6 digit) PINs:`);

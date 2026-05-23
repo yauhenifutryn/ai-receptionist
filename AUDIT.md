@@ -38,7 +38,7 @@ Why this matters for agents: a new agent reading `CLAUDE.md` will try to create 
 
 **F5. Empty ghost directories.** `apps/backend/apps/backend/{src, src/lib, test, test/lib}` exist as empty dirs (0 B total). Probable leftover from a refactor. Confuses `find`, IDE indexers, and grep. Low risk to delete.
 
-**F6. Duplicated skill stores.** `.agents/skills/` and `.claude/skills/` contain the same two subdirs (`supabase`, `supabase-postgres-best-practices`) with identical content (`diff -rq` shows no file differences beyond `.DS_Store`). One should be deleted; pick whichever the toolchain actually reads.
+**F6. ~~Duplicated skill stores~~ — RESOLVED, finding was wrong.** `.claude/skills/` contains symlinks pointing at `.agents/skills/`; canonical content lives once under `.agents/`. `diff -rq` followed the symlinks and looked like duplication. No action needed. Audit error corrected 2026-05-23.
 
 **F7. No mechanical guardrails for the hard rules.** `CLAUDE.md` § "Hard rules" lists ~10 invariants (no PII in logs, no audio storage, default `consent_flag = false`, audio-saving permanently off, EU regions). None of these are enforced by a test, validator, or pre-commit hook. They are prose. A regression that flips audio-saving back on, or default-trues `consent_flag`, would not be caught until production.
 

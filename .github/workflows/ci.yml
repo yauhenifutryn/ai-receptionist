@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  typecheck-test-build:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -34,20 +34,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Format check
-        run: pnpm format:check
-
-      - name: Build contracts (required before typecheck — backend imports from dist/)
-        run: pnpm -F @ai-receptionist/contracts build
-
-      - name: Build backend (required so web's typecheck can resolve backend dist/)
-        run: pnpm -F @ai-receptionist/backend build
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Test
-        run: pnpm test
-
-      - name: Build web
-        run: pnpm -F @ai-receptionist/web build
+      # `pnpm verify` is the canonical local + CI gate. Sequence:
+      #   format:check -> contracts build -> backend build -> typecheck
+      #   -> lint -> test -> web build -> verify-rules.sh
+      # Keep CI in lockstep with local by invoking the same script.
+      - name: Verify
+        run: pnpm verify

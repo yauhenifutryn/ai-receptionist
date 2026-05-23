@@ -56,10 +56,13 @@ HANDOFF.json
 CLAUDE.md
 PROJECT_LOG.md
 AGENTS.md
-docs/research/
-docs/superpowers/
-docs/handover-*.md
-docs/plans/
+
+# All in-repo documentation is local-only. The single public surface is
+# README.md (plus the legal templates under apps/web/public/legal/, which
+# clinics actively need). Everything internal — strategy, plans, sales
+# materials, session handovers, AI design contracts — stays in the local
+# checkout and ships to teammates via Notion / Drive / direct share.
+docs/
 
 # IDE
 .idea/
@@ -71,9 +74,6 @@ docs/plans/
 *.log
 logs/
 .vercel
-
-# Local-only docs that were previously at root
-docs/internal/
 
 # Local test-session artifacts — full record of each /api/prepare + /api/provision
 # run for human + Claude review. Local only, contains real scraped clinic data.

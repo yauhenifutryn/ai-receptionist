@@ -14,11 +14,12 @@ All rights reserved. The source code is provided here for transparency to pilot 
 
 ## Repository layout
 
-- `apps/web/` — Next.js 16 (App Router) + Tailwind. Onboarding wizard, owner dashboard, public landing, SMS short-URL pages.
+- `apps/web/` — Next.js 16 (App Router) + Tailwind. Onboarding wizard, owner dashboard, public landing, SMS short-URL pages. Public legal templates under `apps/web/public/legal/`.
 - `apps/backend/` — Hono on Node. ElevenLabs orchestration, Firecrawl-based scraper, server-tool webhooks, post-call handlers, consent classifier.
 - `packages/contracts/` — Zod schemas + TypeScript types shared by the web and backend tiers. Changes here are PR-gated.
-- `docs/` — public design + research notes.
 - `supabase/` — database schema (EU, Ireland `eu-west-1`).
+
+Internal documentation (strategy, plans, sales materials, session handovers) lives in a local-only `docs/` tree that is not tracked in this repo.
 
 ## Local setup
 

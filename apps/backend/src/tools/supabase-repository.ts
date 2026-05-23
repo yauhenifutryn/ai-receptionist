@@ -1,10 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type {
-  BookingRow,
-  BookingsRepository,
-  InsertBookingArgs,
-  TenantBinding,
-} from "./repository.js";
+import type { BookingRow, BookingsRepository, InsertBookingArgs } from "./repository.js";
+import { resolveTenantByAgent as sharedResolveTenantByAgent } from "../lib/supabase-agent.js";
 
 /**
  * Supabase-backed BookingsRepository. Service-role client only — bypasses RLS
@@ -13,16 +9,8 @@ import type {
  */
 export function createSupabaseBookingsRepository(client: SupabaseClient): BookingsRepository {
   return {
-    async resolveTenantByAgent(providerAgentId: string): Promise<TenantBinding | null> {
-      const { data, error } = await client
-        .from("agents")
-        .select("id, tenant_id")
-        .eq("provider_agent_id", providerAgentId)
-        .maybeSingle();
-      if (error) throw new Error(`agents lookup failed: ${error.message}`);
-      if (!data) return null;
-      return { tenantId: data.tenant_id, agentRowId: data.id };
-    },
+    resolveTenantByAgent: (providerAgentId: string) =>
+      sharedResolveTenantByAgent(client, providerAgentId),
 
     async findBookingByRequestId(requestId: string): Promise<BookingRow | null> {
       const { data, error } = await client

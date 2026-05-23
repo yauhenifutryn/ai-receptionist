@@ -8,20 +8,12 @@ import type {
   UpdateBookingRevenueArgs,
   UpsertConversationArgs,
 } from "./repository.js";
-import type { TenantBinding } from "../tools/repository.js";
+import { resolveTenantByAgent as sharedResolveTenantByAgent } from "../lib/supabase-agent.js";
 
 export function createSupabasePostCallRepository(client: SupabaseClient): PostCallRepository {
   return {
-    async resolveTenantByAgent(providerAgentId: string): Promise<TenantBinding | null> {
-      const { data, error } = await client
-        .from("agents")
-        .select("id, tenant_id")
-        .eq("provider_agent_id", providerAgentId)
-        .maybeSingle();
-      if (error) throw new Error(`agents lookup failed: ${error.message}`);
-      if (!data) return null;
-      return { tenantId: data.tenant_id, agentRowId: data.id };
-    },
+    resolveTenantByAgent: (providerAgentId: string) =>
+      sharedResolveTenantByAgent(client, providerAgentId),
 
     async upsertConsentLog(args: InsertConsentLogArgs): Promise<void> {
       const { error } = await client.from("consent_log").upsert(

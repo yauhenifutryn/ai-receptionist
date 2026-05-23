@@ -81,7 +81,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { data: op } = await userSupabase
+  // operator_emails has RLS enabled with NO SELECT policy — every non-service-
+  // role read returns null, so this check MUST use the service-role client or
+  // every operator gets silently downgraded to the tenant_member path.
+  const { data: op } = await getServiceRoleSupabase()
     .from("operator_emails")
     .select("email")
     .eq("email", userData.user.email)

@@ -35,11 +35,17 @@ export async function POST(req: NextRequest) {
   // Operator flag: present a user session and check the operator_emails
   // allow-list. A missing session is fine — only the browser_test branch
   // actually requires isOperator=true in the handler.
+  //
+  // The allow-list read MUST go through the service-role client: operator_emails
+  // has RLS enabled with no SELECT policy, so a user-JWT read returns null for
+  // everyone (including actual operators), silently downgrading them to the
+  // PIN-only finalize path.
   const userSupabase = await getUserSupabase();
   const { data: userData } = await userSupabase.auth.getUser();
+  const service = getServiceRoleSupabase();
   let isOperator = false;
   if (userData.user?.email) {
-    const { data: op } = await userSupabase
+    const { data: op } = await service
       .from("operator_emails")
       .select("email")
       .eq("email", userData.user.email)
@@ -52,7 +58,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "elevenlabs_env_missing" }, { status: 500 });
   }
 
-  const service = getServiceRoleSupabase();
   const repo = createSupabasePostCallRepository(service);
 
   const r = await handleFinalizeConversation(parsed.data, {

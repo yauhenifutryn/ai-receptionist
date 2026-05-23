@@ -1,0 +1,17 @@
+# Code owners
+# https://docs.github.com/en/repositories/managing-your-repositories-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Reviewers listed here become required reviewers when GitHub Branch Protection
+# is configured with "Require review from Code Owners" on the protected branch.
+
+# Default owner — everything in the repo.
+*                       @yauhenifutryn
+
+# Contract files are the only hard cross-tier sync point. Jenya MUST review any
+# PR that changes them. See CLAUDE.md § "Parallel work and PR review rules".
+/packages/contracts/    @yauhenifutryn
+
+# CI workflow + harness scripts — change requires owner review even after
+# Rem onboards as a maintainer.
+/.github/workflows/     @yauhenifutryn
+/scripts/               @yauhenifutryn

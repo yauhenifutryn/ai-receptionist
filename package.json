@@ -16,7 +16,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore",
     "verify": "pnpm format:check && pnpm -F @ai-receptionist/contracts build && pnpm -F @ai-receptionist/backend build && pnpm typecheck && pnpm lint && pnpm test && pnpm -F @ai-receptionist/web build && pnpm verify:rules",
-    "verify:rules": "bash scripts/verify-rules.sh"
+    "verify:rules": "bash scripts/verify-rules.sh",
+    "env:doctor": "node scripts/env-doctor.mjs"
   },
   "devDependencies": {
     "prettier": "^3.4.2",

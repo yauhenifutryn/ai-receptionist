@@ -32,6 +32,10 @@ export interface VerifyOptions {
   secret?: string | null;
   /** Override env-resolution (for tests). */
   nodeEnv?: string;
+  /** Override Vercel env-resolution (for tests). VERCEL_ENV is set by the
+   *  platform; "production" indicates a prod deployment regardless of
+   *  whatever NODE_ENV value the user has set. F9. */
+  vercelEnv?: string;
 }
 
 export async function verifyElevenLabsWebhook(
@@ -42,11 +46,18 @@ export async function verifyElevenLabsWebhook(
   const secret =
     opts.secret !== undefined ? opts.secret : (process.env.ELEVENLABS_WEBHOOK_SECRET ?? null);
   const nodeEnv = opts.nodeEnv ?? process.env.NODE_ENV ?? "development";
+  const vercelEnv = opts.vercelEnv ?? process.env.VERCEL_ENV ?? "";
   const now = opts.now ?? Date.now;
   const header = req.headers.get(SIGNATURE_HEADER);
 
+  // F9: fail-closed when either NODE_ENV or VERCEL_ENV signals production.
+  // VERCEL_ENV is platform-set and resistant to user misconfiguration of
+  // NODE_ENV, so checking both eliminates a class of "I thought we were in
+  // dev" silent webhook-bypass bugs.
+  const isProduction = nodeEnv === "production" || vercelEnv === "production";
+
   if (!secret) {
-    if (nodeEnv === "production") {
+    if (isProduction) {
       return {
         ok: false,
         status: 500,

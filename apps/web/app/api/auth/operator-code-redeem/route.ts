@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
+import { checkRateLimit, callerIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,19 @@ function mapCodeToEmail(code: string): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  // F5/F10: rate limit by IP. The code namespace (8+ chars) makes brute
+  // force impractical, but throttling caps log/Supabase-call cost from spray.
+  const rl = checkRateLimit({
+    key: `auth:operator-code:${callerIp(req)}`,
+    maxAttempts: 5,
+    windowSec: 60,
+  });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited", retryAfterSec: rl.retryAfterSec },
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
   const raw = await req.json().catch(() => null);
   const parsed = BodySchema.safeParse(raw);
   if (!parsed.success) {

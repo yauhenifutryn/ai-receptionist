@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
+import { verifyTwilioRequest } from "@/lib/verify-twilio-signature";
 
 /**
  * Twilio (and Zadarma — same TwiML/SIP-redirect shape) inbound voice webhook.
@@ -33,8 +34,16 @@ export async function POST(req: Request) {
     // unexpected hits from carrier health-checks.
     return xml(`<Hangup/>`);
   }
-  const form = await req.formData();
-  const digits = form.get("Digits");
+  // F4: verify X-Twilio-Signature before any DB lookup or SIP-dial response.
+  // Without this, attackers could brute-force PINs against agents.pin_code on
+  // this surface and elicit SIP endpoint URLs that may enable toll fraud.
+  const verified = await verifyTwilioRequest(req);
+  if (!verified.ok) {
+    // Generic hang-up rather than a JSON error: a real Twilio retry still
+    // sees TwiML, but a forged caller learns nothing about format/state.
+    return xml(`<Hangup/>`);
+  }
+  const digits = verified.params.Digits;
   if (typeof digits !== "string") {
     // Step 1: prompt for PIN. Polish TTS via Twilio's <Say language="pl-PL">.
     return xml(

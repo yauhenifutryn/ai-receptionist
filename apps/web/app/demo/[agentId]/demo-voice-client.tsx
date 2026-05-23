@@ -88,7 +88,7 @@ function Inner({ agentId, strings, pin }: Props) {
         timestamp: Date.now(),
       };
       setTranscript((t) => [...t, entry]);
-      void persistTurn(agentId, conversation, entry, mode);
+      void persistTurn(agentId, conversation, entry, mode, pin);
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : JSON.stringify(err);
@@ -178,7 +178,7 @@ function Inner({ agentId, strings, pin }: Props) {
       timestamp: Date.now(),
     };
     setTranscript((t) => [...t, entry]);
-    void persistTurn(agentId, conversation, entry, mode);
+    void persistTurn(agentId, conversation, entry, mode, pin);
     conversation.sendUserMessage(text);
     setChatInput("");
   }
@@ -374,6 +374,7 @@ async function persistTurn(
   conversation: { getId?: () => string },
   entry: { role: "user" | "agent"; text: string; timestamp: number },
   mode: "voice" | "chat",
+  pin: string | null,
 ): Promise<void> {
   let conversationId = "pending";
   try {
@@ -394,6 +395,9 @@ async function persistTurn(
         timestamp: entry.timestamp,
         source: mode,
         surface: "pin_demo",
+        // F3: PIN is required for pin_demo writes. The demo page already
+        // validated this PIN against agents.pin_code before rendering.
+        pin,
       }),
     });
   } catch (err) {

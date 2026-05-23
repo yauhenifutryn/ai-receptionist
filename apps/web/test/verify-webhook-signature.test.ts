@@ -96,6 +96,18 @@ describe("verifyElevenLabsWebhook", () => {
     if (!r.ok) expect(r.status).toBe(500);
   });
 
+  it("hard-fails when VERCEL_ENV=production even if NODE_ENV is misset (F9)", async () => {
+    const req = fakeReq({ body: BODY, signature: sign(SECRET, NOW_SEC, BODY) });
+    const r = await verifyElevenLabsWebhook(req, {
+      secret: null,
+      now: fixedNow,
+      nodeEnv: "development",
+      vercelEnv: "production",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(500);
+  });
+
   it("allows in dev when secret is missing (ergonomic fallback)", async () => {
     const req = fakeReq({ body: BODY });
     const r = await verifyElevenLabsWebhook(req, {

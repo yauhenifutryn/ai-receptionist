@@ -18,6 +18,7 @@ import { createGeminiProvider } from "@ai-receptionist/backend/lib/gemini-provid
 import { buildSystemPrompt, extractPolishCity } from "@ai-receptionist/backend/prompts";
 import type { FirecrawlPage } from "@ai-receptionist/backend/scraper";
 import { openTestSession, openExistingSession } from "@/lib/test-session-logger";
+import { getOperatorOrJsonError } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,6 +72,15 @@ const BodySchema = z.object({
  *   { type: "error", code, message }
  */
 export async function POST(req: NextRequest) {
+  // F1: operator gate. /api/prepare runs paid Firecrawl + Gemini work (60-180s
+  // per call, up to 50 pages scraped) and is internal-only. Without this gate
+  // anyone with the URL can drain our LLM quota and tie up function concurrency.
+  // Mirrors the gate on /api/provision (the next step in the same flow).
+  const operator = await getOperatorOrJsonError();
+  if (!operator.ok) {
+    return jsonError(operator.body.error, operator.body.error, operator.status);
+  }
+
   const raw = await req.json().catch(() => null);
   const parsed = BodySchema.safeParse(raw);
   if (!parsed.success) {

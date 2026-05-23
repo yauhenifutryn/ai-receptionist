@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { getServiceRoleSupabase } from "@/lib/supabase-server";
+import { getServiceRoleSupabase, getUserSupabase } from "@/lib/supabase-server";
+import { checkRateLimit, callerIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,15 @@ const BodySchema = z.object({
   text: z.string().min(1).max(8000),
   timestamp: z.number().int().positive(),
   source: z.enum(["voice", "chat"]).optional(),
-  surface: z.enum(["browser_test", "pin_demo"]).optional(),
+  // F3: surface is now REQUIRED so the route can pick the right auth path
+  // (PIN check for pin_demo, operator session for browser_test).
+  surface: z.enum(["browser_test", "pin_demo"]),
+  // Required only when surface === "pin_demo". Validated against
+  // agents.pin_code below. Demo client passes this; operator client doesn't.
+  pin: z
+    .string()
+    .regex(/^\d{4,6}$/)
+    .optional(),
 });
 
 function repoRoot(): string {
@@ -50,12 +59,59 @@ export async function POST(req: NextRequest) {
   }
   const b = parsed.data;
 
+  // F3: rate limit (agentId, conversationId, IP) to bound transcript spam
+  // even from valid PIN holders. 60 inserts per minute is generous (a fast
+  // mic conversation emits ~10/min); blocks the obvious abuse case.
+  const rl = checkRateLimit({
+    key: `transcript:${b.agentId}:${b.conversationId}:${callerIp(req)}`,
+    maxAttempts: 60,
+    windowSec: 60,
+  });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited", retryAfterSec: rl.retryAfterSec },
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
+
+  // F3: auth gate. Route handles two contexts:
+  //   - pin_demo: caller must supply matching PIN for the agent.
+  //   - browser_test: caller must be an authenticated operator.
+  const service = getServiceRoleSupabase();
+  if (b.surface === "pin_demo") {
+    if (!b.pin) {
+      return NextResponse.json({ error: "pin_required" }, { status: 401 });
+    }
+    const { data: agentRow } = await service
+      .from("agents")
+      .select("pin_code")
+      .eq("provider_agent_id", b.agentId)
+      .maybeSingle();
+    if (!agentRow || agentRow.pin_code !== b.pin) {
+      return NextResponse.json({ error: "pin_mismatch" }, { status: 403 });
+    }
+  } else {
+    // browser_test → operator session required.
+    const userSupabase = await getUserSupabase();
+    const { data: userData } = await userSupabase.auth.getUser();
+    if (!userData.user) {
+      return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+    }
+    const { data: op } = await service
+      .from("operator_emails")
+      .select("email")
+      .eq("email", userData.user.email)
+      .maybeSingle();
+    if (!op) {
+      return NextResponse.json({ error: "not_an_operator" }, { status: 403 });
+    }
+  }
+
   // 1. Supabase insert — primary, durable, queryable.
   let supabaseOk = false;
   let supabaseError: string | undefined;
   try {
-    const supabase = getServiceRoleSupabase();
-    const { error: dbErr } = await supabase.from("test_transcripts").insert({
+    const { error: dbErr } = await service.from("test_transcripts").insert({
       provider_agent_id: b.agentId,
       conversation_id: b.conversationId,
       role: b.role,

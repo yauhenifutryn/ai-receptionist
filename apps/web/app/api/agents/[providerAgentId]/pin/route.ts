@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { randomInt } from "node:crypto";
 import { getOperatorOrJsonError, getServiceRoleSupabase } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -8,13 +9,23 @@ interface RouteParams {
   params: Promise<{ providerAgentId: string }>;
 }
 
+/**
+ * F2 + F7: 6-digit PIN (1,000,000-value space) generated with crypto.randomInt
+ * instead of Math.random. Combined with the rate limit on `?pin=` parameter
+ * routes (see apps/web/app/api/conversations/route.ts), this makes the demo
+ * gate practically un-brute-forceable.
+ *
+ * Old 4-digit PINs in the DB stay valid for the operator who shared them; a
+ * fresh POST replaces them with 6-digit. scripts/rotate-pins.ts can rotate
+ * all at once when convenient.
+ */
 function generatePin(): string {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  return String(randomInt(100000, 1000000));
 }
 
 /**
  * GET: returns the current pin_code (or null) for an agent.
- * POST: generates a fresh 4-digit PIN and saves it on agents.pin_code,
+ * POST: generates a fresh 6-digit PIN and saves it on agents.pin_code,
  *       retrying up to 5 times on uniqueness conflict.
  *
  * Operator-only — PIN gates the public /demo/<agentId>?pin=X route.

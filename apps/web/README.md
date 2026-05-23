@@ -23,3 +23,18 @@ Local-iteration tip: when iterating on web-only code, run `pnpm -F @ai-reception
 ## Lint
 
 ESLint 9 flat config in `eslint.config.mjs`. Uses `eslint-config-next/core-web-vitals` with two React 19 strict-mode rules demoted (see comments in the config).
+
+## `public/` is web-public — do not put anything sensitive here
+
+Next.js serves every file under `apps/web/public/` as a static asset reachable by URL with no auth. Anything dropped in here is fetchable by the entire internet. Today:
+
+- `public/legal/clinic-website-notice-template.md` — intentional. Compliance template clinics paste on their websites; being able to link to it from a public repo is itself a transparency signal.
+
+Do NOT put inside `public/`:
+
+- Backend keys, API tokens, signed URLs of any kind.
+- Patient transcripts, call recordings, prospect lead data.
+- Internal-only design docs, prompts, or planning notes.
+- Anything from the local-only `docs/` tree.
+
+When in doubt, put it under `apps/web/lib/`, `apps/backend/`, or `docs/` instead.

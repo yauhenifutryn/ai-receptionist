@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
 import { materializePendingInvitations } from "@/lib/auth-materialize-invitations";
+import { checkRateLimit, callerIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +57,21 @@ export async function POST(req: NextRequest) {
   // Tolerate "1 2 3 4 5 6" or "123-456" pastings.
   const token = parsed.data.token.replace(/[\s-]/g, "");
   const next = sanitizeNext(parsed.data.next);
+
+  // F5: rate limit OTP verification attempts. 6-digit space is 1M, so
+  // 5 attempts per 10 min per (email, IP) makes brute force impractical
+  // while not blocking a forgetful user who fat-fingered the code.
+  const rl = checkRateLimit({
+    key: `auth:verify-otp:${email}:${callerIp(req)}`,
+    maxAttempts: 5,
+    windowSec: 600,
+  });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited", retryAfterSec: rl.retryAfterSec },
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
 
   // Defense-in-depth: whitelist still gates here. If somehow the user got
   // an OTP from outside the request-magic-link path, refuse to mint a session.

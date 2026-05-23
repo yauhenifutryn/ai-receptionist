@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceRoleSupabase, getUserSupabase } from "@/lib/supabase-server";
+import { checkRateLimit, callerIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,18 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ conversatio
   const agentId = url.searchParams.get("agentId");
 
   if (pin && agentId) {
+    // F2: rate limit (agent, IP) to defeat brute force on the PIN.
+    const rl = checkRateLimit({
+      key: `pin:${agentId}:${callerIp(req)}`,
+      maxAttempts: 5,
+      windowSec: 60,
+    });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "rate_limited", retryAfterSec: rl.retryAfterSec },
+        { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+      );
+    }
     const service = getServiceRoleSupabase();
     const { data: agentRow } = await service
       .from("agents")

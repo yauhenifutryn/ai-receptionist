@@ -47,6 +47,10 @@ const envSchema = z.object({
 
   // Standard.
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  // Vercel platform-set. "production" on prod deployments, "preview" on PR
+  // previews, "development" on local. Independent of NODE_ENV; used by F9
+  // checks (webhook-secret presence) and other prod-only assertions.
+  VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -64,6 +68,15 @@ export function getEnv(): Env {
         ...issues,
         "Check .env.local against .env.example.",
       ].join("\n"),
+    );
+  }
+  // F9: production hard-requires ELEVENLABS_WEBHOOK_SECRET. Without it the
+  // signature verifier degrades to warn-and-accept, which lets attackers
+  // forge consent flags and bookings via /api/post-call + /api/tools/*.
+  if (parsed.data.VERCEL_ENV === "production" && !parsed.data.ELEVENLABS_WEBHOOK_SECRET) {
+    throw new Error(
+      "ELEVENLABS_WEBHOOK_SECRET is required when VERCEL_ENV=production. " +
+        "Set it in Vercel project settings → Environment Variables.",
     );
   }
   cached = parsed.data;

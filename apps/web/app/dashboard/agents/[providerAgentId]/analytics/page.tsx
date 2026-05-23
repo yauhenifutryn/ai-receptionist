@@ -3,6 +3,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireOperator } from "@/lib/supabase-server";
 import { aggregateRagStats } from "@/lib/rag-stats";
+import { formatShortDateTime } from "@/lib/format-pl-datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -386,12 +387,8 @@ export default async function AnalyticsPage({ params }: PageProps) {
                 <tr key={phone}>
                   <td className="py-2 font-mono text-xs">{maskPhone(phone)}</td>
                   <td className="py-2">{v.count}</td>
-                  <td className="py-2 text-xs text-neutral-600">
-                    {new Date(v.first).toLocaleString("pl-PL")}
-                  </td>
-                  <td className="py-2 text-xs text-neutral-600">
-                    {new Date(v.last).toLocaleString("pl-PL")}
-                  </td>
+                  <td className="py-2 text-xs text-neutral-600">{formatShortDateTime(v.first)}</td>
+                  <td className="py-2 text-xs text-neutral-600">{formatShortDateTime(v.last)}</td>
                 </tr>
               ))}
             </tbody>

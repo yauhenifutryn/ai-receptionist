@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { extractRagStats } from "@/lib/rag-stats";
+import { formatShortDateTime } from "@/lib/format-pl-datetime";
 
 export interface ConversationRow {
   conversation_id: string;
@@ -77,9 +78,7 @@ export default function ConversationsTable({
             const kbHits = ragStats?.turnsWithRetrieval ?? null;
             return (
               <tr key={r.conversation_id} className="hover:bg-neutral-50">
-                <td className="px-4 py-3 font-mono text-xs">
-                  {new Date(r.started_at).toLocaleString("pl-PL")}
-                </td>
+                <td className="px-4 py-3 font-mono text-xs">{formatShortDateTime(r.started_at)}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sourceColor[r.source]}`}

@@ -30,51 +30,57 @@ export async function handlePostCall(
     return { ok: false, status: 404, error: "tenant_not_found" };
   }
 
-  // Consent log: ALWAYS written. consent_flag must match (decision === 'yes').
   const consentFlag = payload.derived.consentDecision === "yes";
-  await deps.repo.upsertConsentLog({
-    tenantId: tenant.tenantId,
-    agentRowId: tenant.agentRowId,
-    conversationId: payload.conversationId,
-    callerLanguage: payload.derived.callerLanguage,
-    decision: payload.derived.consentDecision,
-    consentFlag,
-    classifierConfidence: 1,
-  });
 
-  // Transcript: gated on consent. DB trigger enforces too — belt + suspenders.
-  let transcriptStored = false;
-  if (consentFlag && payload.transcript.length > 0) {
-    await deps.repo.insertTranscript({
+  // Three independent chains run in parallel:
+  //   1. consent_log upsert -> transcript insert (transcript trigger requires the consent row)
+  //   2. service_value lookup -> booking revenue update
+  //   3. booking-id find
+  // upsertConversation runs after all three because it needs the booking id.
+  const consentChain = (async () => {
+    await deps.repo.upsertConsentLog({
       tenantId: tenant.tenantId,
+      agentRowId: tenant.agentRowId,
       conversationId: payload.conversationId,
-      turns: payload.transcript,
+      callerLanguage: payload.derived.callerLanguage,
+      decision: payload.derived.consentDecision,
+      consentFlag,
+      classifierConfidence: 1,
     });
-    transcriptStored = true;
-  }
+    if (consentFlag && payload.transcript.length > 0) {
+      await deps.repo.insertTranscript({
+        tenantId: tenant.tenantId,
+        conversationId: payload.conversationId,
+        turns: payload.transcript,
+      });
+      return { transcriptStored: true };
+    }
+    return { transcriptStored: false };
+  })();
 
-  // Revenue: computed only when we have an appointmentCategory.
-  let recoveredRevenuePln: number | null = null;
-  if (payload.derived.appointmentCategory) {
+  const revenueChain = (async () => {
+    if (!payload.derived.appointmentCategory) return { recoveredRevenuePln: null as number | null };
     const matrix = await deps.repo.lookupServiceValue({
       tenantId: tenant.tenantId,
       category: payload.derived.appointmentCategory,
     });
-    if (matrix) {
-      recoveredRevenuePln = Number((matrix.expectedRevenuePln * matrix.showRate).toFixed(2));
-      await deps.repo.updateBookingRecoveredRevenue({
-        conversationId: payload.conversationId,
-        recoveredRevenuePln,
-      });
-    }
-  }
+    if (!matrix) return { recoveredRevenuePln: null as number | null };
+    const recoveredRevenuePln = Number((matrix.expectedRevenuePln * matrix.showRate).toFixed(2));
+    await deps.repo.updateBookingRecoveredRevenue({
+      conversationId: payload.conversationId,
+      recoveredRevenuePln,
+    });
+    return { recoveredRevenuePln };
+  })();
 
-  // Canonical conversations row (Chat C §4.4). Same row may also be updated
-  // by /api/conversations/finalize for browser/PIN sessions; upsert keys on
-  // conversation_id so the post-call webhook is authoritative for PSTN.
-  // Consent gate: strip transcript from raw_jsonb when consent_flag is false
-  // (DB CHECK also enforces this; belt + suspenders).
-  const bookedBookingId = await deps.repo.findBookingIdByConversation(payload.conversationId);
+  const bookingChain = deps.repo.findBookingIdByConversation(payload.conversationId);
+
+  const [{ transcriptStored }, { recoveredRevenuePln }, bookedBookingId] = await Promise.all([
+    consentChain,
+    revenueChain,
+    bookingChain,
+  ]);
+
   const transcriptForJsonb = consentFlag ? payload.transcript : undefined;
 
   // EL shape varies depending on which webhook variant fired; check both

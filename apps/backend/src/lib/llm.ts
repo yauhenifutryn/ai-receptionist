@@ -122,18 +122,9 @@ export class LLMClient {
             );
           } else {
             lastError = new Error(`JSON parse failed: ${parsedJson.error}`);
-            // Dump truncated/malformed text to /tmp so we can inspect it.
-            // Filename includes attempt + model so multiple runs are kept.
-            const dumpPath = `/tmp/llm-raw-${model}-attempt${attempts}-${Date.now()}.txt`;
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
-              require("node:fs").writeFileSync(dumpPath, text);
-            } catch {
-              // ignore dump failures
-            }
             console.warn(
               `[LLMClient] attempt ${attempts} model=${model} retry=${retry} JSON_PARSE_FAIL ` +
-                `outputChars=${text.length} dumpedTo=${dumpPath} :: ${parsedJson.error.slice(0, 300)}`,
+                `outputChars=${text.length} :: ${parsedJson.error.slice(0, 300)}`,
             );
             console.warn(`[LLMClient]   last 200 chars: ${JSON.stringify(text.slice(-200))}`);
           }

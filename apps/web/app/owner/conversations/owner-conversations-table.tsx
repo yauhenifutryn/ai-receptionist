@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useRouter, useSearchParams } from "next/navigation";
+import { formatShortDateTime } from "@/lib/format-pl-datetime";
 
 /**
  * Owner-facing row shape. Narrower than the operator table — owners only
@@ -85,7 +86,7 @@ export default function OwnerConversationsTable({
               {rows.map((r) => (
                 <tr key={r.conversation_id} className="hover:bg-neutral-50">
                   <td className="px-4 py-3 font-mono text-xs text-neutral-700">
-                    {new Date(r.started_at).toLocaleString("pl-PL")}
+                    {formatShortDateTime(r.started_at)}
                   </td>
                   <td className="px-4 py-3">{formatSource(r.source)}</td>
                   <td className="px-4 py-3">{formatDuration(r.duration_seconds)}</td>

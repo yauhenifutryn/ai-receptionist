@@ -81,6 +81,10 @@ export async function POST(
     },
     { onConflict: "tenant_id,email", ignoreDuplicates: false },
   );
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // Don't surface raw Supabase message; it can leak schema or constraint detail.
+    console.error("[owner-invite] tenant_invitations upsert failed:", error.message);
+    return NextResponse.json({ error: "invitation_failed" }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }

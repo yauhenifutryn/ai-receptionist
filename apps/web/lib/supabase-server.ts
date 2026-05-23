@@ -131,11 +131,16 @@ export async function getOperatorOrJsonError(): Promise<
   if (!user) {
     return { ok: false, status: 401, body: { error: "unauthenticated" } };
   }
-  const { data: operatorRow } = await supabase
+  const { data: operatorRow, error } = await supabase
     .from("operators")
     .select("user_id")
     .eq("user_id", user.id)
     .maybeSingle();
+  if (error) {
+    // Surface DB failures as 500 so they're not silently confused with a
+    // legitimate "not an operator" denial during a Supabase outage.
+    return { ok: false, status: 500, body: { error: "operator_lookup_failed" } };
+  }
   if (!operatorRow) {
     return { ok: false, status: 403, body: { error: "not_an_operator" } };
   }

@@ -7,8 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  // F1: Verify before any DB write. Bookings write tenant_id + PII;
-  // an unverified caller could forge bookings against any agent.
+  // Verify HMAC before any DB write — bookings carry tenant_id + PII and an
+  // unverified caller could forge bookings against any agent.
   const verified = await verifyElevenLabsWebhook(req);
   if (!verified.ok) {
     return NextResponse.json(
@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
     smsFailureLogger: deps.smsFailureLogger,
     clinicName: cfg.clinicName,
     contactPhone: cfg.contactPhone,
+    smsConfirmationsEnabled: cfg.smsConfirmationsEnabled,
     ...(conversationId ? { conversationId } : {}),
   });
   if (result.ok) {

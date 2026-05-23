@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useState } from "react";
 import { extractRagStats } from "@/lib/rag-stats";
+import { formatShortDateTime } from "@/lib/format-pl-datetime";
 
 /**
  * Two shapes coexist in raw_jsonb depending on the call surface:
@@ -99,7 +100,7 @@ export default function ConversationDetail({ row }: { row: ConversationRow }) {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">
-        Conversation · {row.source} · {new Date(row.started_at).toLocaleString("pl-PL")}
+        Conversation · {row.source} · {formatShortDateTime(row.started_at)}
       </h1>
 
       <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">

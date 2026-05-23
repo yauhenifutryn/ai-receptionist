@@ -12,6 +12,7 @@ import {
   reportCoverage,
   extractInternalLinks,
   DEFAULT_RELEVANCE_QUERY,
+  PER_PAGE_CHAR_CAP,
 } from "@ai-receptionist/backend/scraper";
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
 import { createGeminiProvider } from "@ai-receptionist/backend/lib/gemini-provider";
@@ -457,17 +458,15 @@ export async function POST(req: NextRequest) {
 
         // 4. Consolidate.
         // Show the user what's about to be sent to Gemini: page count + the
-        // actual char count after per-page capping (must match the cap in
-        // consolidate.ts → PER_PAGE_CHAR_CAP). Tokens are estimated at
+        // actual char count after per-page capping. Tokens are estimated at
         // ~4 chars/token (Gemini tokenizer is close enough for status text).
-        const CONSOLIDATE_PER_PAGE_CAP = 50000;
         const inputChars = validPages.reduce(
-          (sum, p) => sum + Math.min(p.markdown.length, CONSOLIDATE_PER_PAGE_CAP),
+          (sum, p) => sum + Math.min(p.markdown.length, PER_PAGE_CHAR_CAP),
           0,
         );
         const inputWords = validPages.reduce(
           (sum, p) =>
-            sum + p.markdown.slice(0, CONSOLIDATE_PER_PAGE_CAP).split(/\s+/).filter(Boolean).length,
+            sum + p.markdown.slice(0, PER_PAGE_CHAR_CAP).split(/\s+/).filter(Boolean).length,
           0,
         );
         const inputTokens = Math.round(inputChars / 4);

@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { randomInt } from "node:crypto";
 import { getOperatorOrJsonError, getServiceRoleSupabase } from "@/lib/supabase-server";
 
+const PG_UNIQUE_VIOLATION = "23505";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -71,8 +73,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
     if (!error && data) {
       return NextResponse.json({ pin: data.pin_code });
     }
-    // 23505 = postgres unique violation. Try a fresh PIN.
-    if (error && (error as { code?: string }).code === "23505") {
+    if (error && (error as { code?: string }).code === PG_UNIQUE_VIOLATION) {
       continue;
     }
     if (error) {

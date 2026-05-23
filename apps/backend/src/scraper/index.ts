@@ -4,7 +4,11 @@ import { consolidate } from "./consolidate.js";
 import type { FirecrawlClient, FirecrawlPage } from "./firecrawl.js";
 
 export { createFirecrawlClient } from "./firecrawl.js";
-export { consolidate, CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES } from "./consolidate.js";
+export {
+  consolidate,
+  CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES,
+  PER_PAGE_CHAR_CAP,
+} from "./consolidate.js";
 export { scraperOutputToMarkdown } from "./to-markdown.js";
 export {
   shouldScrape,

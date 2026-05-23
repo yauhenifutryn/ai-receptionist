@@ -167,7 +167,7 @@ export interface ConsolidateArgs {
  * If a deployment ever drops back to free tier (250K tokens/min), this
  * cap should drop too — but priority is quality, not cost.
  */
-const PER_PAGE_CHAR_CAP = 50000;
+export const PER_PAGE_CHAR_CAP = 50000;
 
 function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
   const blocks = pages.map(

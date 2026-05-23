@@ -14,7 +14,6 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * Avoids adding the `twilio` npm dep — algorithm is ~20 lines and the rest
  * of that package is irrelevant to our minimal flow.
  *
- * F4 in security_best_practices_report.md.
  */
 
 const SIGNATURE_HEADER = "x-twilio-signature";

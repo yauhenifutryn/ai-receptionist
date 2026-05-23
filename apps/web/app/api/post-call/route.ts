@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  // F6: HMAC verify before any state-changing work. Forged payloads
+  // HMAC verify before any state-changing work. Forged payloads
   // would otherwise flip consent flags / transcript storage / recovered-
   // revenue counters with only an agentId guess.
   const verified = await verifyElevenLabsWebhook(req);

@@ -56,7 +56,9 @@ async function main(): Promise<void> {
 
   console.log(`[backfill] serverToolBaseUrl=${serverToolBaseUrl}`);
 
-  const sb = createClient(supabaseUrl, serviceRoleKey);
+  const sb = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
   const { data, error } = await sb
     .from("agents")
     .select("id, tenant_id, provider_agent_id")

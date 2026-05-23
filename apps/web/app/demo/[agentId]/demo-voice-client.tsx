@@ -395,7 +395,7 @@ async function persistTurn(
         timestamp: entry.timestamp,
         source: mode,
         surface: "pin_demo",
-        // F3: PIN is required for pin_demo writes. The demo page already
+        // PIN is required for pin_demo writes. The demo page already
         // validated this PIN against agents.pin_code before rendering.
         pin,
       }),

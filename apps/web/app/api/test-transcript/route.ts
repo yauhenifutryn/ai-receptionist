@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { getServiceRoleSupabase, getUserSupabase } from "@/lib/supabase-server";
-import { checkRateLimit, callerIp } from "@/lib/rate-limit";
+import { checkRateLimit, callerIp, rateLimitedResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +32,7 @@ const BodySchema = z.object({
   text: z.string().min(1).max(8000),
   timestamp: z.number().int().positive(),
   source: z.enum(["voice", "chat"]).optional(),
-  // F3: surface is now REQUIRED so the route can pick the right auth path
+  // surface is now REQUIRED so the route can pick the right auth path
   // (PIN check for pin_demo, operator session for browser_test).
   surface: z.enum(["browser_test", "pin_demo"]),
   // Required only when surface === "pin_demo". Validated against
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   }
   const b = parsed.data;
 
-  // F3: rate limit (agentId, conversationId, IP) to bound transcript spam
+  // rate limit (agentId, conversationId, IP) to bound transcript spam
   // even from valid PIN holders. 60 inserts per minute is generous (a fast
   // mic conversation emits ~10/min); blocks the obvious abuse case.
   const rl = checkRateLimit({
@@ -67,14 +67,9 @@ export async function POST(req: NextRequest) {
     maxAttempts: 60,
     windowSec: 60,
   });
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "rate_limited", retryAfterSec: rl.retryAfterSec },
-      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
-    );
-  }
+  if (!rl.allowed) return rateLimitedResponse(rl);
 
-  // F3: auth gate. Route handles two contexts:
+  // auth gate. Route handles two contexts:
   //   - pin_demo: caller must supply matching PIN for the agent.
   //   - browser_test: caller must be an authenticated operator.
   const service = getServiceRoleSupabase();

@@ -1,11 +1,7 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-interface CookieToSet {
-  name: string;
-  value: string;
-  options: CookieOptions;
-}
+import type { CookieToSet } from "@/lib/supabase-server";
+import { assertSameOrigin } from "@/lib/assert-same-origin";
 
 /**
  * Auth gate. Three states:
@@ -21,49 +17,32 @@ interface CookieToSet {
  * Gated paths: /provision, /test/*, /dashboard/*. Public: /, /auth/*, /api/*.
  * /api/* is excluded from the OPERATOR gate (handlers do their own auth —
  * webhooks use HMAC, operator routes use getOperatorOrJsonError, owner routes
- * use resolveOwnerAgent). It IS subject to the CSRF Origin check below (F8).
+ * use resolveOwnerAgent). It IS subject to the CSRF Origin check below.
  */
 
 const GATED_PREFIXES = ["/provision", "/test", "/dashboard"];
 const ALLOW_NONOPERATOR_AUTH_PATHS = ["/auth/access-pending", "/auth/sign-out"];
 
-// F8: state-changing methods that must pass the same-origin Origin check.
+// state-changing methods that must pass the same-origin Origin check.
 const STATE_CHANGING_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 
-// F8: API path prefixes that LEGITIMATELY receive cross-origin POSTs from
+// API path prefixes that LEGITIMATELY receive cross-origin POSTs from
 // server-to-server (ElevenLabs, Twilio, Vercel cron, etc.). These already do
 // their own HMAC / signature verification before any side-effect.
 const ORIGIN_CHECK_BYPASS_PREFIXES = ["/api/post-call", "/api/tools/", "/api/twilio/"];
 
-function isOriginAllowed(req: NextRequest): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return true; // no Origin: server-to-server or same-tab nav; SameSite covers.
-  const allowed = new Set<string>([req.nextUrl.origin]);
-  const publicBase = process.env.PUBLIC_BASE_URL;
-  if (publicBase) {
-    try {
-      allowed.add(new URL(publicBase).origin);
-    } catch {
-      // ignore — env validator catches malformed PUBLIC_BASE_URL.
-    }
-  }
-  return allowed.has(origin);
-}
-
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // F8: CSRF defense-in-depth. Block state-changing requests whose Origin
+  // CSRF defense-in-depth. Block state-changing requests whose Origin
   // header is present and does not match our own origin. Done BEFORE any
   // Supabase session work so the check is cheap. Webhook prefixes bypass
   // because they validate signatures cryptographically.
   if (STATE_CHANGING_METHODS.has(req.method) && pathname.startsWith("/api/")) {
     const bypass = ORIGIN_CHECK_BYPASS_PREFIXES.some((p) => pathname.startsWith(p));
-    if (!bypass && !isOriginAllowed(req)) {
-      return NextResponse.json(
-        { error: "origin_not_allowed", origin: req.headers.get("origin") },
-        { status: 403, headers: { "x-csrf-block": "1" } },
-      );
+    if (!bypass) {
+      const blocked = assertSameOrigin(req);
+      if (blocked) return blocked;
     }
   }
 
@@ -128,7 +107,7 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   // Match everything except Next.js internals and static files. /api/* IS
-  // matched so F8 can run the CSRF Origin check there; the proxy function
+  // matched so the CSRF Origin check can run there; the proxy function
   // short-circuits before the operator-session work for /api/* paths.
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*$).*)"],
 };

@@ -1,9 +1,11 @@
+import { NextResponse } from "next/server";
+
 // Lightweight in-memory rate limiter for the pre-pilot window.
 //
 // Trade-offs (intentional, for the 7-days-to-pilot timeline):
 //   - Per-instance only. Vercel function instances may run in parallel, so
 //     under load an attacker may get N * limit attempts where N is the live
-//     instance count. Counterweight: PIN namespace is 1M (F2), so even an
+//     instance count. Counterweight: PIN namespace is 1M, so even an
 //     8x instance multiplier still leaves brute force at >2 weeks of full
 //     traffic per agent.
 //   - Cleared on cold start. That bounds an attacker to roughly one cold-
@@ -112,6 +114,18 @@ function pruneOldest(): void {
     const entry = entries[i];
     if (entry) buckets.delete(entry[0]);
   }
+}
+
+/**
+ * Build the canonical 429 response. Every caller of `checkRateLimit` that
+ * needs to short-circuit on a deny uses this — keeps the response body and
+ * Retry-After header consistent across the API.
+ */
+export function rateLimitedResponse(rl: RateLimitResult): NextResponse {
+  return NextResponse.json(
+    { error: "rate_limited", retryAfterSec: rl.retryAfterSec },
+    { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+  );
 }
 
 /** For tests only. */

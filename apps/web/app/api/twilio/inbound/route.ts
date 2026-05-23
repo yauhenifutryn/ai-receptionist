@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     // unexpected hits from carrier health-checks.
     return xml(`<Hangup/>`);
   }
-  // F4: verify X-Twilio-Signature before any DB lookup or SIP-dial response.
+  // verify X-Twilio-Signature before any DB lookup or SIP-dial response.
   // Without this, attackers could brute-force PINs against agents.pin_code on
   // this surface and elicit SIP endpoint URLs that may enable toll fraud.
   const verified = await verifyTwilioRequest(req);

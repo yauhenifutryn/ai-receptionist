@@ -9,7 +9,7 @@ import { fetchElevenLabsConversation } from "@ai-receptionist/backend/integratio
 import { createSupabasePostCallRepository } from "@ai-receptionist/backend/post-call/supabase-repository";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceRoleSupabase, getUserSupabase } from "@/lib/supabase-server";
-import { checkRateLimit, callerIp } from "@/lib/rate-limit";
+import { checkRateLimit, callerIp, rateLimitedResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,20 +43,15 @@ export async function GET(req: NextRequest) {
     if (!q.agentId) {
       return NextResponse.json({ error: "agentId_required" }, { status: 400 });
     }
-    // F2: rate limit PIN attempts per (agent, IP) to defeat brute force.
-    // Combined with the 6-digit PIN namespace (F7), this puts brute force
+    // Rate-limit PIN attempts per (agent, IP) to defeat brute force.
+    // Combined with the 6-digit PIN namespace, this puts brute force
     // well outside the demo window.
     const rl = checkRateLimit({
       key: `pin:${q.agentId}:${callerIp(req)}`,
       maxAttempts: 5,
       windowSec: 60,
     });
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: "rate_limited", retryAfterSec: rl.retryAfterSec },
-        { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
-      );
-    }
+    if (!rl.allowed) return rateLimitedResponse(rl);
     const service = getServiceRoleSupabase();
     const { data: agentRow } = await service
       .from("agents")

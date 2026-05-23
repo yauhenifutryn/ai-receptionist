@@ -7,7 +7,7 @@ import type { User } from "@supabase/supabase-js";
 
 // @supabase/ssr exports CookieOptions but not the per-entry shape of the
 // setAll callback; redeclare it here so we can type the parameter strictly.
-interface CookieToSet {
+export interface CookieToSet {
   name: string;
   value: string;
   options: CookieOptions;

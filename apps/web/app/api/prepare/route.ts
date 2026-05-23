@@ -72,7 +72,7 @@ const BodySchema = z.object({
  *   { type: "error", code, message }
  */
 export async function POST(req: NextRequest) {
-  // F1: operator gate. /api/prepare runs paid Firecrawl + Gemini work (60-180s
+  // operator gate. /api/prepare runs paid Firecrawl + Gemini work (60-180s
   // per call, up to 50 pages scraped) and is internal-only. Without this gate
   // anyone with the URL can drain our LLM quota and tie up function concurrency.
   // Mirrors the gate on /api/provision (the next step in the same flow).

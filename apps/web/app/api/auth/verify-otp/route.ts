@@ -1,18 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { getServiceRoleSupabase } from "@/lib/supabase-server";
+import { createServerClient } from "@supabase/ssr";
+import { getServiceRoleSupabase, type CookieToSet } from "@/lib/supabase-server";
 import { materializePendingInvitations } from "@/lib/auth-materialize-invitations";
-import { checkRateLimit, callerIp } from "@/lib/rate-limit";
+import { checkRateLimit, callerIp, rateLimitedResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-interface CookieToSet {
-  name: string;
-  value: string;
-  options: CookieOptions;
-}
 
 /**
  * OTP code verification. The user enters the 6-digit code from the email
@@ -58,7 +52,7 @@ export async function POST(req: NextRequest) {
   const token = parsed.data.token.replace(/[\s-]/g, "");
   const next = sanitizeNext(parsed.data.next);
 
-  // F5: rate limit OTP verification attempts. 6-digit space is 1M, so
+  // rate limit OTP verification attempts. 6-digit space is 1M, so
   // 5 attempts per 10 min per (email, IP) makes brute force impractical
   // while not blocking a forgetful user who fat-fingered the code.
   const rl = checkRateLimit({
@@ -66,12 +60,7 @@ export async function POST(req: NextRequest) {
     maxAttempts: 5,
     windowSec: 600,
   });
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "rate_limited", retryAfterSec: rl.retryAfterSec },
-      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
-    );
-  }
+  if (!rl.allowed) return rateLimitedResponse(rl);
 
   // Defense-in-depth: whitelist still gates here. If somehow the user got
   // an OTP from outside the request-magic-link path, refuse to mint a session.

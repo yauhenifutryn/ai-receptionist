@@ -1,16 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { getServiceRoleSupabase } from "@/lib/supabase-server";
+import { createServerClient } from "@supabase/ssr";
+import { getServiceRoleSupabase, type CookieToSet } from "@/lib/supabase-server";
 import { materializePendingInvitations } from "@/lib/auth-materialize-invitations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-interface CookieToSet {
-  name: string;
-  value: string;
-  options: CookieOptions;
-}
 
 /**
  * Magic-link callback. Supabase appends `?code=<pkce-code>&next=<path>` to the

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
-import { checkRateLimit, callerIp } from "@/lib/rate-limit";
+import { checkRateLimit, callerIp, rateLimitedResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   }
   const email = parsed.data.email.trim().toLowerCase();
 
-  // F5: rate limit BEFORE any Supabase work. Two buckets:
+  // rate limit BEFORE any Supabase work. Two buckets:
   //   - per-email: 3 / hour (blocks email-bombing a specific operator)
   //   - per-IP:    10 / hour (blocks a single attacker spraying many emails)
   // Cheap, defense-in-depth; Vercel WAF + email-provider throttling are
@@ -61,23 +61,13 @@ export async function POST(req: NextRequest) {
     maxAttempts: 10,
     windowSec: 3600,
   });
-  if (!ipBucket.allowed) {
-    return NextResponse.json(
-      { error: "rate_limited", retryAfterSec: ipBucket.retryAfterSec },
-      { status: 429, headers: { "retry-after": String(ipBucket.retryAfterSec) } },
-    );
-  }
+  if (!ipBucket.allowed) return rateLimitedResponse(ipBucket);
   const emailBucket = checkRateLimit({
     key: `auth:request-magic-link:email:${email}`,
     maxAttempts: 3,
     windowSec: 3600,
   });
-  if (!emailBucket.allowed) {
-    return NextResponse.json(
-      { error: "rate_limited", retryAfterSec: emailBucket.retryAfterSec },
-      { status: 429, headers: { "retry-after": String(emailBucket.retryAfterSec) } },
-    );
-  }
+  if (!emailBucket.allowed) return rateLimitedResponse(emailBucket);
 
   // 1. Whitelist check.
   const service = getServiceRoleSupabase();

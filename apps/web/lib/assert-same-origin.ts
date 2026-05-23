@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * F8: CSRF defense-in-depth for cookie-auth Route Handlers.
+ * CSRF defense-in-depth for cookie-auth Route Handlers.
  *
  * Next.js applies an automatic Origin/Host check to Server Actions but NOT
  * to Route Handlers. All of our API is Route Handlers. Supabase SSR sets

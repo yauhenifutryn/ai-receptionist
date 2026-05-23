@@ -50,7 +50,7 @@ export async function verifyElevenLabsWebhook(
   const now = opts.now ?? Date.now;
   const header = req.headers.get(SIGNATURE_HEADER);
 
-  // F9: fail-closed when either NODE_ENV or VERCEL_ENV signals production.
+  // fail-closed when either NODE_ENV or VERCEL_ENV signals production.
   // VERCEL_ENV is platform-set and resistant to user misconfiguration of
   // NODE_ENV, so checking both eliminates a class of "I thought we were in
   // dev" silent webhook-bypass bugs.

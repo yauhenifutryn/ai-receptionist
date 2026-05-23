@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  // F1: Webhook signature verification before processing — without
+  // Webhook signature verification before processing — without
   // this anyone who knew the URL + an agentId could spam our backend.
   const verified = await verifyElevenLabsWebhook(req);
   if (!verified.ok) {

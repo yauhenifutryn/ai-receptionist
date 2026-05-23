@@ -1,14 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
+import type { CookieToSet } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-interface CookieToSet {
-  name: string;
-  value: string;
-  options: CookieOptions;
-}
 
 /**
  * Sign-out is POST-ONLY. A GET endpoint here was a critical bug: Next.js

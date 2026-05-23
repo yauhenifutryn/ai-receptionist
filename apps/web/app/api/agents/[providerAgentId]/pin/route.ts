@@ -10,7 +10,7 @@ interface RouteParams {
 }
 
 /**
- * F2 + F7: 6-digit PIN (1,000,000-value space) generated with crypto.randomInt
+ * 6-digit PIN (1,000,000-value space) generated with crypto.randomInt
  * instead of Math.random. Combined with the rate limit on `?pin=` parameter
  * routes (see apps/web/app/api/conversations/route.ts), this makes the demo
  * gate practically un-brute-forceable.

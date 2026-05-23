@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { getServiceRoleSupabase } from "@/lib/supabase-server";
-import { checkRateLimit, callerIp } from "@/lib/rate-limit";
+import { createServerClient } from "@supabase/ssr";
+import { getServiceRoleSupabase, type CookieToSet } from "@/lib/supabase-server";
+import { checkRateLimit, callerIp, rateLimitedResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,12 +26,6 @@ export const dynamic = "force-dynamic";
  * Delete this route + the OPERATOR_CODE_* env vars once Resend domain is
  * verified and operators use the regular email-OTP path at `/auth/sign-in`.
  */
-
-interface CookieToSet {
-  name: string;
-  value: string;
-  options: CookieOptions;
-}
 
 const BodySchema = z.object({
   code: z.string().min(8).max(64),
@@ -72,12 +66,7 @@ export async function POST(req: NextRequest) {
     maxAttempts: 5,
     windowSec: 60,
   });
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "rate_limited", retryAfterSec: rl.retryAfterSec },
-      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
-    );
-  }
+  if (!rl.allowed) return rateLimitedResponse(rl);
   const raw = await req.json().catch(() => null);
   const parsed = BodySchema.safeParse(raw);
   if (!parsed.success) {
@@ -99,12 +88,7 @@ export async function POST(req: NextRequest) {
     maxAttempts: 10,
     windowSec: 3600,
   });
-  if (!codeBucket.allowed) {
-    return NextResponse.json(
-      { error: "rate_limited", retryAfterSec: codeBucket.retryAfterSec },
-      { status: 429, headers: { "retry-after": String(codeBucket.retryAfterSec) } },
-    );
-  }
+  if (!codeBucket.allowed) return rateLimitedResponse(codeBucket);
 
   const email = lookupEmail(submitted);
   if (!email) {

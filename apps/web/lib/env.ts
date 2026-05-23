@@ -70,7 +70,7 @@ export function getEnv(): Env {
       ].join("\n"),
     );
   }
-  // F9: production hard-requires ELEVENLABS_WEBHOOK_SECRET. Without it the
+  // production hard-requires ELEVENLABS_WEBHOOK_SECRET. Without it the
   // signature verifier degrades to warn-and-accept, which lets attackers
   // forge consent flags and bookings via /api/post-call + /api/tools/*.
   if (parsed.data.VERCEL_ENV === "production" && !parsed.data.ELEVENLABS_WEBHOOK_SECRET) {

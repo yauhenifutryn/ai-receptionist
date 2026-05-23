@@ -1,5 +1,6 @@
 import type { FinalizeConversationRequest } from "@ai-receptionist/contracts";
 import type { PostCallRepository } from "../post-call/repository.js";
+import type { TenantBinding } from "../tools/repository.js";
 import type { FetchConversationResult } from "../integrations/elevenlabs/conversation.js";
 
 /**
@@ -38,6 +39,12 @@ export interface FinalizeDeps {
    * pass true based on user input.
    */
   bypassAuthCheck?: boolean;
+  /**
+   * Optional pre-resolved tenant binding. When passed, the handler skips its
+   * own resolveTenantByAgent call. Lazy-finalize uses this to avoid an N+1
+   * over a batch of conversations that share one provider_agent_id.
+   */
+  tenantHint?: TenantBinding;
   fetchEl: (args: { conversationId: string }) => Promise<FetchConversationResult>;
   repo: Pick<
     PostCallRepository,
@@ -72,8 +79,8 @@ export async function handleFinalizeConversation(
     }
   }
 
-  // 2. Resolve tenant.
-  const tenant = await deps.repo.resolveTenantByAgent(req.agentId);
+  // 2. Resolve tenant (or accept the hint when the caller pre-resolved it).
+  const tenant = deps.tenantHint ?? (await deps.repo.resolveTenantByAgent(req.agentId));
   if (!tenant) {
     return { ok: false, status: 404, error: "tenant_not_found" };
   }

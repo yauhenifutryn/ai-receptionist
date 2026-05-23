@@ -64,6 +64,12 @@ export async function lazyFinalizeMissing(args: LazyFinalizeArgs): Promise<numbe
   }
   if (missing.length === 0) return 0;
 
+  // Pre-resolve the tenant once for the whole batch — every conversation in
+  // `missing` shares the same provider_agent_id, so calling resolveTenantByAgent
+  // inside handleFinalizeConversation per item would be N+1 over the same row.
+  const tenantHint = await args.repo.resolveTenantByAgent(args.providerAgentId);
+  if (!tenantHint) return 0;
+
   await Promise.all(
     missing.map(async (m) => {
       try {
@@ -81,12 +87,17 @@ export async function lazyFinalizeMissing(args: LazyFinalizeArgs): Promise<numbe
             isOperator: true,
             pinMatchAgentId: null,
             bypassAuthCheck: true,
+            tenantHint,
             fetchEl: args.fetchEl,
             repo: args.repo,
           },
         );
-      } catch {
-        // Swallow per-item: the next list view will retry.
+      } catch (err) {
+        // Per-item swallow keeps the batch progressing — the next list view
+        // will retry. Log so the failure is observable rather than silent.
+        console.warn(
+          `[lazy-finalize] conv=${m.conversationId} agent=${args.providerAgentId}: ${(err as Error).message ?? String(err)}`,
+        );
       }
     }),
   );

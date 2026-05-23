@@ -321,18 +321,18 @@ export async function POST(req: NextRequest) {
           if (aborted()) return;
           validPages = pages.filter((p) => p.markdown.length > 0);
           await session?.event("firecrawl:scrape", { pagesCount: validPages.length });
-          await session?.write(
-            "04-firecrawl-pages.json",
-            JSON.stringify(
-              validPages.map((p) => ({ url: p.url, markdownLength: p.markdown.length })),
-              null,
-              2,
-            ),
-          );
-          for (let i = 0; i < validPages.length; i++) {
-            const p = validPages[i]!;
+          // Manifest entries include the per-page filename so the resume path
+          // can pair URL→markdown explicitly, instead of relying on filesystem
+          // sort order matching the write order (breaks at 100+ pages and
+          // when sibling discover-* files are also present).
+          const manifest = validPages.map((p, i) => {
             const safe = p.url.replace(/[^a-zA-Z0-9-]+/g, "-").slice(0, 100);
-            await session?.write(`pages/${String(i + 1).padStart(2, "0")}-${safe}.md`, p.markdown);
+            const file = `${String(i + 1).padStart(2, "0")}-${safe}.md`;
+            return { url: p.url, markdownLength: p.markdown.length, file };
+          });
+          await session?.write("04-firecrawl-pages.json", JSON.stringify(manifest, null, 2));
+          for (let i = 0; i < validPages.length; i++) {
+            await session?.write(`pages/${manifest[i]!.file}`, validPages[i]!.markdown);
           }
           if (validPages.length === 0) {
             emit({
@@ -660,7 +660,7 @@ function shorten(u: string): string {
 async function loadCachedScrape(
   sessionDir: string,
 ): Promise<{ pages: FirecrawlPage[]; urlsMapped: number; droppedCount: number }> {
-  let manifest: Array<{ url: string; markdownLength: number }> = [];
+  let manifest: Array<{ url: string; markdownLength: number; file?: string }> = [];
   try {
     const raw = await fs.readFile(path.join(sessionDir, "04-firecrawl-pages.json"), "utf-8");
     manifest = JSON.parse(raw);
@@ -669,17 +669,23 @@ async function loadCachedScrape(
   }
 
   const pagesDir = path.join(sessionDir, "pages");
-  let files: string[] = [];
+  let availableFiles: Set<string>;
   try {
-    files = (await fs.readdir(pagesDir)).filter((f) => f.endsWith(".md")).sort();
+    availableFiles = new Set((await fs.readdir(pagesDir)).filter((f) => f.endsWith(".md")));
   } catch {
     return { pages: [], urlsMapped: 0, droppedCount: 0 };
   }
 
+  // Pair URL → markdown explicitly via the per-entry filename in the manifest.
+  // Falls back to positional pairing for legacy sessions written before the
+  // manifest carried `file` (works at <100 pages where lexicographic sort
+  // matches the zero-padded write order).
+  const sortedLegacy = [...availableFiles].sort();
   const pages: FirecrawlPage[] = [];
-  for (let i = 0; i < files.length && i < manifest.length; i++) {
-    const fileName = files[i]!;
+  for (let i = 0; i < manifest.length; i++) {
     const entry = manifest[i]!;
+    const fileName = entry.file ?? sortedLegacy[i];
+    if (!fileName || !availableFiles.has(fileName)) continue;
     try {
       const md = await fs.readFile(path.join(pagesDir, fileName), "utf-8");
       pages.push({ url: entry.url, markdown: md });

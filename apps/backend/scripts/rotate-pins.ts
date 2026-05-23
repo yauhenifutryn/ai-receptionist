@@ -76,7 +76,12 @@ for (const row of candidates as Array<{
     const pin = generatePin();
     const { error: updErr } = await sb.from("agents").update({ pin_code: pin }).eq("id", row.id);
     if (!updErr) {
-      console.error(`  ok: ${row.provider_agent_id}  (was len=${row.pin_code.length})`);
+      // Print the new PIN to stdout (and a human line to stderr) so the
+      // operator can grep / pipe / capture without parsing the log.
+      console.log(`${row.provider_agent_id}\t${pin}`);
+      console.error(
+        `  ok: ${row.provider_agent_id}  was len=${row.pin_code.length}  new pin=${pin}`,
+      );
       okCount += 1;
       rotated = true;
     } else if ((updErr as { code?: string }).code === "23505") {

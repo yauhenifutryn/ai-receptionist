@@ -97,9 +97,9 @@ export default function SmsToggleCard() {
           <div className="flex-1">
             <h2 className="text-base font-semibold text-neutral-900">SMS confirmations</h2>
             <p className="mt-1 text-sm text-neutral-600">
-              When on, every booking triggers a confirmation SMS to the patient with the date,
-              time, and a short link to the booking page. When off, no SMS goes out — patients
-              get the verbal confirmation from the agent only.
+              When on, every booking triggers a confirmation SMS to the patient with the date, time,
+              and a short link to the booking page. When off, no SMS goes out — patients get the
+              verbal confirmation from the agent only.
             </p>
           </div>
           <button
@@ -139,8 +139,8 @@ export default function SmsToggleCard() {
           <p className="font-medium">Zadarma not yet configured.</p>
           <p className="mt-1">
             SMS confirmations use Zadarma. Zadarma credentials are not yet configured in the
-            deployment (operator action). The toggle saves your preference, but no SMS will go
-            out until both the toggle is on AND credentials are added.
+            deployment (operator action). The toggle saves your preference, but no SMS will go out
+            until both the toggle is on AND credentials are added.
           </p>
         </div>
       )}

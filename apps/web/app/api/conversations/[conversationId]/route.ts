@@ -23,10 +23,7 @@ const COLS =
  * Both paths return 404 when no row matches, so an unauthorised caller cannot
  * distinguish "wrong id" from "no permission".
  */
-export async function GET(
-  req: NextRequest,
-  ctx: { params: Promise<{ conversationId: string }> },
-) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ conversationId: string }> }) {
   const { conversationId } = await ctx.params;
   const url = req.nextUrl;
   const pin = url.searchParams.get("pin");
@@ -108,7 +105,10 @@ async function ensureTranscript(
   const synthesized = turns.map((t) => ({
     role: t.role,
     message: t.text,
-    time_in_call_secs: Math.max(0, Math.round((new Date(t.recorded_at).getTime() - startMs) / 1000)),
+    time_in_call_secs: Math.max(
+      0,
+      Math.round((new Date(t.recorded_at).getTime() - startMs) / 1000),
+    ),
   }));
   return {
     ...row,

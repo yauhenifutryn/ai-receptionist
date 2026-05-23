@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  classifyTranscript,
-  createLiveConsentChecker,
-} from "../../src/consent/live-check.js";
+import { classifyTranscript, createLiveConsentChecker } from "../../src/consent/live-check.js";
 
 const CONSENT_QUESTION_PL =
   "Czy zgadza się Pan / Pani na zachowanie zapisu tej rozmowy w celu poprawy jakości obsługi?";
@@ -150,8 +147,7 @@ describe("createLiveConsentChecker", () => {
   });
 
   it("fails closed on non-2xx response from EL", async () => {
-    const fakeFetch: typeof fetch = async () =>
-      new Response("not found", { status: 404 });
+    const fakeFetch: typeof fetch = async () => new Response("not found", { status: 404 });
     const checker = createLiveConsentChecker({ apiKey: "test", fetcher: fakeFetch });
     expect(await checker("conv-missing")).toBe("unknown");
   });

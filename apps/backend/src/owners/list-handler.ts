@@ -51,10 +51,9 @@ export async function handleListOwners(
   supabase: SupabaseClient,
 ): Promise<ListOwnersResult | ListOwnersError> {
   // 1. Active members via RPC.
-  const { data: activeRaw, error: activeErr } = await supabase.rpc(
-    "get_tenant_owners",
-    { p_tenant_id: tenantId },
-  );
+  const { data: activeRaw, error: activeErr } = await supabase.rpc("get_tenant_owners", {
+    p_tenant_id: tenantId,
+  });
   if (activeErr) {
     return { ok: false, status: 500, error: activeErr.message };
   }
@@ -62,9 +61,7 @@ export async function handleListOwners(
   // 2. Pending invitations (consumed_at IS NULL).
   const { data: pendingRaw, error: pendingErr } = await supabase
     .from("tenant_invitations")
-    .select(
-      "id, email, created_at, signin_token_expires_at, signin_token_consumed_at, consumed_at",
-    )
+    .select("id, email, created_at, signin_token_expires_at, signin_token_consumed_at, consumed_at")
     .eq("tenant_id", tenantId)
     .is("consumed_at", null);
   if (pendingErr) {
@@ -108,11 +105,7 @@ export async function handleListOwners(
       signin_token_expires_at: r.signin_token_expires_at,
       signin_token_consumed_at: r.signin_token_consumed_at,
     }))
-    .sort(
-      (a, b) =>
-        new Date(b.invited_at ?? 0).getTime() -
-        new Date(a.invited_at ?? 0).getTime(),
-    );
+    .sort((a, b) => new Date(b.invited_at ?? 0).getTime() - new Date(a.invited_at ?? 0).getTime());
 
   return { ok: true, owners: [...active, ...pending] };
 }

@@ -121,8 +121,7 @@ export async function POST(
     );
   }
 
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? new URL(req.url).origin;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? new URL(req.url).origin;
   const url = `${siteUrl}/auth/owner-link?token=${encodeURIComponent(signinToken)}`;
 
   return NextResponse.json({

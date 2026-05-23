@@ -58,11 +58,7 @@ export interface WorkflowDefinition {
   prevent_subagent_loops?: boolean;
 }
 
-export type WorkflowNode =
-  | StartNode
-  | EndNode
-  | OverrideAgentNode
-  | StandaloneAgentNode;
+export type WorkflowNode = StartNode | EndNode | OverrideAgentNode | StandaloneAgentNode;
 
 interface StartNode {
   type: "start";
@@ -167,13 +163,13 @@ export const CONSENT_GATE_WORKFLOW: WorkflowDefinition = {
         "Mirror the caller's last language. Use the matching script:",
         "",
         "Polish:",
-        "  \"Rozumiem, w takim razie nie mogę kontynuować, bo system rezerwacji wymaga zgody na zachowanie zapisu rozmowy. Jeśli chciałby Pan lub Pani umówić wizytę, proszę zadzwonić w godzinach pracy recepcji albo zostawić numer, a recepcja oddzwoni. Dziękuję za telefon, do usłyszenia.\"",
+        '  "Rozumiem, w takim razie nie mogę kontynuować, bo system rezerwacji wymaga zgody na zachowanie zapisu rozmowy. Jeśli chciałby Pan lub Pani umówić wizytę, proszę zadzwonić w godzinach pracy recepcji albo zostawić numer, a recepcja oddzwoni. Dziękuję za telefon, do usłyszenia."',
         "",
         "English:",
         "  \"Understood, in that case I can't continue because the booking system requires consent to keep a transcript. If you'd like to book a visit, please call back during reception hours, or leave your number and someone will call you back. Thank you for calling, goodbye.\"",
         "",
         "Russian:",
-        "  \"Понял, в таком случае я не могу продолжить, потому что система записи требует согласия на сохранение разговора. Если хотите записаться на приём, перезвоните в часы работы регистратуры или оставьте номер, и вам перезвонят. Спасибо за звонок, до свидания.\"",
+        '  "Понял, в таком случае я не могу продолжить, потому что система записи требует согласия на сохранение разговора. Если хотите записаться на приём, перезвоните в часы работы регистратуры или оставьте номер, и вам перезвонят. Спасибо за звонок, до свидания."',
         "",
         "Do NOT call create_booking. Do NOT push back, do NOT try to convince the caller to consent. Say the goodbye line and wait — the workflow will end the call once you're done speaking.",
       ].join("\n"),

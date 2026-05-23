@@ -61,7 +61,12 @@ export default function ConversationsTable({
             <th className="px-4 py-3">Lang</th>
             <th className="px-4 py-3">Consent</th>
             <th className="px-4 py-3">Tools</th>
-            <th className="px-4 py-3" title="Agent turns that pulled from the knowledge base on this call">KB</th>
+            <th
+              className="px-4 py-3"
+              title="Agent turns that pulled from the knowledge base on this call"
+            >
+              KB
+            </th>
             <th className="px-4 py-3">Booked</th>
             <th className="px-4 py-3" />
           </tr>

@@ -6,11 +6,7 @@ export {
   DEFAULT_BASE_URL,
 } from "./elevenlabs-convai.js";
 export type { ElevenLabsConvAIProviderOptions } from "./elevenlabs-convai.js";
-export {
-  ElevenLabsToolsCatalog,
-  TOOL_SPECS,
-  buildToolSpecs,
-} from "./elevenlabs-tools-catalog.js";
+export { ElevenLabsToolsCatalog, TOOL_SPECS, buildToolSpecs } from "./elevenlabs-tools-catalog.js";
 export type {
   ElevenLabsToolsCatalogOptions,
   CatalogTool,

@@ -46,18 +46,14 @@ export default function ConversationsFilters() {
         type="date"
         className="rounded border border-neutral-200 bg-white px-3 py-1.5 text-sm"
         defaultValue={sp.get("dateFrom")?.slice(0, 10) ?? ""}
-        onChange={(e) =>
-          set("dateFrom", e.target.value ? `${e.target.value}T00:00:00.000Z` : null)
-        }
+        onChange={(e) => set("dateFrom", e.target.value ? `${e.target.value}T00:00:00.000Z` : null)}
         aria-label="From date"
       />
       <input
         type="date"
         className="rounded border border-neutral-200 bg-white px-3 py-1.5 text-sm"
         defaultValue={sp.get("dateTo")?.slice(0, 10) ?? ""}
-        onChange={(e) =>
-          set("dateTo", e.target.value ? `${e.target.value}T23:59:59.999Z` : null)
-        }
+        onChange={(e) => set("dateTo", e.target.value ? `${e.target.value}T23:59:59.999Z` : null)}
         aria-label="To date"
       />
       <label className="flex items-center gap-2 text-sm">

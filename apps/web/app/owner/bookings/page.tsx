@@ -94,8 +94,7 @@ export default async function Page({ searchParams }: PageProps) {
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">Bookings</h1>
         <p className="text-sm text-neutral-500">
-          Appointments your AI receptionist has booked. Includes real phone calls and demo
-          sessions.
+          Appointments your AI receptionist has booked. Includes real phone calls and demo sessions.
         </p>
       </header>
 

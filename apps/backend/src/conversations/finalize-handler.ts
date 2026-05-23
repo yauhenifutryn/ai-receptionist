@@ -93,9 +93,7 @@ export async function handleFinalizeConversation(
       ? new Date(startUnix * 1000).toISOString()
       : new Date().toISOString();
     const endedAt =
-      startUnix && durationSecs
-        ? new Date((startUnix + durationSecs) * 1000).toISOString()
-        : null;
+      startUnix && durationSecs ? new Date((startUnix + durationSecs) * 1000).toISOString() : null;
 
     // EL nests tool_calls per-turn in transcript[]. Flatten so UI + analytics
     // can treat them like the flat PostCallWebhookSchema.toolInvocations[].
@@ -111,16 +109,12 @@ export async function handleFinalizeConversation(
     );
     const toolErrorCount = flatToolResults.filter((r) => r && r.is_error === true).length;
     const language =
-      (meta.main_language as string | undefined) ??
-      (meta.language as string | undefined) ??
-      null;
+      (meta.main_language as string | undefined) ?? (meta.language as string | undefined) ?? null;
 
     // EL exposes the PSTN caller line at metadata.phone_call.from_phone_number
     // (E.164). Absent for browser/PIN sessions; we still extract opportunistically
     // because the finalize endpoint hydrates *all* sources.
-    const phoneCallMeta = (meta.phone_call ?? null) as
-      | { from_phone_number?: unknown }
-      | null;
+    const phoneCallMeta = (meta.phone_call ?? null) as { from_phone_number?: unknown } | null;
     const callerPhoneCandidate = phoneCallMeta?.from_phone_number;
     const callerPhoneE164 =
       typeof callerPhoneCandidate === "string" && callerPhoneCandidate.length > 0

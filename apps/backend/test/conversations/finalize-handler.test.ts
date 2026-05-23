@@ -59,9 +59,7 @@ type RepoSubset = Pick<
 
 function makeRepo(): RepoSubset {
   return {
-    resolveTenantByAgent: vi
-      .fn()
-      .mockResolvedValue({ tenantId: "t1", agentRowId: "a1" }),
+    resolveTenantByAgent: vi.fn().mockResolvedValue({ tenantId: "t1", agentRowId: "a1" }),
     upsertConversation: vi.fn().mockResolvedValue(undefined),
     findBookingIdByConversation: vi.fn().mockResolvedValue(null),
     resolveAgentPin: vi.fn().mockResolvedValue("4242"),
@@ -139,9 +137,7 @@ describe("handleFinalizeConversation", () => {
   });
 
   it("EL 404 still writes a stub row and returns ok=true", async () => {
-    const fetchEl = vi
-      .fn()
-      .mockResolvedValue({ ok: false, status: 404, message: "" });
+    const fetchEl = vi.fn().mockResolvedValue({ ok: false, status: 404, message: "" });
     const r = await handleFinalizeConversation(
       { conversationId: "c1", agentId: "agent_x", source: "browser_test" },
       { isOperator: true, pinMatchAgentId: null, fetchEl, repo },

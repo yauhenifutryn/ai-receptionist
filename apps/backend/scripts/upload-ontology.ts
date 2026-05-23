@@ -93,13 +93,10 @@ async function deleteDoc(documentId: string): Promise<void> {
   // Detach is implicit when we omit the document from agents' knowledge_base;
   // the actual delete frees the workspace slot. Best-effort: a 404 means the
   // doc was already deleted, treat as success.
-  const res = await fetch(
-    `https://api.elevenlabs.io/v1/convai/knowledge-base/${documentId}`,
-    {
-      method: "DELETE",
-      headers: { "xi-api-key": apiKey! },
-    },
-  );
+  const res = await fetch(`https://api.elevenlabs.io/v1/convai/knowledge-base/${documentId}`, {
+    method: "DELETE",
+    headers: { "xi-api-key": apiKey! },
+  });
   if (!res.ok && res.status !== 404) {
     console.warn(`  warn: delete of ${documentId} failed: ${res.status}`);
   }

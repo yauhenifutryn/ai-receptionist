@@ -278,8 +278,9 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
       baseUrl: this.baseUrl,
       fetcher: this.doFetch,
     });
-    const { checkAvailabilityId, createBookingId } =
-      await catalog.ensureBookingTools(input.serverToolBaseUrl);
+    const { checkAvailabilityId, createBookingId } = await catalog.ensureBookingTools(
+      input.serverToolBaseUrl,
+    );
 
     // Knowledge base wiring:
     //   - The ontology (5 files: services, triage, scripts, emergency-keywords,
@@ -475,17 +476,15 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
    * Idempotent: repeated calls are safe — re-running against the same agent
    * with the same workspace state produces no creates and the same PATCH.
    */
-  async updateAgentTools(input: {
-    agentId: string;
-    serverToolBaseUrl: string;
-  }): Promise<void> {
+  async updateAgentTools(input: { agentId: string; serverToolBaseUrl: string }): Promise<void> {
     const catalog = new ElevenLabsToolsCatalog({
       apiKey: this.apiKey,
       baseUrl: this.baseUrl,
       fetcher: this.doFetch,
     });
-    const { checkAvailabilityId, createBookingId } =
-      await catalog.ensureBookingTools(input.serverToolBaseUrl);
+    const { checkAvailabilityId, createBookingId } = await catalog.ensureBookingTools(
+      input.serverToolBaseUrl,
+    );
     await this.request("PATCH", `/v1/convai/agents/${input.agentId}`, {
       conversation_config: {
         agent: {

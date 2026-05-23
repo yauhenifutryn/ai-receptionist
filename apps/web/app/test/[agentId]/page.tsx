@@ -27,9 +27,7 @@ export default async function TestAgentPage({ params }: PageProps) {
     .eq("provider_agent_id", agentId)
     .maybeSingle();
 
-  const tenants = Array.isArray(agentRow?.tenant)
-    ? agentRow?.tenant[0]
-    : agentRow?.tenant;
+  const tenants = Array.isArray(agentRow?.tenant) ? agentRow?.tenant[0] : agentRow?.tenant;
   const tenantDisplayName: string = tenants?.display_name ?? "—";
   const tenantSourceUrl: string | null = tenants?.source_url ?? null;
 
@@ -79,10 +77,7 @@ export default async function TestAgentPage({ params }: PageProps) {
         existingPhoneNumber={agentRow?.phone_number ?? null}
       />
       <OwnerInvitePanel agentId={agentId} />
-      <AgentManagementPanel
-        providerAgentId={agentId}
-        tenantDisplayName={tenantDisplayName}
-      />
+      <AgentManagementPanel providerAgentId={agentId} tenantDisplayName={tenantDisplayName} />
       <TestAgentClient agentId={agentId} />
     </div>
   );

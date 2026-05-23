@@ -29,10 +29,12 @@ export async function materializePendingInvitations(
 
   let count = 0;
   for (const inv of invites) {
-    const { error: memberErr } = await service.from("tenant_members").upsert(
-      { tenant_id: inv.tenant_id, user_id: uid, role: inv.role },
-      { onConflict: "tenant_id,user_id" },
-    );
+    const { error: memberErr } = await service
+      .from("tenant_members")
+      .upsert(
+        { tenant_id: inv.tenant_id, user_id: uid, role: inv.role },
+        { onConflict: "tenant_id,user_id" },
+      );
     if (memberErr) continue;
     await service
       .from("tenant_invitations")

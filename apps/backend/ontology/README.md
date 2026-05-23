@@ -10,13 +10,13 @@ This directory holds the **authored, vertical-specific knowledge** that overlays
 
 Vertical is locked on Polish dental clinics. All Layer 1 files in this directory are authored content.
 
-| File                    | Status                     | Why                                                                                                                                                  |
-| ----------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| File                    | Status                     | Why                                                                                                                                                 |
+| ----------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `consent.md`            | **REAL CONTENT** (PL + EN) | Consent wording is vertical-independent per `CLAUDE.md`: RODO-driven, not domain-driven. Used by the runtime classifier in `apps/backend/consent/`. |
-| `services.md`           | Authored 2026-05-21        | Polish dental service taxonomy with PL primary, EN + RU parallel summaries.                                                                          |
-| `triage.md`             | Authored 2026-05-21        | Three-tier dental escalation rules (NAGŁY / PILNY / PLANOWY).                                                                                        |
-| `scripts.md`            | Authored 2026-05-21        | Default Polish conversational flows: greeting, booking, cancellation, recall, unknown-situation fallback.                                            |
-| `emergency-keywords.md` | Authored 2026-05-21        | Polish emergency phrases by category, with inflection variants and an escalation rule.                                                               |
+| `services.md`           | Authored 2026-05-21        | Polish dental service taxonomy with PL primary, EN + RU parallel summaries.                                                                         |
+| `triage.md`             | Authored 2026-05-21        | Three-tier dental escalation rules (NAGŁY / PILNY / PLANOWY).                                                                                       |
+| `scripts.md`            | Authored 2026-05-21        | Default Polish conversational flows: greeting, booking, cancellation, recall, unknown-situation fallback.                                           |
+| `emergency-keywords.md` | Authored 2026-05-21        | Polish emergency phrases by category, with inflection variants and an escalation rule.                                                              |
 
 ## Indexing rules (apply once content lands)
 

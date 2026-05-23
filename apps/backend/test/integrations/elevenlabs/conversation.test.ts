@@ -36,11 +36,7 @@ describe("fetchElevenLabsConversation", () => {
   it("returns { ok: false, status: 'timeout' } on AbortError", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockImplementation(() =>
-          Promise.reject(new DOMException("aborted", "AbortError")),
-        ),
+      vi.fn().mockImplementation(() => Promise.reject(new DOMException("aborted", "AbortError"))),
     );
     const r = await fetchElevenLabsConversation({
       conversationId: "c1",

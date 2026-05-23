@@ -25,10 +25,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "elevenlabs_api_key_missing" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "elevenlabs_api_key_missing" }, { status: 500 });
   }
   const provider = new ElevenLabsConvAIProvider({ apiKey });
 

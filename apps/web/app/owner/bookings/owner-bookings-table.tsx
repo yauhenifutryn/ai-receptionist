@@ -96,8 +96,8 @@ export default function OwnerBookingsTable({
       {rows.length === 0 ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-6 text-sm text-amber-900">
           No bookings yet. Real phone bookings will start arriving once the operator finishes phone
-          number verification with Zadarma. In the meantime, ask the operator for your demo URL
-          (<code className="rounded bg-white/60 px-1">/demo/&lt;agentId&gt;?pin=…</code>) to create a
+          number verification with Zadarma. In the meantime, ask the operator for your demo URL (
+          <code className="rounded bg-white/60 px-1">/demo/&lt;agentId&gt;?pin=…</code>) to create a
           test booking end-to-end.
         </div>
       ) : (

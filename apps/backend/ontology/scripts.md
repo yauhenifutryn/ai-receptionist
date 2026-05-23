@@ -147,7 +147,6 @@ Kroki:
    > "Dzwonię w sprawie wizyty zaplanowanej na dziś o 10:30, na której Pana / Pani nie było. Chciałbym sprawdzić, czy wszystko w porządku i czy chciałby Pan / Pani umówić nowy termin."
 
 3. **Odpowiedź pacjenta: trzy scenariusze**:
-
    - **Chce nowego terminu**: standardowy flow rezerwacji.
    - **Nie chce, zrezygnuje**: agent rejestruje i potwierdza: "Rozumiem. Anulowałem Pana / Pani planowane wizyty. Gdyby Pan / Pani chciał wrócić, jesteśmy do dyspozycji."
    - **Pacjent nie odbiera lub jest zdenerwowany**: agent kończy uprzejmie, nie naciska.

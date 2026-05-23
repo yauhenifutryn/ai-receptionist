@@ -38,9 +38,7 @@ const sb = createClient(supabaseUrl, serviceKey, {
 
 const { data: agents, error } = await sb
   .from("agents")
-  .select(
-    "provider_agent_id, status, tenant:tenants(display_name, source_url)",
-  )
+  .select("provider_agent_id, status, tenant:tenants(display_name, source_url)")
   .eq("provider", "elevenlabs");
 
 if (error) throw new Error(`Supabase listAgents: ${error.message}`);
@@ -75,7 +73,9 @@ for (const row of rows) {
   void extractPolishCity; // keep import resolvable for future use
 
   console.error(`${agentId} (${tenant.display_name})`);
-  console.error(`  prompt: ${systemPrompt.length} chars · first_message: ${firstMessage.length} chars`);
+  console.error(
+    `  prompt: ${systemPrompt.length} chars · first_message: ${firstMessage.length} chars`,
+  );
 
   const res = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${agentId}`, {
     method: "PATCH",

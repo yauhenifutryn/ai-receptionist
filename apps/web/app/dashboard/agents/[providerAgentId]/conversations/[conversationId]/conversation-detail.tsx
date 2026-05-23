@@ -146,10 +146,7 @@ export default function ConversationDetail({ row }: { row: ConversationRow }) {
         ) : (
           <ol className="flex flex-col gap-2 text-sm">
             {transcript.map((t, i) => (
-              <li
-                key={i}
-                className={t.role === "user" ? "text-neutral-800" : "text-emerald-900"}
-              >
+              <li key={i} className={t.role === "user" ? "text-neutral-800" : "text-emerald-900"}>
                 <span className="mr-2 font-mono text-xs text-neutral-400">{fmtTs(t)}</span>
                 <strong className="mr-2">{t.role}:</strong>
                 {turnText(t)}
@@ -165,16 +162,14 @@ export default function ConversationDetail({ row }: { row: ConversationRow }) {
             Knowledge retrieval
           </h2>
           <p className="font-mono text-xs text-neutral-400">
-            {ragStats.turnsWithRetrieval} / {ragStats.totalAgentTurns} agent
-            turns used RAG
+            {ragStats.turnsWithRetrieval} / {ragStats.totalAgentTurns} agent turns used RAG
           </p>
         </div>
         {ragStats.turnsWithRetrieval === 0 ? (
           <p className="text-sm text-neutral-400">
-            No knowledge base documents were referenced during this call.
-            Either the agent answered from the system prompt alone (small talk,
-            consent, language switching) or EL did not populate retrieval
-            attribution for these turns.
+            No knowledge base documents were referenced during this call. Either the agent answered
+            from the system prompt alone (small talk, consent, language switching) or EL did not
+            populate retrieval attribution for these turns.
           </p>
         ) : (
           <div className="flex flex-col gap-4">
@@ -201,20 +196,14 @@ export default function ConversationDetail({ row }: { row: ConversationRow }) {
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="font-mono text-xs text-neutral-400">
                       turn {ref.turnIndex}
-                      {ref.timeSec != null
-                        ? ` · ${Math.floor(ref.timeSec)}s`
-                        : ""}
+                      {ref.timeSec != null ? ` · ${Math.floor(ref.timeSec)}s` : ""}
                     </span>
                     <span className="font-mono text-[11px] text-neutral-500">
                       {ref.docIds.length} doc(s)
-                      {ref.chunkCount != null
-                        ? ` · ${ref.chunkCount} chunks`
-                        : ""}
+                      {ref.chunkCount != null ? ` · ${ref.chunkCount} chunks` : ""}
                     </span>
                   </div>
-                  {ref.preview ? (
-                    <p className="mt-1 text-neutral-800">{ref.preview}</p>
-                  ) : null}
+                  {ref.preview ? <p className="mt-1 text-neutral-800">{ref.preview}</p> : null}
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {ref.docIds.map((id) => (
                       <code
@@ -253,10 +242,7 @@ export default function ConversationDetail({ row }: { row: ConversationRow }) {
               const args = t.argsJson ?? t.args_json ?? t.params_as_json;
               const resp = t.responseJson ?? t.response_json ?? t.result_value;
               return (
-                <li
-                  key={i}
-                  className="rounded-lg border border-neutral-100 bg-neutral-50 p-3"
-                >
+                <li key={i} className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
                   <div className="flex items-center justify-between font-medium">
                     <span>{name}</span>
                     <span className="text-xs text-neutral-500">

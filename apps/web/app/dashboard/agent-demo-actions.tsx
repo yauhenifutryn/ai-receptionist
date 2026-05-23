@@ -13,11 +13,7 @@ interface Props {
  * Compact single-row layout when a PIN exists; falls back to a
  * "Generate" prompt when not.
  */
-export default function AgentDemoActions({
-  providerAgentId,
-  initialPin,
-  origin,
-}: Props) {
+export default function AgentDemoActions({ providerAgentId, initialPin, origin }: Props) {
   const [pin, setPin] = useState<string | null>(initialPin);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -105,9 +101,7 @@ export default function AgentDemoActions({
       >
         {generating ? "…" : "↻"}
       </button>
-      {error ? (
-        <span className="ml-1 text-[10px] text-rose-600">{error}</span>
-      ) : null}
+      {error ? <span className="ml-1 text-[10px] text-rose-600">{error}</span> : null}
     </div>
   );
 }

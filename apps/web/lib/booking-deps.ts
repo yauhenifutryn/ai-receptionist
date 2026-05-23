@@ -79,9 +79,7 @@ export function getBookingDeps(): BookingDeps {
       const sb = getServiceRoleSupabase();
       const { data, error } = await sb
         .from("agents")
-        .select(
-          "tenant_id, tenants(display_name, contact_phone, sms_confirmations_enabled)",
-        )
+        .select("tenant_id, tenants(display_name, contact_phone, sms_confirmations_enabled)")
         .eq("provider_agent_id", providerAgentId)
         .maybeSingle();
       if (error || !data) return null;

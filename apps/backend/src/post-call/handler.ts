@@ -81,12 +81,10 @@ export async function handlePostCall(
   // payload.raw.phone_call.from_phone_number and the nested
   // payload.raw.metadata.phone_call.from_phone_number. PSTN-only field.
   const rawRecord = (payload.raw ?? {}) as Record<string, unknown>;
-  const rawPhoneCall = (rawRecord.phone_call ?? null) as
-    | { from_phone_number?: unknown }
-    | null;
-  const rawMetadata = (rawRecord.metadata ?? null) as
-    | { phone_call?: { from_phone_number?: unknown } }
-    | null;
+  const rawPhoneCall = (rawRecord.phone_call ?? null) as { from_phone_number?: unknown } | null;
+  const rawMetadata = (rawRecord.metadata ?? null) as {
+    phone_call?: { from_phone_number?: unknown };
+  } | null;
   const phoneCandidate =
     rawPhoneCall?.from_phone_number ?? rawMetadata?.phone_call?.from_phone_number ?? null;
   const callerPhoneE164 =

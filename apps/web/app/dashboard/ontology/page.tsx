@@ -60,7 +60,10 @@ const ONTOLOGY_DIR = join(process.cwd(), "..", "backend", "ontology");
 
 async function loadOntology(): Promise<OntologyFile[]> {
   const idsCsv = process.env.ELEVENLABS_ONTOLOGY_KB_DOC_IDS ?? "";
-  const ids = idsCsv.split(",").map((s) => s.trim()).filter(Boolean);
+  const ids = idsCsv
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const out: OntologyFile[] = [];
   for (let i = 0; i < ATTACHED_FILES.length; i++) {
@@ -86,11 +89,8 @@ async function loadOntology(): Promise<OntologyFile[]> {
 // ontology layer is actually earning its place.
 const RAG_WINDOW_DAYS = 30;
 
-async function loadRagAggregate(
-  supabase: Awaited<ReturnType<typeof requireOperator>>["supabase"],
-) {
-  const since = new Date(Date.now() - RAG_WINDOW_DAYS * 24 * 60 * 60 * 1000)
-    .toISOString();
+async function loadRagAggregate(supabase: Awaited<ReturnType<typeof requireOperator>>["supabase"]) {
+  const since = new Date(Date.now() - RAG_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("conversations")
     .select("raw_jsonb")
@@ -148,10 +148,9 @@ export default async function OntologyPage() {
           <div className="flex flex-col gap-2">
             <h1 className="text-3xl font-semibold tracking-tight">Ontology</h1>
             <p className="max-w-2xl text-sm text-neutral-600">
-              Universal Polish dental reference layer. Auto-attached to every
-              agent (new + existing) as RAG knowledge documents. Complementary
-              to the system prompt and the per-clinic knowledge base, never a
-              replacement.
+              Universal Polish dental reference layer. Auto-attached to every agent (new + existing)
+              as RAG knowledge documents. Complementary to the system prompt and the per-clinic
+              knowledge base, never a replacement.
             </p>
           </div>
           <div className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-medium uppercase tracking-wider text-emerald-700">
@@ -170,13 +169,11 @@ export default async function OntologyPage() {
           </p>
         </div>
         {ragError ? (
-          <p className="mt-3 text-sm text-rose-700">
-            Failed to load retrieval stats: {ragError}
-          </p>
+          <p className="mt-3 text-sm text-rose-700">Failed to load retrieval stats: {ragError}</p>
         ) : agg.totalConversations === 0 ? (
           <p className="mt-3 text-sm text-neutral-500">
-            No conversations with stored payloads yet. Once calls land, this
-            section will show per-document retrieval counts.
+            No conversations with stored payloads yet. Once calls land, this section will show
+            per-document retrieval counts.
           </p>
         ) : (
           <div className="mt-4 grid gap-6 sm:grid-cols-3">
@@ -205,21 +202,19 @@ export default async function OntologyPage() {
         </h2>
         <ul className="mt-4 space-y-2 text-sm text-neutral-700">
           <li>
-            <strong className="text-neutral-900">System prompt</strong> drives
-            agent behavior (greeting, identity, language switching, escalation
-            policy, tool usage). Source of truth for what the agent says and
-            does.
+            <strong className="text-neutral-900">System prompt</strong> drives agent behavior
+            (greeting, identity, language switching, escalation policy, tool usage). Source of truth
+            for what the agent says and does.
           </li>
           <li>
-            <strong className="text-neutral-900">Per-clinic knowledge</strong>{" "}
-            (Layer 2) is the source of truth for clinic-specific facts: prices,
-            hours, doctors, NFZ contract, addresses, services offered.
+            <strong className="text-neutral-900">Per-clinic knowledge</strong> (Layer 2) is the
+            source of truth for clinic-specific facts: prices, hours, doctors, NFZ contract,
+            addresses, services offered.
           </li>
           <li>
-            <strong className="text-neutral-900">Ontology</strong> (this page,
-            Layer 1) is reference terminology. The agent retrieves from it to
-            understand WHAT a service IS, WHICH urgency tier a symptom maps to,
-            WHICH Polish phrases signal an emergency. It does not script the
+            <strong className="text-neutral-900">Ontology</strong> (this page, Layer 1) is reference
+            terminology. The agent retrieves from it to understand WHAT a service IS, WHICH urgency
+            tier a symptom maps to, WHICH Polish phrases signal an emergency. It does not script the
             agent.
           </li>
         </ul>
@@ -231,8 +226,8 @@ export default async function OntologyPage() {
             Attached documents
           </h2>
           <p className="text-sm text-neutral-600">
-            Every agent provisioned through this dashboard receives these
-            documents automatically. Editing a file at{" "}
+            Every agent provisioned through this dashboard receives these documents automatically.
+            Editing a file at{" "}
             <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs">
               apps/backend/ontology/
             </code>{" "}
@@ -256,9 +251,7 @@ export default async function OntologyPage() {
                     <h3 className="text-lg font-semibold tracking-tight text-neutral-900">
                       {doc.title}
                     </h3>
-                    <code className="font-mono text-xs text-neutral-400">
-                      {doc.filename}
-                    </code>
+                    <code className="font-mono text-xs text-neutral-400">{doc.filename}</code>
                   </div>
                   <p className="max-w-3xl text-sm text-neutral-600">{doc.summary}</p>
                 </div>
@@ -282,8 +275,7 @@ export default async function OntologyPage() {
                       }
                       title={`Retrieved on ${usageByFilename[doc.filename] ?? 0} agent turn(s) in the last ${RAG_WINDOW_DAYS} days`}
                     >
-                      {(usageByFilename[doc.filename] ?? 0).toLocaleString()}× ·{" "}
-                      {RAG_WINDOW_DAYS}d
+                      {(usageByFilename[doc.filename] ?? 0).toLocaleString()}× · {RAG_WINDOW_DAYS}d
                     </span>
                   </div>
                   {doc.documentId ? (
@@ -318,12 +310,12 @@ export default async function OntologyPage() {
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
           Demoted documents (not attached)
-        </h2>{/* below stat block ends */}
+        </h2>
+        {/* below stat block ends */}
         <p className="text-sm text-neutral-600">
-          These files exist on disk as internal documentation but are no longer
-          attached to agents. They were behavior scripts that overlapped with
-          the system prompt and risked drifting the agent off-policy at
-          retrieval time.
+          These files exist on disk as internal documentation but are no longer attached to agents.
+          They were behavior scripts that overlapped with the system prompt and risked drifting the
+          agent off-policy at retrieval time.
         </p>
         <ul className="flex flex-col gap-3">
           {DEMOTED_FILES.map((d) => (
@@ -332,9 +324,7 @@ export default async function OntologyPage() {
               className="flex flex-col gap-1 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-3"
             >
               <div className="flex items-baseline gap-3">
-                <code className="font-mono text-xs text-neutral-700">
-                  {d.filename}
-                </code>
+                <code className="font-mono text-xs text-neutral-700">{d.filename}</code>
                 <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-neutral-700">
                   Demoted
                 </span>
@@ -348,23 +338,13 @@ export default async function OntologyPage() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="font-mono text-[11px] uppercase tracking-wider text-neutral-500">
         {label}
       </span>
-      <span className="text-2xl font-semibold tabular-nums text-neutral-900">
-        {value}
-      </span>
+      <span className="text-2xl font-semibold tabular-nums text-neutral-900">{value}</span>
       {hint ? <span className="text-xs text-neutral-500">{hint}</span> : null}
     </div>
   );

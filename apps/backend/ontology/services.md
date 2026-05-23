@@ -23,7 +23,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Konsultacja to pierwsze spotkanie z lekarzem, podczas którego pacjent jest badany wstępnie, omawiane są dolegliwości i ustalany ogólny plan leczenia. Zwykle nie obejmuje zabiegów, ale lekarz może zlecić zdjęcie panoramiczne lub punktowe. Konsultacja jest często warunkiem przed leczeniem implantologicznym, ortodontycznym lub protetycznym.
 
-
 ### EN
 
 **Synonyms**: consultation, first visit, treatment planning visit.
@@ -53,7 +52,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Rutynowa wizyta kontrolna, zalecana co sześć miesięcy. Lekarz ocenia stan uzębienia, dziąseł, sprawdza wcześniejsze wypełnienia i ewentualnie zleca higienizację albo dodatkowe leczenie. W ramach NFZ przysługuje jeden przegląd rocznie dla dorosłych, dla dzieci częściej.
 
-
 ### EN
 
 **Synonyms**: checkup, routine exam, dental review.
@@ -82,7 +80,6 @@ Pytania od pacjenta (przykład):
 
 Krótki opis:
 Pełna higienizacja obejmuje trzy etapy: skaling ultradźwiękowy (usunięcie kamienia nazębnego), piaskowanie (usunięcie osadu i przebarwień piaskiem stomatologicznym) oraz polerowanie pastą profilaktyczną. Często na końcu lakierowanie fluorem. Zalecana co sześć miesięcy. Bezbolesna, ale przy nadwrażliwości dziąseł warto uprzedzić higienistkę.
-
 
 ### EN
 
@@ -142,7 +139,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Dwie podstawowe metody. Gabinetowe: aplikacja żelu wybielającego aktywowanego lampą, jedna lub dwie sesje, efekt natychmiastowy. Nakładkowe: indywidualne nakładki plus żel do stosowania w domu przez 2–3 tygodnie, efekt łagodniejszy ale trwalszy. Przed wybielaniem zalecana higienizacja, zęby muszą być zdrowe (bez próchnicy ani aktywnych zmian). Po zabiegu 48 godzin diety białej (bez kawy, herbaty, wina, papierosów).
 
-
 ### EN
 
 **Synonyms**: whitening, bleaching, in-office whitening, take-home whitening.
@@ -171,7 +167,6 @@ Pytania od pacjenta (przykład):
 
 Krótki opis:
 Zabieg profilaktyczny polegający na pokryciu bruzd zębów trzonowych specjalnym lakiem, który zapobiega gromadzeniu się płytki nazębnej i próchnicy. Wykonywany głównie u dzieci po wyrośnięciu pierwszych stałych trzonowców (zęby szóste, około 6–7 roku życia). NFZ pokrywa lakowanie szóstek u dzieci do 8 roku życia.
-
 
 ### EN
 
@@ -202,7 +197,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Powierzchowna aplikacja preparatu z fluorem (zwykle lakier lub pianka) na zęby. Wzmacnia szkliwo, zmniejsza ryzyko próchnicy. Często wykonywana po higienizacji jako dopełnienie zabiegu, albo osobno u dzieci. Po zabiegu nie jeść i nie pić przez 30 minut.
 
-
 ### EN
 
 **Synonyms**: fluoride application, fluoride varnish, fluoride treatment.
@@ -232,7 +226,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Wypełnienie ubytku po usunięciu próchnicy. Standard prywatny to kompozyt światłoutwardzalny, dopasowany kolorystycznie do zęba, mediana trwałości około 5–8 lat przy dobrej higienie. NFZ oferuje wypełnienia materiałami ograniczonymi (najczęściej cement glasjonomerowy) i tylko na wybrane zęby u dorosłych.
 
-
 ### EN
 
 **Synonyms**: filling, composite filling, light-cure filling, cavity treatment.
@@ -261,7 +254,6 @@ Pytania od pacjenta (przykład):
 
 Krótki opis:
 Leczenie miazgi zęba (zapalenia lub martwicy). Polega na usunięciu chorej miazgi, opracowaniu i wypełnieniu kanałów korzeniowych. Cena zależy od liczby kanałów: zęby przednie (1 kanał), przedtrzonowce (1–2 kanały), trzonowce (3–4 kanały). Standard prywatny to leczenie pod mikroskopem stomatologicznym. Po leczeniu kanałowym zwykle wymagana jest odbudowa zęba (wkład koronowo-korzeniowy) lub korona, do umówienia osobno.
-
 
 ### EN
 
@@ -321,7 +313,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Odtworzenie struktury zęba po leczeniu kanałowym lub po znacznym ubytku. Przy małych ubytkach wystarczy odbudowa kompozytowa. Przy większych ubytkach (utrata więcej niż 50% korony) zwykle stosowany jest wkład koronowo-korzeniowy z włókna szklanego lub metalu, na którym buduje się odbudowę, a finalnie często osadzana jest korona. Decyzja zależy od ilości pozostałej tkanki zęba.
 
-
 ### EN
 
 **Synonyms**: tooth reconstruction, post-and-core, composite buildup.
@@ -350,7 +341,6 @@ Pytania od pacjenta (przykład):
 
 Krótki opis:
 Usunięcie zęba w znieczuleniu miejscowym. Ekstrakcja prosta dotyczy zębów w pełni wyrośniętych, dostępnych, bez powikłań. Ekstrakcja chirurgiczna dotyczy zębów złamanych przy dziąśle, korzeni zalegających, zębów zatrzymanych, lub przypadków wymagających nacięcia dziąsła. Po zabiegu pacjent dostaje pisemne zalecenia: nie płukać 24h, dieta miękka, lód na policzek przeciw obrzękowi.
-
 
 ### EN
 
@@ -381,7 +371,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Osobna kategoria ze względu na trudność. Ósemki często rosną nieprawidłowo: w poziomie, ukośnie, lub są zatrzymane w kości (nie wyrżnięte). Przed zabiegiem wymagane zdjęcie panoramiczne, czasem CBCT 3D. Zabieg w znieczuleniu miejscowym, czasem z sedacją. Po zabiegu 7–10 dni gojenia, opuchlizna i ograniczone otwieranie ust przez kilka dni są normalne. Zwykle zalecany antybiotyk i lek przeciwbólowy.
 
-
 ### EN
 
 **Synonyms**: wisdom tooth removal, third molar extraction, impacted wisdom tooth.
@@ -410,7 +399,6 @@ Pytania od pacjenta (przykład):
 
 Krótki opis:
 Dwuetapowa procedura: wszczepienie tytanowego implantu w kość szczęki, okres osteointegracji 3–6 miesięcy, następnie osadzenie korony protetycznej na implancie. Przed zabiegiem obowiązkowa konsultacja implantologiczna i CBCT (tomografia 3D) do oceny ilości kości. Czasem wymagana augmentacja kości lub podniesienie zatoki szczękowej, co zwiększa koszt i czas. Cena całkowita obejmuje konsultację, CBCT, wszczep, łącznik (abutment) i koronę.
-
 
 ### EN
 
@@ -441,7 +429,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Trwała odbudowa zęba pokrywająca całą koronę kliniczną. Stosowana po leczeniu kanałowym, przy znacznych ubytkach, lub estetycznie. Materiały: metaloceramika (tańsza, trwała, mniej estetyczna na przednich zębach), pełna ceramika (Emax, estetyczna, zalecana na przednie), cyrkon (trwała i estetyczna, zalecana na trzonowce i tylne zęby). Procedura: szlifowanie zęba, wycisk lub skan 3D, korona tymczasowa, następnie osadzenie korony stałej na drugiej wizycie.
 
-
 ### EN
 
 **Synonyms**: crown, porcelain crown, zirconia crown, ceramic crown, metal-ceramic crown.
@@ -470,7 +457,6 @@ Pytania od pacjenta (przykład):
 
 Krótki opis:
 Stała konstrukcja uzupełniająca brak jednego lub dwóch zębów, oparta na sąsiednich zębach własnych (zęby filarowe) lub na implantach. Klasyczny most trzypunktowy: dwie korony na zębach filarowych plus zawieszony człon brakującego zęba w środku. Wymaga oszlifowania zębów sąsiednich, co jest wadą w porównaniu do implantu (który nie ingeruje w sąsiednie zęby). Materiały jak przy koronach: metaloceramika, pełna ceramika, cyrkon.
-
 
 ### EN
 
@@ -501,7 +487,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Ruchoma konstrukcja uzupełniająca brakujące zęby. Częściowa: gdy zachowane są niektóre własne zęby (proteza zaczepiana na nich klamrami lub zatrzaskami). Całkowita: brak wszystkich zębów w łuku, proteza opiera się na dziąsłach. Materiały: akryl (tańsze, klasyczne), szkielet metalowy (trwalsze, lżejsze, lepiej trzymają się w jamie ustnej). NFZ pokrywa proteze akrylową raz na 5 lat. Wizyty: wycisk pierwotny, wycisk wtórny, próba zwarcia, próba zębów, oddanie protezy plus wizyty kontrolne.
 
-
 ### EN
 
 **Synonyms**: denture, partial denture, full denture, acrylic denture, skeletal denture.
@@ -530,7 +515,6 @@ Pytania od pacjenta (przykład):
 
 Krótki opis:
 Cienkie nakładki na przednią powierzchnię zębów, poprawiające kształt i kolor. Trzy główne typy. Kompozytowe: nakładane bezpośrednio w gabinecie, jedna wizyta, tańsze, trwałość 5–7 lat. Porcelanowe (Emax): wykonywane w laboratorium, dwie wizyty, estetycznie lepsze, trwałość 10–15 lat. Konsultacja z mock-upem (próbnym ustawieniem licówek z materiału tymczasowego) pozwala zobaczyć efekt przed decyzją. Konieczne lekkie szlifowanie zęba (poza licówkami "no-prep" w wybranych przypadkach).
-
 
 ### EN
 
@@ -561,7 +545,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Wizyta diagnostyczna u ortodonty. Ocena zwarcia, ustawienia zębów, ewentualnych wad zgryzu. Zwykle ortodonta zleca dodatkowe badania: zdjęcie pantomograficzne i cefalometryczne, czasem CBCT i skan wewnątrzustny. Na podstawie diagnostyki ortodonta przedstawia plan leczenia: typ aparatu, czas trwania, koszt. Diagnostyka rozliczana osobno.
 
-
 ### EN
 
 **Synonyms**: orthodontic consultation, ortho first visit, braces consultation.
@@ -590,7 +573,6 @@ Pytania od pacjenta (przykład):
 
 Krótki opis:
 Stały aparat ortodontyczny przyklejany do zębów. Typy: metalowy (najtańszy, najmocniejszy, mało estetyczny), estetyczny porcelanowy lub kryształowy (mniej widoczny, droższy), samoligaturujący (szybsze leczenie, mniejszy nacisk; popularne marki: Damon, Speed, Carriere). Leczenie trwa 18–36 miesięcy w zależności od wady zgryzu i wieku pacjenta. Wymagane regularne wizyty kontrolne (zwykle co 4–6 tygodni), prawidłowa higiena (osobne szczoteczki międzyzębowe, irygator). Po zdjęciu aparatu obowiązkowy retainer (utrzymywacz wyniku): stały podklejany od wewnątrz lub szyna zdejmowana na noc.
-
 
 ### EN
 
@@ -622,7 +604,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Przezroczyste, zdejmowane nakładki noszone 20–22 godziny na dobę, zmieniane co 1–2 tygodnie. Niewidoczne dla otoczenia. Zalecane dla dorosłych i nastolatków z umiarkowanymi wadami zgryzu. Cięższe przypadki wymagają aparatu stałego. Po skanowaniu 3D pacjent dostaje wirtualną symulację efektu końcowego. Leczenie trwa zwykle 12–24 miesięcy. Mniej wizyt kontrolnych niż przy aparacie stałym.
 
-
 ### EN
 
 **Synonyms**: Invisalign, clear aligners, invisible braces.
@@ -652,7 +633,6 @@ Pytania od pacjenta (przykład):
 Krótki opis:
 Stomatologia dziecięca to osobna kategoria z dwóch powodów: techniki pracy z dzieckiem (adaptacja, ograniczenie czasu wizyty, nagrody, brak elementu strachu) oraz specyfika leczenia mleczaków (różne od stałych zębów, krótsze korzenie, większy nerw). Pierwsza wizyta to zwykle wizyta adaptacyjna: pokazanie gabinetu, fotela, narzędzi, bez rzeczywistego zabiegu. Następne wizyty już lecznicze. NFZ obejmuje pełny zakres usług dla dzieci do 18 roku życia.
 
-
 ### EN
 
 **Synonyms**: pediatric dentistry, children's dentist, kids dental, milk teeth treatment.
@@ -681,7 +661,6 @@ Pytania od pacjenta (przykład):
 
 Krótki opis:
 NFZ (Narodowy Fundusz Zdrowia) finansuje ograniczony zakres usług stomatologicznych. Dla dorosłych: jeden przegląd rocznie, wypełnienia z materiałów refundowanych na zęby przednie i niektóre boczne, leczenie kanałowe zębów jedno- i dwukanałowych (przednich; w trybie pilnym możliwy szerszy zakres), ekstrakcje w trybie pilnym, proteza akrylowa raz na 5 lat, znieczulenie miejscowe. Dla dzieci do 18 roku życia: pełny zakres (przegląd, plomby ze światłoutwardzalnego kompozytu na zębach przednich, lakowanie szóstek do 8 roku życia, fluoryzacja, ekstrakcje, leczenie kanałowe wszystkich zębów). Nie obejmuje: higienizacji, wybielania, koron, implantów, ortodoncji u dorosłych, większości protetyki. Terminy NFZ w skali kraju często są długie (od tygodni do kilku miesięcy). Czy dana klinika przyjmuje na NFZ i w jakim zakresie zależy od jej kontraktu z NFZ; ta informacja jest w danych konkretnej kliniki (Layer 2), nie tutaj.
-
 
 ### EN
 

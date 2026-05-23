@@ -21,10 +21,7 @@ describe("ElevenLabsToolsCatalog", () => {
     it("emits two specs (check_availability + create_booking) with full urls", () => {
       const specs = buildToolSpecs("https://backend.example.com");
       expect(specs).toHaveLength(2);
-      expect(specs.map((s) => s.name).sort()).toEqual([
-        "check_availability",
-        "create_booking",
-      ]);
+      expect(specs.map((s) => s.name).sort()).toEqual(["check_availability", "create_booking"]);
       const ca = specs.find((s) => s.name === "check_availability")!;
       const cb = specs.find((s) => s.name === "create_booking")!;
       expect(ca.url).toBe("https://backend.example.com/tools/check-availability");
@@ -60,9 +57,7 @@ describe("ElevenLabsToolsCatalog", () => {
         }
         return failures;
       }
-      const failures = specs.flatMap((s) =>
-        walk(s.requestBodySchema, `specs.${s.name}`),
-      );
+      const failures = specs.flatMap((s) => walk(s.requestBodySchema, `specs.${s.name}`));
       expect(failures).toEqual([]);
     });
   });
@@ -100,9 +95,7 @@ describe("ElevenLabsToolsCatalog", () => {
     it("returns existing tool id when name already in workspace (no POST)", async () => {
       const fetcher = vi.fn().mockResolvedValueOnce(
         jsonResponse({
-          tools: [
-            { id: "tool_existing", tool_config: { name: "check_availability" } },
-          ],
+          tools: [{ id: "tool_existing", tool_config: { name: "check_availability" } }],
         }),
       );
       const cat = new ElevenLabsToolsCatalog({ apiKey: "xi", fetcher });
@@ -129,7 +122,10 @@ describe("ElevenLabsToolsCatalog", () => {
         description: "desc",
         url: "https://x/check",
         method: "POST",
-        requestBodySchema: { type: "object", properties: { a: { type: "string", description: "d" } } },
+        requestBodySchema: {
+          type: "object",
+          properties: { a: { type: "string", description: "d" } },
+        },
         responseTimeoutSecs: 20,
       });
       expect(id).toBe("tool_new123");
@@ -231,9 +227,7 @@ describe("ElevenLabsToolsCatalog", () => {
 
   describe("error handling", () => {
     it("throws when listWorkspaceTools returns non-2xx", async () => {
-      const fetcher = vi
-        .fn()
-        .mockResolvedValue(new Response("nope", { status: 401 }));
+      const fetcher = vi.fn().mockResolvedValue(new Response("nope", { status: 401 }));
       const cat = new ElevenLabsToolsCatalog({ apiKey: "xi", fetcher });
       await expect(cat.listWorkspaceTools()).rejects.toThrow(/401/);
     });

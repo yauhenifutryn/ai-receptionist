@@ -173,9 +173,7 @@ export default async function DashboardPage() {
                       />
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">
-                      {a.phone_number ?? (
-                        <span className="text-neutral-300">— unset</span>
-                      )}
+                      {a.phone_number ?? <span className="text-neutral-300">— unset</span>}
                     </td>
                     <td className="px-4 py-3">
                       <AgentDemoActions

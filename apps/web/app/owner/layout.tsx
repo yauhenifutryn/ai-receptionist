@@ -32,8 +32,11 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
     .maybeSingle();
   if (!membership) redirect("/auth/access-pending");
 
-  const tenants = (membership as { tenants?: { display_name?: string | null } | { display_name?: string | null }[] | null })
-    .tenants;
+  const tenants = (
+    membership as {
+      tenants?: { display_name?: string | null } | { display_name?: string | null }[] | null;
+    }
+  ).tenants;
   const tenantRow = Array.isArray(tenants) ? tenants[0] : tenants;
   const clinic = tenantRow?.display_name ?? "Your clinic";
 
@@ -74,10 +77,7 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
               Settings
             </Link>
             <form method="post" action="/auth/sign-out">
-              <button
-                type="submit"
-                className="text-neutral-500 hover:text-neutral-800"
-              >
+              <button type="submit" className="text-neutral-500 hover:text-neutral-800">
                 Sign out
               </button>
             </form>

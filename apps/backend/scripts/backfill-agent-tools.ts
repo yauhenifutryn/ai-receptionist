@@ -87,9 +87,7 @@ async function main(): Promise<void> {
         serverToolBaseUrl,
       });
       const ms = Date.now() - started;
-      console.log(
-        `[backfill] agent=${row.provider_agent_id} tenant=${row.tenant_id} ok (${ms}ms)`,
-      );
+      console.log(`[backfill] agent=${row.provider_agent_id} tenant=${row.tenant_id} ok (${ms}ms)`);
       ok += 1;
     } catch (e) {
       const msg = (e as Error).message;

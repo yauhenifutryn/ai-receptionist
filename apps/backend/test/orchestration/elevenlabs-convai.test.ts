@@ -216,9 +216,7 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
       .mockImplementationOnce(() =>
         Promise.resolve(
           jsonResponse({
-            tools: [
-              { id: "tool_ca", tool_config: { name: "check_availability" } },
-            ],
+            tools: [{ id: "tool_ca", tool_config: { name: "check_availability" } }],
           }),
         ),
       )
@@ -226,9 +224,7 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
       .mockImplementationOnce(() =>
         Promise.resolve(
           jsonResponse({
-            tools: [
-              { id: "tool_ca", tool_config: { name: "check_availability" } },
-            ],
+            tools: [{ id: "tool_ca", tool_config: { name: "check_availability" } }],
           }),
         ),
       )

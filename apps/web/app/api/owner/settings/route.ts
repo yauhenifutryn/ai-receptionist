@@ -43,13 +43,9 @@ export async function GET(_req: NextRequest) {
     );
   }
   const sms_confirmations_enabled =
-    typeof data?.sms_confirmations_enabled === "boolean"
-      ? data.sms_confirmations_enabled
-      : true;
+    typeof data?.sms_confirmations_enabled === "boolean" ? data.sms_confirmations_enabled : true;
 
-  const zadarmaConfigured = Boolean(
-    process.env.ZADARMA_USER_KEY && process.env.ZADARMA_SECRET_KEY,
-  );
+  const zadarmaConfigured = Boolean(process.env.ZADARMA_USER_KEY && process.env.ZADARMA_SECRET_KEY);
 
   return NextResponse.json({ sms_confirmations_enabled, zadarmaConfigured });
 }

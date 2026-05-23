@@ -46,7 +46,9 @@ async function main() {
     if (r.conversation_id && r.conversation_id !== "pending") distinct.add(r.conversation_id);
   }
   const missing = [...distinct].filter((id) => !known.has(id));
-  console.log(`agent=${providerAgentId} test_transcripts=${tt?.length ?? 0} conversations=${cv?.length ?? 0} missing=${missing.length}`);
+  console.log(
+    `agent=${providerAgentId} test_transcripts=${tt?.length ?? 0} conversations=${cv?.length ?? 0} missing=${missing.length}`,
+  );
 
   for (const cid of missing) {
     const el = await fetchElevenLabsConversation({ conversationId: cid, apiKey: elKey });
@@ -56,16 +58,22 @@ async function main() {
     }
     const body = el.body;
     const meta = (body.metadata ?? {}) as Record<string, unknown>;
-    const startUnix = typeof meta.start_time_unix_secs === "number" ? meta.start_time_unix_secs : null;
-    const durationSecs = typeof meta.call_duration_secs === "number" ? meta.call_duration_secs : null;
-    const startedAt = startUnix ? new Date(startUnix * 1000).toISOString() : new Date().toISOString();
-    const endedAt = startUnix && durationSecs ? new Date((startUnix + durationSecs) * 1000).toISOString() : null;
+    const startUnix =
+      typeof meta.start_time_unix_secs === "number" ? meta.start_time_unix_secs : null;
+    const durationSecs =
+      typeof meta.call_duration_secs === "number" ? meta.call_duration_secs : null;
+    const startedAt = startUnix
+      ? new Date(startUnix * 1000).toISOString()
+      : new Date().toISOString();
+    const endedAt =
+      startUnix && durationSecs ? new Date((startUnix + durationSecs) * 1000).toISOString() : null;
     type ElTurn = { tool_calls?: unknown[]; tool_results?: Array<{ is_error?: boolean }> };
     const turns: ElTurn[] = Array.isArray(body.transcript) ? (body.transcript as ElTurn[]) : [];
     const flatTools = turns.flatMap((t) => (Array.isArray(t.tool_calls) ? t.tool_calls : []));
     const flatResults = turns.flatMap((t) => (Array.isArray(t.tool_results) ? t.tool_results : []));
     const toolErrorCount = flatResults.filter((r) => r && r.is_error === true).length;
-    const language = (meta.main_language as string | undefined) ?? (meta.language as string | undefined) ?? null;
+    const language =
+      (meta.main_language as string | undefined) ?? (meta.language as string | undefined) ?? null;
 
     const { error } = await sb.from("conversations").upsert(
       {
@@ -93,4 +101,7 @@ async function main() {
     else console.log(`  ${cid} ok turns=${turns.length} dur=${durationSecs}s lang=${language}`);
   }
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

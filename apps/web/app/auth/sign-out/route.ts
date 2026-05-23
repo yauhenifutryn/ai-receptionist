@@ -56,10 +56,7 @@ async function performSignOut(req: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(`${req.nextUrl.origin}/auth/sign-in`, 303);
   }
 
-  const response = NextResponse.redirect(
-    `${req.nextUrl.origin}/auth/sign-in`,
-    303,
-  );
+  const response = NextResponse.redirect(`${req.nextUrl.origin}/auth/sign-in`, 303);
 
   const supabase = createServerClient(supabaseUrl, anonKey, {
     cookies: {

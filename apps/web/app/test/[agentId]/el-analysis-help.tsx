@@ -24,9 +24,8 @@ export function ELAnalysisHelp() {
           Configure evaluation criteria in EL&apos;s dashboard to auto-score every call (sentiment,
           escalation correctness, RODO-consent capture, etc.). Each criterion runs after the call
           ends and lands in <code className="font-mono">raw_jsonb.analysis</code> on the matching
-          conversation row. See{" "}
-          <code className="font-mono">docs/el-analysis-setup.md</code> for a step-by-step walkthrough
-          and suggested Polish-dental criteria.
+          conversation row. See <code className="font-mono">docs/el-analysis-setup.md</code> for a
+          step-by-step walkthrough and suggested Polish-dental criteria.
         </p>
       ) : null}
     </div>

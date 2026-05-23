@@ -260,5 +260,4 @@ describe("handleCreateBooking (W2.3, CalendarProvider DI)", () => {
     });
     expect((insertSpy.mock.calls[0]![0] as InsertBookingArgs).conversationId).toBe("conv-xyz");
   });
-
 });

@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ElevenLabsConvAIProvider } from "@ai-receptionist/backend/orchestration";
-import {
-  getOperatorOrJsonError,
-  getServiceRoleSupabase,
-} from "@/lib/supabase-server";
+import { getOperatorOrJsonError, getServiceRoleSupabase } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,10 +64,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
     );
   }
 
-  const { error: delAgentError } = await sb
-    .from("agents")
-    .delete()
-    .eq("id", agentRow.id);
+  const { error: delAgentError } = await sb.from("agents").delete().eq("id", agentRow.id);
   if (delAgentError) {
     return NextResponse.json(
       {

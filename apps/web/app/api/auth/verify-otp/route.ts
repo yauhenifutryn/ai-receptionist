@@ -83,10 +83,9 @@ export async function POST(req: NextRequest) {
     }
     let hasMembership = false;
     if (!pendingInvite) {
-      const { data: rpcData, error: rpcErr } = await service.rpc(
-        "is_active_tenant_member",
-        { p_email: email },
-      );
+      const { data: rpcData, error: rpcErr } = await service.rpc("is_active_tenant_member", {
+        p_email: email,
+      });
       if (rpcErr) {
         return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
       }
@@ -188,10 +187,7 @@ export async function POST(req: NextRequest) {
 
   // Build the final JSON response, then port the session cookies that the
   // supabase adapter attached to cookieSink during verifyOtp.
-  const finalResponse = NextResponse.json(
-    { ok: true, redirectTo },
-    { status: 200 },
-  );
+  const finalResponse = NextResponse.json({ ok: true, redirectTo }, { status: 200 });
   for (const cookie of cookieSink.cookies.getAll()) {
     finalResponse.cookies.set(cookie);
   }

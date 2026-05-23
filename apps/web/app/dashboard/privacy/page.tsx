@@ -143,11 +143,11 @@ export default async function PrivacyReferencePage() {
 
       <Section title="What to say to a clinic owner asking about compliance">
         <p className="text-sm leading-relaxed text-neutral-700">
-          &ldquo;Voice is never stored. Transcripts are kept briefly for quality and debugging
-          under legitimate-interest basis. You publish a one-paragraph notice on your contact page
-          (we provide the wording). For the call itself, the agent identifies as AI on the first
-          turn, which satisfies the EU AI Act transparency requirement. No explicit in-call consent
-          is needed for the booking flow because Articles 6(1)(b) and 9(2)(h) cover pre-contractual
+          &ldquo;Voice is never stored. Transcripts are kept briefly for quality and debugging under
+          legitimate-interest basis. You publish a one-paragraph notice on your contact page (we
+          provide the wording). For the call itself, the agent identifies as AI on the first turn,
+          which satisfies the EU AI Act transparency requirement. No explicit in-call consent is
+          needed for the booking flow because Articles 6(1)(b) and 9(2)(h) cover pre-contractual
           healthcare processing.&rdquo;
         </p>
       </Section>
@@ -167,7 +167,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex gap-2.5 text-sm leading-relaxed text-neutral-700">
-      <span aria-hidden className="mt-2 inline-block h-1 w-1 shrink-0 rounded-full bg-neutral-400" />
+      <span
+        aria-hidden
+        className="mt-2 inline-block h-1 w-1 shrink-0 rounded-full bg-neutral-400"
+      />
       <span>{children}</span>
     </div>
   );

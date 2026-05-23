@@ -190,13 +190,7 @@ export async function handleCreateBooking(
       }),
     );
   }
-  if (
-    hasPhone &&
-    smsToggleOn &&
-    deps.smsClient &&
-    deps.smsFailureLogger &&
-    deps.clinicName
-  ) {
+  if (hasPhone && smsToggleOn && deps.smsClient && deps.smsFailureLogger && deps.clinicName) {
     const smsBody = formatConfirmationSms({
       clinicName: deps.clinicName,
       startsAt: providerResult.startsAt,

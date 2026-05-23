@@ -71,8 +71,7 @@ export function buildToolSpecs(serverToolBaseUrl: string): ToolSpec[] {
           },
           preferredWindow: {
             type: "object",
-            description:
-              "Optional caller-stated time window. ISO 8601 datetimes (UTC).",
+            description: "Optional caller-stated time window. ISO 8601 datetimes (UTC).",
             properties: {
               from: {
                 type: "string",
@@ -100,8 +99,7 @@ export function buildToolSpecs(serverToolBaseUrl: string): ToolSpec[] {
         properties: {
           slotId: {
             type: "string",
-            description:
-              "Slot identifier returned by a prior check_availability call.",
+            description: "Slot identifier returned by a prior check_availability call.",
           },
           patientName: {
             type: "string",
@@ -115,8 +113,7 @@ export function buildToolSpecs(serverToolBaseUrl: string): ToolSpec[] {
           },
           serviceCategory: {
             type: "string",
-            description:
-              "Must match the serviceCategory used in check_availability for this slot.",
+            description: "Must match the serviceCategory used in check_availability for this slot.",
           },
           notes: {
             type: "string",
@@ -197,29 +194,22 @@ export class ElevenLabsToolsCatalog {
     const match = existing.find((t) => t.name === spec.name);
     if (match) return match.id;
 
-    const body = await this.request<{ id?: string; tool_id?: string }>(
-      "POST",
-      "/v1/convai/tools",
-      {
-        tool_config: {
-          type: "webhook",
-          name: spec.name,
-          description: spec.description,
-          response_timeout_secs:
-            spec.responseTimeoutSecs ?? DEFAULT_RESPONSE_TIMEOUT_SECS,
-          api_schema: {
-            url: spec.url,
-            method: spec.method,
-            request_body_schema: spec.requestBodySchema,
-          },
+    const body = await this.request<{ id?: string; tool_id?: string }>("POST", "/v1/convai/tools", {
+      tool_config: {
+        type: "webhook",
+        name: spec.name,
+        description: spec.description,
+        response_timeout_secs: spec.responseTimeoutSecs ?? DEFAULT_RESPONSE_TIMEOUT_SECS,
+        api_schema: {
+          url: spec.url,
+          method: spec.method,
+          request_body_schema: spec.requestBodySchema,
         },
       },
-    );
+    });
     const id = body.id ?? body.tool_id;
     if (!id) {
-      throw new Error(
-        `ElevenLabs POST /v1/convai/tools returned no tool id (name=${spec.name})`,
-      );
+      throw new Error(`ElevenLabs POST /v1/convai/tools returned no tool id (name=${spec.name})`);
     }
     return id;
   }
@@ -263,9 +253,7 @@ export class ElevenLabsToolsCatalog {
     const res = await this.doFetch(`${this.baseUrl}${path}`, init);
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new Error(
-        `ElevenLabs ${method} ${path} failed: ${res.status} ${text}`,
-      );
+      throw new Error(`ElevenLabs ${method} ${path} failed: ${res.status} ${text}`);
     }
     const ct = res.headers.get("content-type") ?? "";
     if (ct.includes("application/json")) {

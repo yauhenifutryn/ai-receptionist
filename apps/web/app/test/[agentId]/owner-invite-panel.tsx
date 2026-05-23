@@ -46,9 +46,7 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
 
   // Sign-in link state. Kept separate from the invite state so the operator
   // can do both in sequence without flicker.
-  const [linkState, setLinkState] = useState<"idle" | "submitting" | "ok" | "err">(
-    "idle",
-  );
+  const [linkState, setLinkState] = useState<"idle" | "submitting" | "ok" | "err">("idle");
   const [linkUrl, setLinkUrl] = useState("");
   const [linkExpiresAt, setLinkExpiresAt] = useState<string | null>(null);
   const [linkErr, setLinkErr] = useState("");
@@ -149,14 +147,11 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
     setLinkExpiresAt(null);
     setCopied(false);
     try {
-      const r = await fetch(
-        `/api/agents/${encodeURIComponent(agentId)}/owner-signin-link`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email }),
-        },
-      );
+      const r = await fetch(`/api/agents/${encodeURIComponent(agentId)}/owner-signin-link`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
       const body = (await r.json().catch(() => ({}))) as {
         ok?: boolean;
         url?: string;
@@ -240,9 +235,8 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
         Owner access
       </h2>
       <p className="text-sm text-neutral-600">
-        Grant a clinic owner access to this agent&apos;s conversations + analytics. They sign
-        in at <code className="font-mono text-xs">/auth/sign-in</code> with the invited
-        email.
+        Grant a clinic owner access to this agent&apos;s conversations + analytics. They sign in at{" "}
+        <code className="font-mono text-xs">/auth/sign-in</code> with the invited email.
       </p>
       <form onSubmit={submit} className="flex flex-wrap gap-2">
         <input
@@ -270,27 +264,25 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
         </button>
       </form>
       {msg ? (
-        <p className={`text-xs ${state === "ok" ? "text-emerald-700" : "text-rose-700"}`}>
-          {msg}
-        </p>
+        <p className={`text-xs ${state === "ok" ? "text-emerald-700" : "text-rose-700"}`}>{msg}</p>
       ) : null}
 
       <div className="rounded-lg bg-neutral-50 px-3 py-2 text-xs leading-relaxed text-neutral-600">
-        Tip: Owner invites also send via email (Resend). Until a custom sending domain is
-        verified, only Resend-authorized addresses receive the email. Use &ldquo;Generate
-        sign-in link&rdquo; for prospects whose address isn&apos;t pre-authorized.
+        Tip: Owner invites also send via email (Resend). Until a custom sending domain is verified,
+        only Resend-authorized addresses receive the email. Use &ldquo;Generate sign-in link&rdquo;
+        for prospects whose address isn&apos;t pre-authorized.
       </div>
 
       {linkState === "ok" && linkUrl ? (
         <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3">
           <p className="text-xs leading-relaxed text-neutral-600">
-            This URL signs the owner in directly without email. Copy and send via your
-            channel of choice (Slack, WhatsApp, your own email).
+            This URL signs the owner in directly without email. Copy and send via your channel of
+            choice (Slack, WhatsApp, your own email).
             {linkExpiresAt
               ? ` Valid until ${new Date(linkExpiresAt).toLocaleDateString("pl-PL", { year: "numeric", month: "short", day: "numeric" })}, single-use.`
-              : " Valid for ~14 days, single-use."}
-            {" "}Treat it like a temporary password &mdash; anyone with the URL signs in as
-            this email until first use or expiry. Regenerate to rotate.
+              : " Valid for ~14 days, single-use."}{" "}
+            Treat it like a temporary password &mdash; anyone with the URL signs in as this email
+            until first use or expiry. Regenerate to rotate.
           </p>
           <div className="flex flex-wrap gap-2">
             <input
@@ -310,9 +302,7 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
           </div>
         </div>
       ) : null}
-      {linkState === "err" && linkErr ? (
-        <p className="text-xs text-rose-700">{linkErr}</p>
-      ) : null}
+      {linkState === "err" && linkErr ? <p className="text-xs text-rose-700">{linkErr}</p> : null}
 
       <div className="mt-2 flex flex-col gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
@@ -386,11 +376,7 @@ export default function OwnerInvitePanel({ agentId }: { agentId: string }) {
                                 : "border border-rose-300 bg-white text-rose-700 hover:bg-rose-50"
                             }`}
                           >
-                            {isRevoking
-                              ? "Revoking…"
-                              : isArmed
-                                ? "Click to confirm"
-                                : "Revoke"}
+                            {isRevoking ? "Revoking…" : isArmed ? "Click to confirm" : "Revoke"}
                           </button>
                         </div>
                       </td>

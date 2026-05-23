@@ -34,7 +34,10 @@ export async function GET(req: NextRequest) {
     .eq("signin_token", token)
     .maybeSingle();
   if (lookupErr) {
-    return signinErrorResponse("Sign-in service is temporarily unavailable. Try again shortly.", 500);
+    return signinErrorResponse(
+      "Sign-in service is temporarily unavailable. Try again shortly.",
+      500,
+    );
   }
   if (!invite) {
     return signinErrorResponse(
@@ -59,8 +62,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Mint a fresh short-lived Supabase action_link at click time.
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? new URL(req.url).origin;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? new URL(req.url).origin;
   const redirectTo = `${siteUrl}/owner/conversations`;
 
   const { data: linkData, error: linkErr } = await service.auth.admin.generateLink({

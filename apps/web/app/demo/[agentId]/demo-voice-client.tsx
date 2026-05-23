@@ -249,9 +249,7 @@ function Inner({ agentId, strings, pin }: Props) {
           </div>
         ) : null}
 
-        <p className="text-xs leading-relaxed text-neutral-500">
-          {strings.privacyNotice}
-        </p>
+        <p className="text-xs leading-relaxed text-neutral-500">{strings.privacyNotice}</p>
       </section>
 
       <section className="flex flex-col gap-3">

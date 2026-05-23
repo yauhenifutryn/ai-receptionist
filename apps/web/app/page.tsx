@@ -185,7 +185,7 @@ const STRINGS: Record<Lang, LangBundle> = {
     flow: {
       eyebrow: "JAK TO DZIAŁA",
       title: "Pięć kroków, mniej niż jedna rozmowa.",
-      body: "Pacjent dzwoni, system rozumie, sprawdza grafik, rezerwuje termin, potwierdza SMSem. Bez menu, bez „naciśnij jeden\", bez automatycznej kolejki.",
+      body: 'Pacjent dzwoni, system rozumie, sprawdza grafik, rezerwuje termin, potwierdza SMSem. Bez menu, bez „naciśnij jeden", bez automatycznej kolejki.',
       steps: [
         "ZADZWONIENIE",
         "ROZUMIENIE",
@@ -195,7 +195,7 @@ const STRINGS: Record<Lang, LangBundle> = {
       ],
       captions: [
         "+48 22 ...",
-        "„chciałbym się umówić\"",
+        '„chciałbym się umówić"',
         "czwartek 10:00 — wolne",
         "booking_id #4521",
         "wysłano do +48 501 ··· 12",
@@ -212,11 +212,11 @@ const STRINGS: Record<Lang, LangBundle> = {
           title: "Odpowiada na pytania o klinikę. Bez briefingu personelu.",
           paragraphs: [
             "Po podłączeniu kliniki recepcjonistka czyta jej stronę, łączy ją z polską ontologią stomatologiczną i odpowiada pacjentom na żywo. NFZ? Cennik implantów? Godziny w sobotę? Czy przyjmuje pan dr Nowak nowych pacjentów? Wszystko z dnia, w którym podpinasz klinikę.",
-            "Jeśli czegoś nie wie, mówi to wprost i proponuje kontakt z żywą osobą. Bez halucynacji, bez wymyślania cen, bez „chyba\". Aktualizacja jest banalna: dorzucasz markdown z FAQ, recepcjonistka uczy się natychmiast.",
+            'Jeśli czegoś nie wie, mówi to wprost i proponuje kontakt z żywą osobą. Bez halucynacji, bez wymyślania cen, bez „chyba". Aktualizacja jest banalna: dorzucasz markdown z FAQ, recepcjonistka uczy się natychmiast.',
           ],
           bullets: [
             "Strona kliniki + nasza ontologia jako baza RAG.",
-            "Jasne „nie wiem\" zamiast wymyślania.",
+            'Jasne „nie wiem" zamiast wymyślania.',
             "Update bez wgrywania kodu, w panelu właściciela.",
           ],
         },
@@ -226,7 +226,7 @@ const STRINGS: Record<Lang, LangBundle> = {
           title: "Mówi po polsku jak człowiek. Po angielsku i rosyjsku tak samo.",
           paragraphs: [
             "Pacjent nie musi wybierać języka. Recepcjonistka słyszy, w jakim języku do niej dzwonisz, i w nim odpowiada. Polski jest domyślny. Angielski i rosyjski działają tak samo dobrze, nie są tłumaczeniem.",
-            "Bez drętwych zwrotów w stylu „proszę powtórzyć\". Jeśli czegoś nie rozumie, dopytuje tak, jak zrobiłaby to osoba siedząca w recepcji.",
+            'Bez drętwych zwrotów w stylu „proszę powtórzyć". Jeśli czegoś nie rozumie, dopytuje tak, jak zrobiłaby to osoba siedząca w recepcji.',
           ],
           bullets: [
             "Naturalna polszczyzna, nie tłumaczenie z angielskiego.",
@@ -239,7 +239,7 @@ const STRINGS: Record<Lang, LangBundle> = {
           eyebrow: "REZERWACJE",
           title: "Pyta o dogodny termin, sprawdza grafik, rezerwuje od razu.",
           paragraphs: [
-            "Bez kartki, bez „sprawdzę grafik i oddzwonię\". System widzi wolne terminy na żywo i potwierdza wizytę jeszcze w tej samej rozmowie.",
+            'Bez kartki, bez „sprawdzę grafik i oddzwonię". System widzi wolne terminy na żywo i potwierdza wizytę jeszcze w tej samej rozmowie.',
             "O trzeciej w nocy działa tak samo jak o jedenastej rano. Nie idzie na lunch i nie zapomina, że pan Kowalski prosił o godzinę po szesnastej.",
           ],
           bullets: [
@@ -351,17 +351,11 @@ const STRINGS: Record<Lang, LangBundle> = {
     flow: {
       eyebrow: "HOW IT WORKS",
       title: "Five steps, less than one conversation.",
-      body: "Patient calls, system understands, checks the schedule, books the slot, confirms by SMS. No menus, no \"press 1\", no automated queue.",
-      steps: [
-        "CALL",
-        "UNDERSTANDING",
-        "SCHEDULE CHECK",
-        "RESERVATION",
-        "CONFIRMATION SMS",
-      ],
+      body: 'Patient calls, system understands, checks the schedule, books the slot, confirms by SMS. No menus, no "press 1", no automated queue.',
+      steps: ["CALL", "UNDERSTANDING", "SCHEDULE CHECK", "RESERVATION", "CONFIRMATION SMS"],
       captions: [
         "+48 22 ...",
-        "\"I'd like to book\"",
+        '"I\'d like to book"',
         "Thursday 10:00 — free",
         "booking_id #4521",
         "sent to +48 501 ··· 12",
@@ -382,7 +376,7 @@ const STRINGS: Record<Lang, LangBundle> = {
           ],
           bullets: [
             "Clinic website plus our ontology, as a RAG base.",
-            "Explicit \"I don't know\" rather than guesses.",
+            'Explicit "I don\'t know" rather than guesses.',
             "Update from the owner panel, no code deploy.",
           ],
         },
@@ -392,7 +386,7 @@ const STRINGS: Record<Lang, LangBundle> = {
           title: "Speaks Polish like a person. English and Russian, equally.",
           paragraphs: [
             "Patients don't have to choose a language. The receptionist hears which language they're in and stays there. Polish is the default; English and Russian work the same way, not as translations on top.",
-            "No stilted phrasing, no \"please repeat that.\" If something isn't clear, it asks again the way a person at the desk would.",
+            'No stilted phrasing, no "please repeat that." If something isn\'t clear, it asks again the way a person at the desk would.',
           ],
           bullets: [
             "Native Polish, not translated from English.",
@@ -405,7 +399,7 @@ const STRINGS: Record<Lang, LangBundle> = {
           eyebrow: "BOOKINGS",
           title: "Asks for a time, checks the schedule, books on the spot.",
           paragraphs: [
-            "No callbacks, no \"I'll check the calendar and ring you back.\" The system reads live availability and confirms a slot in the same call.",
+            'No callbacks, no "I\'ll check the calendar and ring you back." The system reads live availability and confirms a slot in the same call.',
             "Works at 3am the same way it works at 11am. It doesn't take lunch and doesn't forget that Mr Kowalski asked for a slot after four.",
           ],
           bullets: [
@@ -434,8 +428,7 @@ const STRINGS: Record<Lang, LangBundle> = {
         {
           question: "Do you accept public insurance?",
           source: "ontology/services.md",
-          answer:
-            "No, all services are private. Full price list at klinika.pl/cennik.",
+          answer: "No, all services are private. Full price list at klinika.pl/cennik.",
         },
         {
           question: "How much is an implant?",
@@ -518,13 +511,7 @@ const STRINGS: Record<Lang, LangBundle> = {
       eyebrow: "КАК ЭТО РАБОТАЕТ",
       title: "Пять шагов, меньше одного разговора.",
       body: "Пациент звонит, система понимает, проверяет график, бронирует слот, подтверждает SMS. Без меню, без «нажмите 1», без автоматической очереди.",
-      steps: [
-        "ЗВОНОК",
-        "ПОНИМАНИЕ",
-        "ПРОВЕРКА ГРАФИКА",
-        "БРОНИРОВАНИЕ",
-        "SMS С ПОДТВЕРЖДЕНИЕМ",
-      ],
+      steps: ["ЗВОНОК", "ПОНИМАНИЕ", "ПРОВЕРКА ГРАФИКА", "БРОНИРОВАНИЕ", "SMS С ПОДТВЕРЖДЕНИЕМ"],
       captions: [
         "+48 22 ...",
         "«хочу записаться»",
@@ -600,8 +587,7 @@ const STRINGS: Record<Lang, LangBundle> = {
         {
           question: "Вы принимаете по госстраховке?",
           source: "ontology/services.md",
-          answer:
-            "Нет, все услуги платные. Полный прейскурант на сайте klinika.pl/cennik.",
+          answer: "Нет, все услуги платные. Полный прейскурант на сайте klinika.pl/cennik.",
         },
         {
           question: "Сколько стоит имплант?",
@@ -921,16 +907,17 @@ function HeroConsole() {
   }
 
   // Tools pane: each tool appears at TOOLS_START_MS + i * TOOLS_GAP_MS.
-  const toolsVisible = TOOL_CALLS.map(
-    (_, i) => elapsed > TOOLS_START_MS + i * TOOLS_GAP_MS,
-  );
+  const toolsVisible = TOOL_CALLS.map((_, i) => elapsed > TOOLS_START_MS + i * TOOLS_GAP_MS);
 
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950 font-mono text-[10px] leading-relaxed text-neutral-300 shadow-2xl sm:text-[11px] md:text-xs">
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+          <span
+            aria-hidden="true"
+            className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-400"
+          />
           <span className="truncate text-emerald-400">{t.console.title}</span>
         </div>
         <span className="shrink-0 text-neutral-500 tabular-nums">{t.console.statusLabel}</span>
@@ -1025,7 +1012,9 @@ function HeroConsole() {
               style={{ opacity: toolsVisible[i] ? 1 : 0.15 }}
             >
               <span className="min-w-0">
-                <span aria-hidden="true" className="text-emerald-400">▸ </span>
+                <span aria-hidden="true" className="text-emerald-400">
+                  ▸{" "}
+                </span>
                 <span className="text-neutral-200">{tc.name}</span>
                 <span className="text-neutral-500">({tc.args})</span>
               </span>
@@ -1100,8 +1089,7 @@ function Hero() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
         style={{
-          backgroundImage:
-            "radial-gradient(circle, rgba(0,0,0,0.045) 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(circle, rgba(0,0,0,0.045) 1px, transparent 1px)",
           backgroundSize: "16px 16px",
         }}
       />
@@ -1175,7 +1163,10 @@ function FlowSection() {
               const isActive = i === active;
               const isPast = i < active;
               return (
-                <li key={step} className="grid grid-cols-[36px_22px_1fr] items-stretch sm:grid-cols-[44px_24px_1fr]">
+                <li
+                  key={step}
+                  className="grid grid-cols-[36px_22px_1fr] items-stretch sm:grid-cols-[44px_24px_1fr]"
+                >
                   <div className="flex items-start pt-3 font-mono text-[10px] uppercase tracking-wider text-neutral-400 tabular-nums">
                     0{i + 1}
                   </div>
@@ -1199,7 +1190,9 @@ function FlowSection() {
                       />
                     )}
                   </div>
-                  <div className={`pb-8 pt-2 transition-opacity duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}>
+                  <div
+                    className={`pb-8 pt-2 transition-opacity duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}
+                  >
                     <div
                       className={`text-base font-semibold tracking-tight transition-colors duration-300 sm:text-lg ${
                         isActive ? "text-emerald-700" : "text-neutral-900"
@@ -1294,9 +1287,7 @@ function KnowledgeVisual() {
       </div>
 
       <div className="mt-4 flex items-baseline justify-between font-mono text-[10px] uppercase tracking-wider text-neutral-500">
-        <span>
-          {stage === "searching" ? t.features.knowledgeStateThinking : "ŹRÓDŁO"}
-        </span>
+        <span>{stage === "searching" ? t.features.knowledgeStateThinking : "ŹRÓDŁO"}</span>
       </div>
       <div className="mt-1 flex items-center gap-2">
         <span
@@ -1423,9 +1414,24 @@ function LanguageVisual() {
 // --- C. Booking: 18-slot grid filling --------------------------------------
 
 const BOOKING_HOURS: string[] = [
-  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
-  "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
-  "14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
+  "08:00",
+  "08:30",
+  "09:00",
+  "09:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "11:30",
+  "12:00",
+  "12:30",
+  "13:00",
+  "13:30",
+  "14:00",
+  "14:30",
+  "15:00",
+  "15:30",
+  "16:00",
+  "16:30",
 ];
 
 function BookingVisual() {
@@ -1517,7 +1523,9 @@ function SmsVisual() {
   const msg = t.features.smsBody;
   const phases = t.features.smsPhase;
 
-  const [phase, setPhase] = useState<"empty" | "typing" | "delivered">(reduced ? "delivered" : "empty");
+  const [phase, setPhase] = useState<"empty" | "typing" | "delivered">(
+    reduced ? "delivered" : "empty",
+  );
   const [typed, setTyped] = useState(reduced ? msg : "");
 
   useEffect(() => {
@@ -1732,7 +1740,12 @@ function renderLedger(elapsedMs: number, dialogue: DialogueLine[]): RenderedLedg
       out.push({ side, ts, text: line, done: true });
     } else {
       const frac = (elapsedMs - start) / typeMs;
-      out.push({ side, ts, text: line.slice(0, Math.max(0, Math.floor(line.length * frac))), done: false });
+      out.push({
+        side,
+        ts,
+        text: line.slice(0, Math.max(0, Math.floor(line.length * frac))),
+        done: false,
+      });
     }
     cursor = end + LEDGER_PAUSE_MS;
   }
@@ -1740,7 +1753,10 @@ function renderLedger(elapsedMs: number, dialogue: DialogueLine[]): RenderedLedg
 }
 
 function totalLedgerMs(dialogue: DialogueLine[]): number {
-  return dialogue.reduce((sum, d) => sum + d.line.length * LEDGER_TYPE_MS_PER_CHAR + LEDGER_PAUSE_MS, 0);
+  return dialogue.reduce(
+    (sum, d) => sum + d.line.length * LEDGER_TYPE_MS_PER_CHAR + LEDGER_PAUSE_MS,
+    0,
+  );
 }
 
 function LiveLedger() {
@@ -1843,7 +1859,9 @@ function DontSection() {
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
               {t.dont.title}
             </h2>
-            <p className="mt-6 max-w-md text-base leading-relaxed text-neutral-700">{t.dont.body}</p>
+            <p className="mt-6 max-w-md text-base leading-relaxed text-neutral-700">
+              {t.dont.body}
+            </p>
           </div>
           <ul className="md:col-span-7">
             {t.dont.items.map((item, i) => (

@@ -130,8 +130,8 @@ function turnText(t: ElTurn): string {
  * misses paraphrased variants (the agent sometimes reformulates slightly,
  * e.g. moving the recording-disclaimer clause around).
  */
-const QUESTION_FINGERPRINTS = (Object.keys(CONSENT_QUESTION) as ConsentLanguage[]).map(
-  (lang) => CONSENT_QUESTION[lang].slice(0, 25).toLowerCase(),
+const QUESTION_FINGERPRINTS = (Object.keys(CONSENT_QUESTION) as ConsentLanguage[]).map((lang) =>
+  CONSENT_QUESTION[lang].slice(0, 25).toLowerCase(),
 );
 
 function findConsentQuestionTurn(transcript: ElTurn[]): number {
@@ -173,18 +173,26 @@ function classifyReply(reply: string): LiveConsentStatus {
   // Strip punctuation so "tak." and "tak!" both match.
   const stripped = normalized.replace(/[.,!?…]/g, "").trim();
 
-  const allAffirmative = (Object.keys(AFFIRMATIVE_EXAMPLES) as ConsentLanguage[]).flatMap(
-    (lang) => AFFIRMATIVE_EXAMPLES[lang].map((s) => s.toLowerCase()),
+  const allAffirmative = (Object.keys(AFFIRMATIVE_EXAMPLES) as ConsentLanguage[]).flatMap((lang) =>
+    AFFIRMATIVE_EXAMPLES[lang].map((s) => s.toLowerCase()),
   );
-  const allNegative = (Object.keys(NEGATIVE_EXAMPLES) as ConsentLanguage[]).flatMap(
-    (lang) => NEGATIVE_EXAMPLES[lang].map((s) => s.toLowerCase()),
+  const allNegative = (Object.keys(NEGATIVE_EXAMPLES) as ConsentLanguage[]).flatMap((lang) =>
+    NEGATIVE_EXAMPLES[lang].map((s) => s.toLowerCase()),
   );
 
   const hasAffirmative = allAffirmative.some(
-    (token) => stripped === token || stripped.startsWith(token + " ") || stripped.includes(" " + token + " ") || stripped.endsWith(" " + token),
+    (token) =>
+      stripped === token ||
+      stripped.startsWith(token + " ") ||
+      stripped.includes(" " + token + " ") ||
+      stripped.endsWith(" " + token),
   );
   const hasNegative = allNegative.some(
-    (token) => stripped === token || stripped.startsWith(token + " ") || stripped.includes(" " + token + " ") || stripped.endsWith(" " + token),
+    (token) =>
+      stripped === token ||
+      stripped.startsWith(token + " ") ||
+      stripped.includes(" " + token + " ") ||
+      stripped.endsWith(" " + token),
   );
 
   // "Tak, oczywiście" → affirmative wins. "Nie, dziękuję" → negative.

@@ -63,7 +63,9 @@ export default function OperatorCodePage() {
           <span className="font-mono text-xs uppercase tracking-wider text-neutral-400">
             Operator console
           </span>
-          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Sign in with code</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
+            Sign in with code
+          </h1>
           <p className="text-sm leading-relaxed text-neutral-600">
             Paste the operator code you received from the admin. The code is tied to your identity
             and signs you in to the operator dashboard. Until our email domain is verified, this is
@@ -107,7 +109,8 @@ export default function OperatorCodePage() {
 
         <footer className="mt-4 border-t border-neutral-200 pt-6 text-xs text-neutral-500">
           <p>
-            Not an operator? Go to the regular sign-in at <span className="font-mono">/auth/sign-in</span>.
+            Not an operator? Go to the regular sign-in at{" "}
+            <span className="font-mono">/auth/sign-in</span>.
           </p>
         </footer>
       </div>

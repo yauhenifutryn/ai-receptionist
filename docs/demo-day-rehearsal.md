@@ -19,7 +19,7 @@ Roughly 5 minutes on stage. Fill in concrete names and timings during rehearsal.
 
 ## Failure modes and mitigations
 
-- **Zadarma not verified by Demo Day.** Use the in-browser PIN demo URL projected as a QR code. Volunteer scans, joins via `@elevenlabs/react` widget. Audience still gets a live Polish conversation; we lose the "SMS landing on a real phone" beat but keep the rest. Have the QR printed *and* available on the projector laptop.
+- **Zadarma not verified by Demo Day.** Use the in-browser PIN demo URL projected as a QR code. Volunteer scans, joins via `@elevenlabs/react` widget. Audience still gets a live Polish conversation; we lose the "SMS landing on a real phone" beat but keep the rest. Have the QR printed _and_ available on the projector laptop.
 - **Agent fumbles a question on stage.** Don't panic. Pivot to the operator dashboard: open the just-finished call, point at the transcript line where it went sideways, point at the tool trace, narrate "this is exactly what the clinic sees the next morning when they review yesterday's calls." Recovery via transparency.
 - **Vercel deploy is sick.** Roll back to the previous production deployment URL. Keep that URL bookmarked on the laptop and printed on paper. Vercel CLI is on the laptop with the project linked, so `vercel rollback` works as a fallback.
 - **Mic/audio fails during the live PSTN call.** Cut to the 90-second pre-recorded backup video (see "Backup demo material" below).
@@ -35,7 +35,7 @@ Roughly 5 minutes on stage. Fill in concrete names and timings during rehearsal.
 5. Phone number verified end-to-end. Call it from a non-team phone the night before; full booking must complete and SMS must land.
 6. SMS sender ID and template verified. Polish text reads naturally to a native speaker; no English phrases leaked through.
 7. Owner-invite email drafted and tested on a friendly clinic — used for the "and they can do this themselves on day 2" line. Don't send live during the demo; show the email mid-composition.
-8. Backup pre-recorded demo video on the laptop *and* on a USB stick. Tested with the venue's projector.
+8. Backup pre-recorded demo video on the laptop _and_ on a USB stick. Tested with the venue's projector.
 9. Previous production deploy URL bookmarked and printed. Vercel CLI authenticated.
 10. Phone fully charged, brightness maxed, do-not-disturb on except for the demo number. Backup phone in the bag.
 
@@ -52,7 +52,7 @@ Don't add extra widgets for the demo; the strip is the point. Mention the number
 
 ## Backup demo material
 
-A 90-second pre-recorded video of a successful PSTN call from start to SMS landing. Record once Zadarma clears (final-week task). Stored locally and on a USB stick; do *not* rely on YouTube embed or Vercel-hosted asset during the demo. Cue point set at the start of the agent's first message so we can hit play and start narrating immediately.
+A 90-second pre-recorded video of a successful PSTN call from start to SMS landing. Record once Zadarma clears (final-week task). Stored locally and on a USB stick; do _not_ rely on YouTube embed or Vercel-hosted asset during the demo. Cue point set at the start of the agent's first message so we can hit play and start narrating immediately.
 
 ## Open items to fill in before Demo Day
 

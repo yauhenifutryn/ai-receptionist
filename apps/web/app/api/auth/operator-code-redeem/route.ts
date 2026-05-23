@@ -129,10 +129,7 @@ export async function POST(req: NextRequest) {
   // can't escalate to a non-operator session.
   void verifyData; // not needed past this point
 
-  const finalResponse = NextResponse.json(
-    { ok: true, redirectTo: "/dashboard" },
-    { status: 200 },
-  );
+  const finalResponse = NextResponse.json({ ok: true, redirectTo: "/dashboard" }, { status: 200 });
   for (const cookie of cookieSink.cookies.getAll()) {
     finalResponse.cookies.set(cookie);
   }

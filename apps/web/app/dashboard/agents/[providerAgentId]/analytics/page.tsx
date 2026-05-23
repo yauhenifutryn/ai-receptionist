@@ -196,10 +196,7 @@ export default async function AnalyticsPage({ params }: PageProps) {
   const hourMax = Math.max(1, ...hourCounts);
 
   // ── Section D — Repeat callers (30d, PSTN with caller_phone_e164) ───────
-  const callerGroups = new Map<
-    string,
-    { count: number; first: string; last: string }
-  >();
+  const callerGroups = new Map<string, { count: number; first: string; last: string }>();
   for (const r of rows30) {
     if (!r.caller_phone_e164) continue;
     const existing = callerGroups.get(r.caller_phone_e164);
@@ -339,9 +336,7 @@ export default async function AnalyticsPage({ params }: PageProps) {
       {/* ── Section C — Hour-of-day ────────────────────────────────────── */}
       <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-neutral-900">Calls by hour</h2>
-        <p className="text-xs text-neutral-500">
-          Last 30 days · Europe/Warsaw
-        </p>
+        <p className="text-xs text-neutral-500">Last 30 days · Europe/Warsaw</p>
         <div className="mt-4 flex h-40 items-end gap-1">
           {hourCounts.map((count, h) => {
             const heightPct = Math.round((count / hourMax) * 100);
@@ -371,9 +366,7 @@ export default async function AnalyticsPage({ params }: PageProps) {
       {/* ── Section D — Repeat callers ─────────────────────────────────── */}
       <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-neutral-900">Repeat callers</h2>
-        <p className="text-xs text-neutral-500">
-          Last 30 days · PSTN only · phone digits masked
-        </p>
+        <p className="text-xs text-neutral-500">Last 30 days · PSTN only · phone digits masked</p>
         {repeatCallers.length === 0 ? (
           <p className="mt-4 text-sm text-neutral-500">
             No repeat callers in this window (or no PSTN traffic yet).
@@ -435,8 +428,8 @@ export default async function AnalyticsPage({ params }: PageProps) {
               </span>
             </div>
             <p className="mt-2 text-sm text-neutral-700">
-              Personality, language mirroring, goal flow, guardrails, tool usage
-              policy. Loaded on every agent turn.
+              Personality, language mirroring, goal flow, guardrails, tool usage policy. Loaded on
+              every agent turn.
             </p>
             <p className="mt-1 font-mono text-[11px] text-neutral-400">
               source: apps/backend/src/prompts/system-prompt.ts
@@ -454,15 +447,11 @@ export default async function AnalyticsPage({ params }: PageProps) {
             <ul className="mt-2 space-y-1 text-sm text-neutral-700">
               <li>
                 <code className="font-mono text-xs">check_availability</code>
-                <span className="ml-2 text-neutral-500">
-                  proposes up to 3 slots
-                </span>
+                <span className="ml-2 text-neutral-500">proposes up to 3 slots</span>
               </li>
               <li>
                 <code className="font-mono text-xs">create_booking</code>
-                <span className="ml-2 text-neutral-500">
-                  confirms a slot to a booking
-                </span>
+                <span className="ml-2 text-neutral-500">confirms a slot to a booking</span>
               </li>
             </ul>
           </div>
@@ -475,17 +464,14 @@ export default async function AnalyticsPage({ params }: PageProps) {
               RAG retrieval
             </h3>
             <span className="font-mono text-xs text-neutral-400">
-              {ragAgg.turnsWithRetrieval} / {ragAgg.totalAgentTurns} agent turns
-              ·{" "}
-              {ragAgg.conversationsWithRetrieval} / {ragAgg.totalConversations}{" "}
-              calls
+              {ragAgg.turnsWithRetrieval} / {ragAgg.totalAgentTurns} agent turns ·{" "}
+              {ragAgg.conversationsWithRetrieval} / {ragAgg.totalConversations} calls
             </span>
           </div>
           {ragAgg.byDoc.length === 0 ? (
             <p className="mt-3 text-sm text-neutral-500">
-              No knowledge retrievals in the last 30 days. Either no patient
-              asked an information-seeking question, or every reply was served
-              by the system prompt alone.
+              No knowledge retrievals in the last 30 days. Either no patient asked an
+              information-seeking question, or every reply was served by the system prompt alone.
             </p>
           ) : (
             <table className="mt-3 min-w-full text-sm">
@@ -507,9 +493,7 @@ export default async function AnalyticsPage({ params }: PageProps) {
                     <tr key={d.docId}>
                       <td className="py-2 font-mono text-xs text-neutral-700">
                         {d.label}
-                        <span className="ml-2 text-neutral-400">
-                          {d.docId.slice(0, 12)}…
-                        </span>
+                        <span className="ml-2 text-neutral-400">{d.docId.slice(0, 12)}…</span>
                       </td>
                       <td className="py-2">
                         <span
@@ -523,9 +507,7 @@ export default async function AnalyticsPage({ params }: PageProps) {
                         </span>
                       </td>
                       <td className="py-2 tabular-nums">{d.count}</td>
-                      <td className="py-2 tabular-nums text-neutral-600">
-                        {share}%
-                      </td>
+                      <td className="py-2 tabular-nums text-neutral-600">{share}%</td>
                     </tr>
                   );
                 })}
@@ -596,9 +578,7 @@ function TileGroup({
 }) {
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-        {title}
-      </h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">{title}</h3>
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
         <Metric label="Calls" value={String(data.total)} />
         <Metric label="Avg dur" value={formatDurationMs(data.avgDur)} />
@@ -643,10 +623,7 @@ function FunnelBar({
         </span>
       </div>
       <div className="h-7 w-full overflow-hidden rounded-md bg-neutral-100">
-        <div
-          className={`h-full ${color} transition-[width]`}
-          style={{ width: `${widthPct}%` }}
-        />
+        <div className={`h-full ${color} transition-[width]`} style={{ width: `${widthPct}%` }} />
       </div>
     </div>
   );

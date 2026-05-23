@@ -76,14 +76,10 @@ export default function PastSessionsPane({ agentId, pin, strings }: Props) {
     setLoadingId(cid);
     try {
       const u = new URLSearchParams({ agentId, pin });
-      const r = await fetch(
-        `/api/conversations/${encodeURIComponent(cid)}?${u.toString()}`,
-      );
+      const r = await fetch(`/api/conversations/${encodeURIComponent(cid)}?${u.toString()}`);
       const d = r.ok ? await r.json() : { row: null };
       const raw = (d?.row?.raw_jsonb ?? {}) as { transcript?: unknown };
-      const turns: Turn[] = Array.isArray(raw.transcript)
-        ? (raw.transcript as Turn[])
-        : [];
+      const turns: Turn[] = Array.isArray(raw.transcript) ? (raw.transcript as Turn[]) : [];
       setTranscripts((s) => ({ ...s, [cid]: turns }));
       setExpanded(cid);
     } catch {
@@ -123,17 +119,13 @@ export default function PastSessionsPane({ agentId, pin, strings }: Props) {
                   <span className="flex items-center gap-4 text-xs text-neutral-700">
                     {r.duration_seconds != null && (
                       <span>
-                        <span className="text-neutral-400">
-                          {strings.pastSessionsDuration}:
-                        </span>{" "}
+                        <span className="text-neutral-400">{strings.pastSessionsDuration}:</span>{" "}
                         {Math.max(1, Math.round(r.duration_seconds))}s
                       </span>
                     )}
                     {r.caller_language && (
                       <span>
-                        <span className="text-neutral-400">
-                          {strings.pastSessionsLanguage}:
-                        </span>{" "}
+                        <span className="text-neutral-400">{strings.pastSessionsLanguage}:</span>{" "}
                         {r.caller_language}
                       </span>
                     )}
@@ -162,9 +154,7 @@ export default function PastSessionsPane({ agentId, pin, strings }: Props) {
                             <li
                               key={i}
                               className={
-                                t.role === "user"
-                                  ? "text-neutral-800"
-                                  : "text-emerald-900"
+                                t.role === "user" ? "text-neutral-800" : "text-emerald-900"
                               }
                             >
                               <strong className="mr-2 text-xs uppercase tracking-wider text-neutral-500">

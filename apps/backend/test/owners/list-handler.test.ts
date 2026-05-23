@@ -53,10 +53,7 @@ describe("handleListOwners", () => {
     const r = await handleListOwners(TENANT, supabase);
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.owners.map((o) => o.email)).toEqual([
-        "alice@clinic.pl",
-        "bob@clinic.pl",
-      ]);
+      expect(r.owners.map((o) => o.email)).toEqual(["alice@clinic.pl", "bob@clinic.pl"]);
       expect(r.owners.every((o) => o.status === "active")).toBe(true);
       expect(r.owners[0].user_id).toBe("u-alice");
       expect(r.owners[0].signed_in_at).toBeNull();

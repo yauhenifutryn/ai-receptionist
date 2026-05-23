@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
 import { getUserSupabase } from "@/lib/supabase-server";
-import OwnerConversationsTable, {
-  type OwnerConversationRow,
-} from "./owner-conversations-table";
+import OwnerConversationsTable, { type OwnerConversationRow } from "./owner-conversations-table";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +40,7 @@ export default async function Page({ searchParams }: PageProps) {
     query = query.in("source", ["pstn", "pin_demo"]);
   }
 
-  const { data, error } = await query
-    .order("started_at", { ascending: false })
-    .limit(50);
+  const { data, error } = await query.order("started_at", { ascending: false }).limit(50);
 
   const rows = (data ?? []) as unknown as OwnerConversationRow[];
 

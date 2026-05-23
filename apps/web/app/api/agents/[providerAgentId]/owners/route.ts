@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { handleListOwners } from "@ai-receptionist/backend/owners";
-import {
-  getOperatorOrJsonError,
-  getServiceRoleSupabase,
-} from "@/lib/supabase-server";
+import { getOperatorOrJsonError, getServiceRoleSupabase } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -127,10 +124,9 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
   // Find the user_id (if any) tied to this email for this tenant. Reusing
   // the same RPC that the GET path calls — it does the auth.users join we
   // can't do directly from PostgREST.
-  const { data: ownersRaw, error: ownersErr } = await service.rpc(
-    "get_tenant_owners",
-    { p_tenant_id: tenantId },
-  );
+  const { data: ownersRaw, error: ownersErr } = await service.rpc("get_tenant_owners", {
+    p_tenant_id: tenantId,
+  });
   if (ownersErr) {
     return NextResponse.json(
       { error: "owners_lookup_failed", message: ownersErr.message },

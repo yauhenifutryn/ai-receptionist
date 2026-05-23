@@ -10,16 +10,16 @@ description: >
   default to dark-mode neon or rounded-emerald SaaS aesthetic.
 
 colors:
-  paper:      "#F6F4EE"   # warm off-white background (printed page)
-  paper-edge: "#EBE7DD"   # slightly darker bg for inset blocks
-  ink:        "#0F1418"   # near-black with cool cast (heading + body)
-  ink-mid:    "#4A5358"   # secondary body / captions
-  ink-faint:  "#8E9499"   # tertiary labels, dividers, axis ticks
-  rule:       "#1A1F24"   # heavy rule lines (section separators)
-  blue:       "#1A4FB8"   # single accent — blueprint ink
-  blue-deep:  "#0F3690"   # accent hover / pressed
-  blue-tint:  "#E6ECF6"   # very faint accent fill (callouts)
-  red-mark:   "#B43A2E"   # editorial proof-mark red (only for "do not" callouts)
+  paper: "#F6F4EE" # warm off-white background (printed page)
+  paper-edge: "#EBE7DD" # slightly darker bg for inset blocks
+  ink: "#0F1418" # near-black with cool cast (heading + body)
+  ink-mid: "#4A5358" # secondary body / captions
+  ink-faint: "#8E9499" # tertiary labels, dividers, axis ticks
+  rule: "#1A1F24" # heavy rule lines (section separators)
+  blue: "#1A4FB8" # single accent — blueprint ink
+  blue-deep: "#0F3690" # accent hover / pressed
+  blue-tint: "#E6ECF6" # very faint accent fill (callouts)
+  red-mark: "#B43A2E" # editorial proof-mark red (only for "do not" callouts)
 
 typography:
   display:
@@ -40,7 +40,7 @@ typography:
   body:
     fontFamily: "var(--font-sans), ui-sans-serif, system-ui"
     fontWeight: 400
-    fontSize: "1.0625rem"   # 17px
+    fontSize: "1.0625rem" # 17px
     lineHeight: "1.65"
     letterSpacing: "0"
     notes: >
@@ -48,7 +48,7 @@ typography:
       Body sets in single columns no wider than 60ch.
   caption:
     fontFamily: "var(--font-mono), ui-monospace, monospace"
-    fontSize: "0.6875rem"   # 11px
+    fontSize: "0.6875rem" # 11px
     letterSpacing: "0.08em"
     textTransform: "uppercase"
     color: "{colors.ink-faint}"
@@ -64,22 +64,22 @@ typography:
 
 rounded:
   none: "0px"
-  sm:   "0px"      # the system commits to sharp corners; sm exists as alias
-  pill: "9999px"   # only for the single sign-in button motif
+  sm: "0px" # the system commits to sharp corners; sm exists as alias
+  pill: "9999px" # only for the single sign-in button motif
 
 spacing:
   hairline: "1px"
-  rule:     "2px"
-  gutter:   "1.5rem"
-  block:    "5rem"
-  section:  "8rem"
+  rule: "2px"
+  gutter: "1.5rem"
+  block: "5rem"
+  section: "8rem"
 
 borders:
   hairline: "1px solid {colors.ink-faint}"
-  rule:     "2px solid {colors.rule}"
-  blue:     "1px solid {colors.blue}"
+  rule: "2px solid {colors.rule}"
+  blue: "1px solid {colors.blue}"
 
-shadows: {}   # the design explicitly avoids drop shadows; depth via rules + ink weight
+shadows: {} # the design explicitly avoids drop shadows; depth via rules + ink weight
 
 components:
   body:
@@ -143,10 +143,10 @@ components:
     textTransform: "{typography.caption.textTransform}"
 
 motion:
-  curve: "cubic-bezier(0.2, 0.7, 0.2, 1)"   # ease-out-expo-ish
-  draw-in-ms: 1200                           # SVG schematic stroke-dasharray draw-in
+  curve: "cubic-bezier(0.2, 0.7, 0.2, 1)" # ease-out-expo-ish
+  draw-in-ms: 1200 # SVG schematic stroke-dasharray draw-in
   fade-in-ms: 700
-  hover-ms:   200
+  hover-ms: 200
   notes: >
     Motion is sparing. Schematics draw themselves on load via stroke-dasharray.
     Body text fades in over 700ms (opacity only, never transform). No looping

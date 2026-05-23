@@ -78,10 +78,9 @@ export async function POST(req: NextRequest) {
     }
     let hasMembership = false;
     if (!pendingInvite) {
-      const { data: rpcData, error: rpcErr } = await service.rpc(
-        "is_active_tenant_member",
-        { p_email: email },
-      );
+      const { data: rpcData, error: rpcErr } = await service.rpc("is_active_tenant_member", {
+        p_email: email,
+      });
       if (rpcErr) {
         return NextResponse.json({ error: "internal_lookup_failed" }, { status: 500 });
       }

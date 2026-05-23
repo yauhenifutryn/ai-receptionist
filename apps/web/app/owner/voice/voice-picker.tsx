@@ -129,9 +129,7 @@ export default function VoicePicker() {
       ) : null}
 
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-neutral-900">
-          {voices.length} curated voices
-        </h2>
+        <h2 className="text-sm font-semibold text-neutral-900">{voices.length} curated voices</h2>
         <div className="flex items-center gap-3 text-xs">
           {status === "saved" ? <span className="text-emerald-700">Saved</span> : null}
           <button
@@ -172,9 +170,7 @@ export default function VoicePicker() {
                           : "border-neutral-300 bg-white")
                       }
                     >
-                      {isSelected ? (
-                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                      ) : null}
+                      {isSelected ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
                     </span>
                     <span className="text-sm font-medium text-neutral-900">{v.name}</span>
                     {v.isDefault ? (
@@ -197,12 +193,7 @@ export default function VoicePicker() {
                   </div>
                 </button>
                 {v.previewUrl ? (
-                  <audio
-                    controls
-                    preload="none"
-                    src={v.previewUrl}
-                    className="h-8 w-48 shrink-0"
-                  />
+                  <audio controls preload="none" src={v.previewUrl} className="h-8 w-48 shrink-0" />
                 ) : null}
               </div>
             </li>

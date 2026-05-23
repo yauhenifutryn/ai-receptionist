@@ -122,9 +122,7 @@ const ONTOLOGY_DOC_NAMES = [
 
 const ontologyIds = readOntologyDocIds();
 if (ontologyIds.length === 0) {
-  console.error(
-    "WARNING: ELEVENLABS_ONTOLOGY_KB_DOC_IDS not set — ontology won't be attached.",
-  );
+  console.error("WARNING: ELEVENLABS_ONTOLOGY_KB_DOC_IDS not set — ontology won't be attached.");
 } else {
   console.error(`Ontology docs: ${ontologyIds.length} ids loaded from env.`);
 }

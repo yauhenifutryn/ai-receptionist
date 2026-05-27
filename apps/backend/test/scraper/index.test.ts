@@ -15,6 +15,16 @@ const VALID_OUTPUT = {
 
 const noSleep = () => Promise.resolve();
 
+/**
+ * Fake fetcher that always returns 200 with no Location header. Causes
+ * detectPrimaryLanguage to return null (no redirect signal), which the
+ * orchestrator falls back to "pl" for — same behavior as a plain .pl
+ * clinic with no language prefix. Keeps tests hermetic (no real
+ * network calls).
+ */
+const noRedirectFetcher: typeof fetch = (async () =>
+  new Response(null, { status: 200 })) as typeof fetch;
+
 function makeLlm(captureUser?: (s: string) => void): LLMClient {
   const provider: LLMProvider = {
     async generateJson(args: GenerateJsonArgs) {
@@ -47,6 +57,7 @@ describe("scrapeAndConsolidate (W2.1 orchestrator)", () => {
       llm,
       maxPages: 5,
       concurrency: 2,
+      fetcher: noRedirectFetcher,
     });
 
     expect(out.tenant.name).toBe("Klinika Łapka");
@@ -84,6 +95,7 @@ describe("scrapeAndConsolidate (W2.1 orchestrator)", () => {
       firecrawl,
       llm: makeLlm(),
       maxPages: 3,
+      fetcher: noRedirectFetcher,
     });
 
     expect(scraped).toHaveLength(3);
@@ -105,6 +117,7 @@ describe("scrapeAndConsolidate (W2.1 orchestrator)", () => {
       url: "https://x.pl",
       firecrawl,
       llm: makeLlm((u) => (userPrompt = u)),
+      fetcher: noRedirectFetcher,
     });
 
     expect(userPrompt).not.toContain("https://x.pl/empty");

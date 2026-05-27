@@ -62,10 +62,7 @@ export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Prom
   const primaryLang = detectedPrimary ?? "pl";
 
   const links = await args.firecrawl.map(args.url);
-  const filter = filterCandidates(
-    [args.url, ...links.filter((l) => l !== args.url)],
-    primaryLang,
-  );
+  const filter = filterCandidates([args.url, ...links.filter((l) => l !== args.url)], primaryLang);
   const candidates = filter.kept.slice(0, args.maxPages ?? DEFAULT_MAX_PAGES);
 
   const pages = await runWithConcurrency(

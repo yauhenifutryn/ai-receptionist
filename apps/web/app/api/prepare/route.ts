@@ -6,6 +6,7 @@ import {
   consolidate,
   createFirecrawlClient,
   scraperOutputToMarkdown,
+  detectPrimaryLanguage,
   filterCandidates,
   rerankUrls,
   pickByScore,
@@ -201,10 +202,27 @@ export async function POST(req: NextRequest) {
             message: `Firecrawl returned ${links.length} URL${links.length === 1 ? "" : "s"}`,
           });
 
+          // 1b. Detect the site's primary content language from its root
+          //     redirect. EN-primary dental-tourism sites (e.g. indexmedica.com)
+          //     used to lose their best pages to the hardcoded PL dedupe;
+          //     now they keep them. Falls back to "pl" if no clear redirect
+          //     signal — preserves prior behavior for plain .pl clinics.
+          const detectedPrimary = await detectPrimaryLanguage(url);
+          const primaryLang = detectedPrimary ?? "pl";
+          await session?.event("lang:detected", { detectedPrimary, primaryLang });
+          emit({
+            type: "log",
+            phase: "filter",
+            percent: 19,
+            message: detectedPrimary
+              ? `Detected site primary language from root redirect: ${detectedPrimary}`
+              : `No language redirect at root — using default primary: pl`,
+          });
+
           // 2. Filter junk + dedupe translations.
           const ranked = [url, ...links.filter((l) => l !== url)];
           urlsMapped = ranked.length;
-          const filter = filterCandidates(ranked);
+          const filter = filterCandidates(ranked, primaryLang);
           const afterFilter = filter.kept;
           droppedCount = filter.droppedJunk.length + filter.droppedTranslations.length;
           await session?.event("filter:done", {
@@ -359,7 +377,7 @@ export async function POST(req: NextRequest) {
           const discovered = extractInternalLinks(validPages, url);
           const newLinks = discovered.filter((u) => !seenUrls.has(u));
           if (newLinks.length > 0 && !aborted()) {
-            const newFilter = filterCandidates(newLinks);
+            const newFilter = filterCandidates(newLinks, primaryLang);
             const newKept = newFilter.kept;
             await session?.event("discover:done", {
               extractedFromPages: validPages.length,

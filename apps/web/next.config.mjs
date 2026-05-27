@@ -30,7 +30,15 @@ const nextConfig = {
   async headers() {
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://*.elevenlabs.io https://va.vercel-scripts.com",
+      // blob: + data: needed for the ElevenLabs React SDK AudioWorklet loader,
+      // which tries `URL.createObjectURL(blob)` then `data:...;base64,...`
+      // when no self-hosted worklet path is configured. Without these the
+      // in-browser call widget fails with "Failed to load the rawAudioProcessor
+      // worklet module" the moment a call starts.
+      "script-src 'self' 'unsafe-inline' blob: data: https://*.elevenlabs.io https://va.vercel-scripts.com",
+      // worker-src governs Web Workers and (in some Chromium versions) worklets.
+      // Allow self + blob: so the worklet runs after script-src lets it load.
+      "worker-src 'self' blob:",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",

@@ -185,6 +185,31 @@ describe("dedupeByLanguage (drop non-Polish translations)", () => {
     expect(result.kept).toEqual(urls);
     expect(result.dropped).toHaveLength(0);
   });
+
+  it("keeps /en/ paths when primaryLang='en' (EN-primary site)", () => {
+    const urls = [
+      "https://indexmedica.com/en/treatments",
+      "https://indexmedica.com/en/prices",
+      "https://indexmedica.com/pl/leczenie",
+      "https://indexmedica.com/de/behandlung",
+    ];
+    const { kept, dropped } = dedupeByLanguage(urls, "en");
+    expect(kept).toEqual([
+      "https://indexmedica.com/en/treatments",
+      "https://indexmedica.com/en/prices",
+    ]);
+    expect(dropped).toEqual([
+      "https://indexmedica.com/pl/leczenie",
+      "https://indexmedica.com/de/behandlung",
+    ]);
+  });
+
+  it("defaults primaryLang to 'pl' when arg omitted (back-compat)", () => {
+    const urls = ["https://klinika.pl/uslugi", "https://klinika.pl/en/services"];
+    const { kept } = dedupeByLanguage(urls);
+    expect(kept).toContain("https://klinika.pl/uslugi");
+    expect(kept).not.toContain("https://klinika.pl/en/services");
+  });
 });
 
 describe("filterCandidates (top-level)", () => {

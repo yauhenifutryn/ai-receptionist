@@ -267,14 +267,17 @@ export function detectLanguagePrefixes(urls: string[]): Set<string> {
  * Safe net: if dedup would drop every URL (purely non-Polish site),
  * keep everything — we'd rather scrape non-Polish content than nothing.
  */
-export function dedupeByLanguage(urls: string[]): {
+export function dedupeByLanguage(
+  urls: string[],
+  primaryLang: string = PRIMARY_LANG,
+): {
   kept: string[];
   dropped: string[];
   detectedPrefixes: string[];
 } {
   const detected = detectLanguagePrefixes(urls);
   const dropPrefixes = new Set<string>();
-  for (const p of detected) if (p !== PRIMARY_LANG) dropPrefixes.add(p);
+  for (const p of detected) if (p !== primaryLang) dropPrefixes.add(p);
 
   const kept: string[] = [];
   const dropped: string[] = [];

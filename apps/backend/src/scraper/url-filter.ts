@@ -115,6 +115,50 @@ const KNOWN_ISO_LANGS: ReadonlySet<string> = new Set([
   "te",
 ]);
 
+/**
+ * Detect a site's primary content language from its root-URL redirect.
+ *
+ * Most sites declare their default language by redirecting `/` to
+ * `/<lang>/...` (e.g. indexmedica.com → /en/, natadent.pl → /pl/wola).
+ * That redirect IS the site's own declaration — more reliable than
+ * guessing from URL counts or content sniffing.
+ *
+ * Single fetch with redirect:'manual' so we read the Location header
+ * without following it. Returns the 2-letter ISO code on a clean
+ * positive signal, otherwise null — the caller is expected to fall
+ * back to a sensible default (typically "pl" for this codebase).
+ *
+ * Network errors / timeouts / non-redirect responses all return null
+ * by design: this function should never throw, callers shouldn't have
+ * to wrap it, and "we couldn't tell" is a valid answer.
+ */
+export async function detectPrimaryLanguage(
+  rootUrl: string,
+  fetcher: typeof fetch = fetch,
+): Promise<string | null> {
+  let res: Response;
+  try {
+    res = await fetcher(rootUrl, { redirect: "manual" });
+  } catch {
+    return null;
+  }
+  if (res.status < 300 || res.status >= 400) return null;
+  const loc = res.headers.get("location");
+  if (!loc) return null;
+  let target: URL;
+  try {
+    target = new URL(loc, rootUrl);
+  } catch {
+    return null;
+  }
+  const firstSeg = target.pathname.split("/").filter((s) => s.length > 0)[0];
+  if (!firstSeg) return null;
+  const lower = firstSeg.toLowerCase();
+  if (!/^[a-z]{2}$/.test(lower)) return null;
+  if (!KNOWN_ISO_LANGS.has(lower)) return null;
+  return lower;
+}
+
 export interface FilterCandidatesResult {
   kept: string[];
   droppedJunk: string[];

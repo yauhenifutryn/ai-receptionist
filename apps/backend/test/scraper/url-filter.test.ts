@@ -4,6 +4,7 @@ import {
   DEFAULT_RELEVANCE_QUERY,
   detectLanguagePrefixes,
   dedupeByLanguage,
+  detectPrimaryLanguage,
   filterCandidates,
 } from "../../src/scraper/url-filter.js";
 
@@ -211,5 +212,64 @@ describe("filterCandidates (top-level)", () => {
     // Mechanical noise dropped.
     expect(r.kept).not.toContain("https://dynastystomatology.pl/sitemap.xml");
     expect(r.kept).not.toContain("https://dynastystomatology.pl/wp-admin/index.php");
+  });
+});
+
+describe("detectPrimaryLanguage (root-redirect signal)", () => {
+  /**
+   * Builds a fake fetch that returns a single response. Lets us inject
+   * the exact redirect status + Location header per test without real
+   * network calls.
+   */
+  function fakeFetch(status: number, location?: string): typeof fetch {
+    return (async (input: RequestInfo | URL) => {
+      void input;
+      const headers = new Headers();
+      if (location !== undefined) headers.set("location", location);
+      return new Response(null, { status, headers });
+    }) as typeof fetch;
+  }
+
+  it("detects EN when root redirects to /en/", async () => {
+    const f = fakeFetch(301, "/en/");
+    expect(await detectPrimaryLanguage("https://indexmedica.com", f)).toBe("en");
+  });
+
+  it("detects PL when root redirects to /pl/wola", async () => {
+    const f = fakeFetch(302, "/pl/wola");
+    expect(await detectPrimaryLanguage("https://natadent.pl", f)).toBe("pl");
+  });
+
+  it("detects DE when redirect Location is an absolute URL", async () => {
+    const f = fakeFetch(301, "https://klinik.de/de/start");
+    expect(await detectPrimaryLanguage("https://klinik.de", f)).toBe("de");
+  });
+
+  it("returns null when root responds 200 with no redirect", async () => {
+    const f = fakeFetch(200);
+    expect(await detectPrimaryLanguage("https://dynastystomatology.pl", f)).toBeNull();
+  });
+
+  it("returns null when redirect Location has no language prefix", async () => {
+    const f = fakeFetch(301, "/home");
+    expect(await detectPrimaryLanguage("https://klinika.pl", f)).toBeNull();
+  });
+
+  it("returns null when redirect prefix is a 2-letter slug but not a known ISO lang", async () => {
+    // /ai/ is not a language. Don't misclassify.
+    const f = fakeFetch(301, "/ai/");
+    expect(await detectPrimaryLanguage("https://klinika.pl", f)).toBeNull();
+  });
+
+  it("returns null on fetch failure (network error / timeout)", async () => {
+    const f = (async () => {
+      throw new Error("network down");
+    }) as typeof fetch;
+    expect(await detectPrimaryLanguage("https://klinika.pl", f)).toBeNull();
+  });
+
+  it("normalizes uppercase Location prefixes to lowercase", async () => {
+    const f = fakeFetch(301, "/EN/about");
+    expect(await detectPrimaryLanguage("https://example.com", f)).toBe("en");
   });
 });

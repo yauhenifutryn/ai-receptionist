@@ -238,6 +238,20 @@ describe("filterCandidates (top-level)", () => {
     expect(r.kept).not.toContain("https://dynastystomatology.pl/sitemap.xml");
     expect(r.kept).not.toContain("https://dynastystomatology.pl/wp-admin/index.php");
   });
+
+  it("threads primaryLang through to dedupeByLanguage (EN-primary site)", () => {
+    const urls = [
+      "https://indexmedica.com/en/treatments",
+      "https://indexmedica.com/en/prices",
+      "https://indexmedica.com/pl/leczenie",
+    ];
+    const result = filterCandidates(urls, "en");
+    expect(result.kept).toEqual([
+      "https://indexmedica.com/en/treatments",
+      "https://indexmedica.com/en/prices",
+    ]);
+    expect(result.droppedTranslations).toEqual(["https://indexmedica.com/pl/leczenie"]);
+  });
 });
 
 describe("detectPrimaryLanguage (root-redirect signal)", () => {

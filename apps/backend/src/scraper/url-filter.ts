@@ -314,14 +314,17 @@ export function dedupeByLanguage(
  * the word "blog" or "career" or "category". Per the rule of thumb:
  * scrape everything except completely obvious noise.
  */
-export function filterCandidates(urls: string[]): FilterCandidatesResult {
+export function filterCandidates(
+  urls: string[],
+  primaryLang: string = PRIMARY_LANG,
+): FilterCandidatesResult {
   const afterJunk: string[] = [];
   const droppedJunk: string[] = [];
   for (const u of urls) {
     if (shouldScrape(u)) afterJunk.push(u);
     else droppedJunk.push(u);
   }
-  const { kept, dropped, detectedPrefixes } = dedupeByLanguage(afterJunk);
+  const { kept, dropped, detectedPrefixes } = dedupeByLanguage(afterJunk, primaryLang);
   return {
     kept,
     droppedJunk,

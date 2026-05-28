@@ -374,7 +374,7 @@ export default function ProvisionPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-10">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-10 sm:px-8 sm:py-12">
       <Header step={draft.step} />
 
       {recent.length > 0 && draft.step === "input" ? (

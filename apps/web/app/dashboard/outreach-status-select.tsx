@@ -68,7 +68,7 @@ export default function OutreachStatusSelect({ providerAgentId, initial }: Props
           value={status}
           onChange={(e) => onChange(e.target.value as OutreachStatus)}
           disabled={saving}
-          className={`appearance-none rounded-full pl-2.5 pr-7 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition disabled:opacity-50 cursor-pointer ${PALETTE[status]}`}
+          className={`appearance-none [-webkit-appearance:none] rounded-full pl-2.5 pr-8 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition disabled:opacity-50 cursor-pointer ${PALETTE[status]}`}
         >
           {(Object.keys(LABELS) as OutreachStatus[]).map((s) => (
             <option key={s} value={s}>
@@ -76,7 +76,10 @@ export default function OutreachStatusSelect({ providerAgentId, initial }: Props
             </option>
           ))}
         </select>
-        <span aria-hidden className="pointer-events-none absolute right-2 text-[8px] text-current">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-3 text-[8px] leading-none text-current opacity-70"
+        >
           ▼
         </span>
       </label>

@@ -116,6 +116,37 @@ const KNOWN_ISO_LANGS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Canonicalize a URL into a stable dedupe key.
+ *
+ * Lowercases host, strips `www.` prefix, drops default ports (80/443),
+ * strips trailing slashes from pathname, drops query string and fragment.
+ * Pathname case is preserved (some servers serve case-sensitive paths).
+ *
+ * Use this as the key when comparing URLs across the pipeline — Firecrawl
+ * may return `www.example.com/x/` while a markdown link uses
+ * `example.com/x`. Without canonicalization the same logical page gets
+ * scraped twice, eating Vercel timeout budget for nothing.
+ *
+ * Returns null if the input is unparseable.
+ */
+export function canonicalizeUrl(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  let host = parsed.hostname.toLowerCase();
+  if (host.startsWith("www.")) host = host.slice(4);
+  const isDefaultPort =
+    (parsed.protocol === "http:" && parsed.port === "80") ||
+    (parsed.protocol === "https:" && parsed.port === "443");
+  const portPart = parsed.port && !isDefaultPort ? `:${parsed.port}` : "";
+  const pathPart = parsed.pathname.replace(/\/+$/, "");
+  return `${parsed.protocol}//${host}${portPart}${pathPart}`;
+}
+
+/**
  * Detect a site's primary content language from its root-URL redirect.
  *
  * Most sites declare their default language by redirecting `/` to

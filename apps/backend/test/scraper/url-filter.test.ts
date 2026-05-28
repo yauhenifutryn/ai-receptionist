@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  canonicalizeUrl,
   shouldScrape,
   DEFAULT_RELEVANCE_QUERY,
   detectLanguagePrefixes,
@@ -310,5 +311,53 @@ describe("detectPrimaryLanguage (root-redirect signal)", () => {
   it("normalizes uppercase Location prefixes to lowercase", async () => {
     const f = fakeFetch(301, "/EN/about");
     expect(await detectPrimaryLanguage("https://example.com", f)).toBe("en");
+  });
+});
+
+describe("canonicalizeUrl (dedupe key for www/trailing-slash/query variants)", () => {
+  it("strips www prefix and treats it equivalent to apex", () => {
+    expect(canonicalizeUrl("https://www.example.com/x")).toBe("https://example.com/x");
+    expect(canonicalizeUrl("https://example.com/x")).toBe("https://example.com/x");
+  });
+
+  it("strips trailing slash from pathname", () => {
+    expect(canonicalizeUrl("https://example.com/treatments/")).toBe(
+      "https://example.com/treatments",
+    );
+  });
+
+  it("keeps root pathname empty (no spurious slash)", () => {
+    expect(canonicalizeUrl("https://example.com/")).toBe("https://example.com");
+    expect(canonicalizeUrl("https://example.com")).toBe("https://example.com");
+  });
+
+  it("drops query string and fragment", () => {
+    expect(canonicalizeUrl("https://example.com/x?q=1#hash")).toBe("https://example.com/x");
+  });
+
+  it("lowercases host but preserves pathname case", () => {
+    expect(canonicalizeUrl("https://EXAMPLE.com/Treatments/X")).toBe(
+      "https://example.com/Treatments/X",
+    );
+  });
+
+  it("drops default ports (443 https / 80 http)", () => {
+    expect(canonicalizeUrl("https://example.com:443/x")).toBe("https://example.com/x");
+    expect(canonicalizeUrl("http://example.com:80/x")).toBe("http://example.com/x");
+  });
+
+  it("preserves non-default ports", () => {
+    expect(canonicalizeUrl("https://example.com:8443/x")).toBe("https://example.com:8443/x");
+  });
+
+  it("returns null for unparseable input", () => {
+    expect(canonicalizeUrl("not a url")).toBeNull();
+    expect(canonicalizeUrl("")).toBeNull();
+  });
+
+  it("treats www and non-www of the same URL as identical after canonicalization", () => {
+    expect(canonicalizeUrl("https://www.indexmedica.com/treatments/teeth-whitening/")).toBe(
+      canonicalizeUrl("https://indexmedica.com/treatments/teeth-whitening"),
+    );
   });
 });

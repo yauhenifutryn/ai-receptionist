@@ -1,7 +1,11 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { ScraperOutputSchema, type ScraperOutput } from "@ai-receptionist/contracts";
-import { scraperOutputToMarkdown, reportCoverage } from "@ai-receptionist/backend/scraper";
+import {
+  scraperOutputToMarkdown,
+  reportCoverage,
+  canonicalizeUrl,
+} from "@ai-receptionist/backend/scraper";
 import { buildSystemPrompt, extractPolishCity } from "@ai-receptionist/backend/prompts";
 import { getOperatorOrJsonError } from "@/lib/supabase-server";
 
@@ -42,21 +46,49 @@ export async function POST(req: NextRequest) {
   });
   const coverage = reportCoverage(scraperOutput);
 
+  const scraperSummary = {
+    sourceUrl: rootUrl,
+    scrapedAt: scraperOutput.scrapedAt,
+    urlsMapped,
+    urlsDroppedByFilter,
+    pagesScraped,
+    servicesCount: scraperOutput.services.length,
+    staffCount: scraperOutput.staff.length,
+    faqCount: scraperOutput.faq.length,
+    hasUnknownPrices: scraperOutput.hasUnknownPrices,
+  };
+
+  // Persist the draft keyed by canonical URL so the operator can leave and
+  // come back, re-pasting the same URL reuses this instead of re-scraping,
+  // and the dashboard can show it as "in progress". Best-effort: a failure
+  // here must not break the review flow — the client still has the result
+  // in memory and localStorage.
+  const canonical = canonicalizeUrl(rootUrl);
+  if (canonical) {
+    const { error: draftErr } = await operator.supabase.from("provision_drafts").upsert(
+      {
+        operator_user_id: operator.user.id,
+        source_url: rootUrl,
+        canonical_url: canonical,
+        tenant_name: scraperOutput.tenant.name,
+        knowledge_markdown: knowledgeMarkdown,
+        system_prompt: systemPrompt,
+        coverage,
+        scraper_summary: scraperSummary,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "canonical_url" },
+    );
+    if (draftErr) {
+      console.warn("provision_drafts upsert failed (non-fatal):", draftErr.message);
+    }
+  }
+
   return Response.json({
     suggestedTenantName: scraperOutput.tenant.name,
     knowledgeMarkdown,
     systemPrompt,
     coverage,
-    scraperSummary: {
-      sourceUrl: rootUrl,
-      scrapedAt: scraperOutput.scrapedAt,
-      urlsMapped,
-      urlsDroppedByFilter,
-      pagesScraped,
-      servicesCount: scraperOutput.services.length,
-      staffCount: scraperOutput.staff.length,
-      faqCount: scraperOutput.faq.length,
-      hasUnknownPrices: scraperOutput.hasUnknownPrices,
-    },
+    scraperSummary,
   });
 }

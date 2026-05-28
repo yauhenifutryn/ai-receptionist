@@ -65,6 +65,21 @@ interface RecentAgent {
   provisionedAt: number;
 }
 
+/** Mirror of the server DraftDTO (apps/web/app/api/drafts/route.ts). Kept
+ *  local because that module pulls server-only Supabase helpers. */
+interface DraftDTO {
+  id: string;
+  sourceUrl: string;
+  canonicalUrl: string;
+  tenantName: string;
+  knowledgeMarkdown: string;
+  systemPrompt: string;
+  coverage: unknown;
+  scraperSummary: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface DraftState {
   url: string;
   tenantName: string;
@@ -129,6 +144,10 @@ export default function ProvisionPage() {
    *  (and on the server, fires the ReadableStream cancel() handler,
    *  which aborts the in-flight Gemini / Firecrawl calls). */
   const prepareAbortRef = useRef<AbortController | null>(null);
+  /** True when the current review was loaded from a server-side cached
+   *  draft (same URL re-pasted, or "Continue" from the dashboard) rather
+   *  than freshly scraped. Drives the "Loaded saved scrape" banner. */
+  const [loadedFromCache, setLoadedFromCache] = useState(false);
 
   useEffect(() => {
     try {
@@ -178,6 +197,71 @@ export default function ProvisionPage() {
     }
   }, [draft]);
 
+  /**
+   * Look up a server-side cached draft for `url`. Returns the prepared
+   * response (ready for the review screen) or null when no cache exists.
+   */
+  async function fetchCachedDraft(
+    url: string,
+    signal?: AbortSignal,
+  ): Promise<PrepareResponse | null> {
+    const res = await fetch(`/api/drafts?url=${encodeURIComponent(url)}`, signal ? { signal } : {});
+    if (!res.ok) return null;
+    const j = (await res.json().catch(() => null)) as { draft?: DraftDTO | null } | null;
+    const d = j?.draft;
+    if (!d) return null;
+    return {
+      suggestedTenantName: d.tenantName,
+      knowledgeMarkdown: d.knowledgeMarkdown,
+      systemPrompt: d.systemPrompt,
+      ...(d.coverage ? { coverage: d.coverage as CoverageReport } : {}),
+      scraperSummary: d.scraperSummary as PrepareResponse["scraperSummary"],
+    };
+  }
+
+  /** Load a cached draft for `url` and jump to the review step. Used by the
+   *  dashboard "Continue" deep-link. */
+  async function loadCachedDraftIntoReview(url: string) {
+    setDraft((d) => ({ ...d, url, step: "preparing" }));
+    try {
+      const cached = await fetchCachedDraft(url);
+      if (!cached) {
+        // Draft was deleted between dashboard render and click — fall back
+        // to the input step with the URL prefilled.
+        setDraft((d) => ({ ...d, url, step: "input" }));
+        return;
+      }
+      setLoadedFromCache(true);
+      setDraft((d) => ({
+        ...d,
+        url,
+        step: "review",
+        tenantName: cached.suggestedTenantName,
+        knowledgeMarkdown: cached.knowledgeMarkdown,
+        systemPrompt: cached.systemPrompt,
+        scraperSummary: cached.scraperSummary,
+        ...(cached.coverage ? { coverage: cached.coverage } : {}),
+      }));
+    } catch {
+      setDraft((d) => ({ ...d, url, step: "input" }));
+    }
+  }
+
+  // "Continue" from the dashboard arrives as ?continue=<source url>. Load
+  // that draft straight into review, skipping the input step. Declared after
+  // loadCachedDraftIntoReview so it isn't referenced before declaration.
+  useEffect(() => {
+    let continueUrl: string | null = null;
+    try {
+      continueUrl = new URLSearchParams(window.location.search).get("continue");
+    } catch {
+      return;
+    }
+    if (continueUrl) void loadCachedDraftIntoReview(continueUrl);
+    // Run once on mount; loadCachedDraftIntoReview is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function pushRecent(entry: RecentAgent) {
     setRecent((prev) => {
       const deduped = [entry, ...prev.filter((p) => p.agentId !== entry.agentId)].slice(
@@ -194,11 +278,35 @@ export default function ProvisionPage() {
   }
 
   function clearDraft() {
+    // Capture the URL before wiping local state so we can also drop the
+    // server-side cached draft — otherwise re-pasting the same URL would
+    // hit the cache again, defeating "Start fresh".
+    const urlToForget = draft.url;
     setDraft(EMPTY_DRAFT);
     setError(null);
     setRestoredFromDraft(false);
+    setLoadedFromCache(false);
     try {
       window.localStorage.removeItem(STORAGE_KEYS.draft);
+    } catch {
+      // ignore
+    }
+    if (urlToForget) {
+      // Fire-and-forget: deleting the server cache is best-effort. The
+      // lookup is by canonical_url so the exact id isn't needed — but our
+      // delete endpoint is by id, so look it up then delete.
+      void forgetServerDraft(urlToForget);
+    }
+  }
+
+  /** Delete the server-side cached draft for a URL (best-effort). */
+  async function forgetServerDraft(url: string) {
+    try {
+      const res = await fetch(`/api/drafts?url=${encodeURIComponent(url)}`);
+      if (!res.ok) return;
+      const j = (await res.json().catch(() => null)) as { draft?: DraftDTO | null } | null;
+      const id = j?.draft?.id;
+      if (id) await fetch(`/api/drafts/${id}`, { method: "DELETE" });
     } catch {
       // ignore
     }
@@ -208,16 +316,49 @@ export default function ProvisionPage() {
     prepareAbortRef.current?.abort();
   }
 
-  async function handlePrepare(e: React.FormEvent | null, opts: { resumeSlug?: string } = {}) {
+  async function handlePrepare(
+    e: React.FormEvent | null,
+    opts: { resumeSlug?: string; skipCache?: boolean } = {},
+  ) {
     if (e) e.preventDefault();
     setError(null);
     setProgress([]);
+    setLoadedFromCache(false);
     setDraft((d) => ({ ...d, step: "preparing" }));
     // Replace any previous controller (a stale one shouldn't exist, but
     // guard anyway so a double-click can't leak two in-flight runs).
     prepareAbortRef.current?.abort();
     const controller = new AbortController();
     prepareAbortRef.current = controller;
+
+    // Cache short-circuit: if this exact URL was already scraped +
+    // consolidated, reuse it instead of paying Firecrawl + Gemini again.
+    // Bypassed by "Re-scrape fresh" (skipCache) and by the resume path.
+    if (!opts.skipCache && !opts.resumeSlug) {
+      try {
+        const cached = await fetchCachedDraft(draft.url, controller.signal);
+        if (cached) {
+          setLoadedFromCache(true);
+          setDraft((d) => ({
+            ...d,
+            step: "review",
+            tenantName: cached.suggestedTenantName,
+            knowledgeMarkdown: cached.knowledgeMarkdown,
+            systemPrompt: cached.systemPrompt,
+            scraperSummary: cached.scraperSummary,
+            ...(cached.coverage ? { coverage: cached.coverage } : {}),
+          }));
+          if (prepareAbortRef.current === controller) prepareAbortRef.current = null;
+          return;
+        }
+      } catch (err) {
+        // A failed cache check shouldn't block a fresh scrape — fall through.
+        if ((err as Error).name === "AbortError" || controller.signal.aborted) {
+          setDraft((d) => ({ ...d, step: "input" }));
+          return;
+        }
+      }
+    }
 
     // Chunked path (feature-flagged): three short JSON calls orchestrated
     // here in the client. Sidesteps Vercel's 300s function-timeout ceiling
@@ -454,6 +595,8 @@ export default function ProvisionPage() {
         <ReviewCard
           draft={draft}
           submitting={draft.step === "provisioning"}
+          loadedFromCache={loadedFromCache}
+          onRescrape={() => handlePrepare(null, { skipCache: true })}
           onChangeTenantName={(tenantName) => setDraft((d) => ({ ...d, tenantName }))}
           onChangeKnowledge={(knowledgeMarkdown) => setDraft((d) => ({ ...d, knowledgeMarkdown }))}
           onChangeSystemPrompt={(systemPrompt) => setDraft((d) => ({ ...d, systemPrompt }))}
@@ -703,6 +846,8 @@ function formatClock(ts: number): string {
 function ReviewCard(props: {
   draft: DraftState;
   submitting: boolean;
+  loadedFromCache: boolean;
+  onRescrape: () => void;
   onChangeTenantName: (v: string) => void;
   onChangeKnowledge: (v: string) => void;
   onChangeSystemPrompt: (v: string) => void;
@@ -713,6 +858,8 @@ function ReviewCard(props: {
   const {
     draft,
     submitting,
+    loadedFromCache,
+    onRescrape,
     onChangeTenantName,
     onChangeKnowledge,
     onChangeSystemPrompt,
@@ -723,6 +870,21 @@ function ReviewCard(props: {
   const summary = draft.scraperSummary;
   return (
     <div className="flex flex-col gap-6">
+      {loadedFromCache && !submitting ? (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          <span>
+            Loaded a saved scrape for this URL — no re-scraping needed. Edit below and provision, or
+            re-scrape if the site changed.
+          </span>
+          <button
+            type="button"
+            onClick={onRescrape}
+            className="shrink-0 rounded-full border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-800 shadow-sm transition hover:bg-sky-100"
+          >
+            Re-scrape fresh
+          </button>
+        </div>
+      ) : null}
       {draft.coverage ? <CoverageBanner coverage={draft.coverage} /> : null}
       {summary ? (
         <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">

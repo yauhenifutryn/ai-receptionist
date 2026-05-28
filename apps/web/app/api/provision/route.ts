@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { ElevenLabsConvAIProvider } from "@ai-receptionist/backend/orchestration";
+import { canonicalizeUrl } from "@ai-receptionist/backend/scraper";
 import { getOperatorOrJsonError } from "@/lib/supabase-server";
 import { openExistingSession, openTestSession } from "@/lib/test-session-logger";
 
@@ -256,6 +257,25 @@ export async function POST(req: NextRequest) {
       },
       { status: 500 },
     );
+  }
+
+  // The draft graduated into a real tenant+agent — drop it from the
+  // in-progress list. Best-effort: keyed by canonical source URL, no-op if
+  // the provision came from a paste-only flow with no matching draft.
+  if (input.sourceUrl) {
+    const canonical = canonicalizeUrl(input.sourceUrl);
+    if (canonical) {
+      const { error: draftDelErr } = await supabase
+        .from("provision_drafts")
+        .delete()
+        .eq("canonical_url", canonical);
+      if (draftDelErr) {
+        await session?.event("provision:warning", {
+          code: "draft_cleanup_failed",
+          message: draftDelErr.message,
+        });
+      }
+    }
   }
 
   await session?.event("provision:done", {

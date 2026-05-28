@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { requireOperator, getServiceRoleSupabase } from "@/lib/supabase-server";
 import AgentDemoActions from "./agent-demo-actions";
 import OutreachStatusSelect from "./outreach-status-select";
+import ProvisionDraftsSection, { type DraftListItem } from "./provision-drafts-section";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,14 @@ interface AgentRow {
   tenant: TenantRow | null;
 }
 
+interface DraftDbRow {
+  id: string;
+  source_url: string;
+  tenant_name: string;
+  scraper_summary: { servicesCount?: number; staffCount?: number; faqCount?: number } | null;
+  created_at: string;
+}
+
 export default async function DashboardPage() {
   const { supabase, user } = await requireOperator({
     redirectPath: "/dashboard",
@@ -45,6 +54,24 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false });
 
   const rows = (agents ?? []) as unknown as AgentRow[];
+
+  // In-progress drafts: scraped + consolidated but not yet provisioned.
+  const { data: draftRows } = await supabase
+    .from("provision_drafts")
+    .select("id, source_url, tenant_name, scraper_summary, created_at")
+    .order("created_at", { ascending: false });
+  const drafts: DraftListItem[] = ((draftRows ?? []) as unknown as DraftDbRow[]).map((d) => {
+    const s = d.scraper_summary;
+    return {
+      id: d.id,
+      sourceUrl: d.source_url,
+      tenantName: d.tenant_name,
+      servicesCount: typeof s?.servicesCount === "number" ? s.servicesCount : null,
+      staffCount: typeof s?.staffCount === "number" ? s.staffCount : null,
+      faqCount: typeof s?.faqCount === "number" ? s.faqCount : null,
+      createdAt: d.created_at,
+    };
+  });
 
   // Resolve provisioner display names via service-role read of operators table.
   // (operators RLS may not be permissive to all operators; service-role
@@ -121,9 +148,11 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      {rows.length === 0 ? (
+      <ProvisionDraftsSection drafts={drafts} />
+
+      {rows.length === 0 && drafts.length === 0 ? (
         <EmptyState />
-      ) : (
+      ) : rows.length === 0 ? null : (
         <>
           <section className="hidden overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm sm:block">
             <table className="w-full text-left text-sm">

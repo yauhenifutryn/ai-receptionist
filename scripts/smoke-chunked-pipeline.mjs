@@ -23,9 +23,28 @@ if (!FIRECRAWL_KEY || !GEMINI_KEY) {
   process.exit(2);
 }
 
-const BATCH_SIZE = 3;
+const CHAR_BUDGET = 30000; // mirror CHUNK_CHAR_BUDGET in provision/page.tsx
+const MAX_PAGES_PER_BATCH = 8;
 const PARALLELISM = 4;
 const MAX_PAGES = 35;
+
+function packByCharBudget(pages) {
+  const batches = [];
+  let cur = [];
+  let curChars = 0;
+  for (const p of pages) {
+    const len = p.markdown.length;
+    if (cur.length > 0 && (curChars + len > CHAR_BUDGET || cur.length >= MAX_PAGES_PER_BATCH)) {
+      batches.push(cur);
+      cur = [];
+      curChars = 0;
+    }
+    cur.push(p);
+    curChars += len;
+  }
+  if (cur.length > 0) batches.push(cur);
+  return batches;
+}
 
 const t0 = performance.now();
 const log = (phase, msg) =>
@@ -129,11 +148,10 @@ if (pages.length === 0) {
 }
 
 // ── Phase 2: parallel consolidate batches ─────────────────────────────
-const batches = [];
-for (let i = 0; i < pages.length; i += BATCH_SIZE) batches.push(pages.slice(i, i + BATCH_SIZE));
+const batches = packByCharBudget(pages);
 log(
   "consolidate",
-  `Split into ${batches.length} batches (${BATCH_SIZE} pages each, ${PARALLELISM} parallel)`,
+  `Split into ${batches.length} batches (~${CHAR_BUDGET} char budget, ${PARALLELISM} parallel)`,
 );
 
 const partials = new Array(batches.length).fill(null);

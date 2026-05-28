@@ -148,6 +148,8 @@ const SYSTEM_PROMPT = [
   '  - Strip thousands separators ("4 000" → 4000) when filling min/max.',
   "If the same service appears at multiple price points across the source (e.g. /cennik page lists multiple variants), pick the most common shape or create ONE service entry whose price covers the full observed range.",
   "",
+  "PRICE-LIST COMPLETENESS (critical): when a page is a price list (cennik) — many rows of 'name … NNN PLN' — you MUST emit a separate priced service for EVERY single row. Do NOT summarize, sample, group, or stop early on a price list. A page with 100 priced rows must yield ~100 priced services. Dropping price-list rows is a hard error: those prices are the single most valuable output.",
+  "",
   "For each service emit { name, synonyms[], nfzCovered, price?, durationMinutes? }.",
   "For each staff member emit { name, role?, specialization?, languages[] }.",
   "For each FAQ emit { question, answer }.",

@@ -1116,12 +1116,42 @@ function CoverageBanner({ coverage }: { coverage: CoverageReport }) {
 // the React component holds the data between calls.
 // ────────────────────────────────────────────────────────────────────────
 
-// Smaller batches = each Gemini call finishes faster, lower chance any
-// single batch trips Vercel's 300s function-timeout. Higher parallelism
-// stays well inside the 2M tokens/min paid-tier limit (4 * 3 * ~12k ≈
-// 144k tokens concurrent).
-const CHUNK_BATCH_SIZE = 3;
+// Batch by CONTENT SIZE, not page count. A fixed page count crammed a dense
+// price list (/cennik, ~18K chars, ~200 prices) into the same call as two
+// 35K-char /uslugi pages — ~90K chars total — and the model summarized and
+// dropped most of the price rows (22 of ~100 priced one run, 85 another).
+// A char budget keeps each call focused: heavy pages go (near) solo so the
+// price list is transcribed completely, small /zespol pages group together.
+const CHUNK_CHAR_BUDGET = 30000;
+const CHUNK_MAX_PAGES_PER_BATCH = 8; // hard cap so many tiny pages still split
 const CHUNK_PARALLELISM = 4;
+
+/**
+ * Greedily pack pages into batches under a character budget. A page larger
+ * than the budget becomes its own batch (can't split a page). Preserves order.
+ */
+function packPagesByCharBudget(
+  pages: { url: string; markdown: string }[],
+): { url: string; markdown: string }[][] {
+  const batches: { url: string; markdown: string }[][] = [];
+  let cur: { url: string; markdown: string }[] = [];
+  let curChars = 0;
+  for (const p of pages) {
+    const len = p.markdown.length;
+    if (
+      cur.length > 0 &&
+      (curChars + len > CHUNK_CHAR_BUDGET || cur.length >= CHUNK_MAX_PAGES_PER_BATCH)
+    ) {
+      batches.push(cur);
+      cur = [];
+      curChars = 0;
+    }
+    cur.push(p);
+    curChars += len;
+  }
+  if (cur.length > 0) batches.push(cur);
+  return batches;
+}
 
 // Failed Gemini batches are retried this many extra rounds, but ONLY for
 // transient failures (timeout / 504 / network). A deterministic failure
@@ -1195,11 +1225,9 @@ async function runChunkedPipeline(
     message: `Scraped ${scrape.pagesScraped} page${scrape.pagesScraped === 1 ? "" : "s"}${cacheNote} · primary language: ${scrape.primaryLanguage}${scrape.detectedLanguage ? " (from root redirect)" : " (default)"}`,
   });
 
-  // 2. Split into batches
-  const batches: { url: string; markdown: string }[][] = [];
-  for (let i = 0; i < scrape.pages.length; i += CHUNK_BATCH_SIZE) {
-    batches.push(scrape.pages.slice(i, i + CHUNK_BATCH_SIZE));
-  }
+  // 2. Split into batches by character budget (not page count) so a dense
+  //    price list isn't crammed in with two huge service pages.
+  const batches = packPagesByCharBudget(scrape.pages);
   emit({
     phase: "consolidate",
     percent: 40,

@@ -61,9 +61,7 @@ describe("mergePartials", () => {
   it("staff: dedup by case-insensitive name, prefer entry with specialization", () => {
     const a = base({ staff: [{ name: "Dr. Jan Kowalski", languages: [] }] });
     const b = base({
-      staff: [
-        { name: "dr. jan kowalski", specialization: "Implantology", languages: ["en"] },
-      ],
+      staff: [{ name: "dr. jan kowalski", specialization: "Implantology", languages: ["en"] }],
     });
     const m = mergePartials([a, b]);
     expect(m.staff).toHaveLength(1);
@@ -190,9 +188,7 @@ describe("mergePartials", () => {
   it("works with 4+ partials (typical batch count)", () => {
     const partials = Array.from({ length: 4 }, (_, i) =>
       base({
-        services: [
-          { name: `Service ${i}`, synonyms: [], nfzCovered: "unknown" as const },
-        ],
+        services: [{ name: `Service ${i}`, synonyms: [], nfzCovered: "unknown" as const }],
       }),
     );
     const m = mergePartials(partials);

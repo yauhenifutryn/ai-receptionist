@@ -44,6 +44,10 @@
       "types": "./dist/scraper/index.d.ts",
       "default": "./dist/scraper/index.js"
     },
+    "./scraper/merge-partials": {
+      "types": "./dist/scraper/merge-partials.d.ts",
+      "default": "./dist/scraper/merge-partials.js"
+    },
     "./consent": {
       "types": "./dist/consent/index.d.ts",
       "default": "./dist/consent/index.js"

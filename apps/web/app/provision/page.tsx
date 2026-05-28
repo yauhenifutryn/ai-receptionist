@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { mergePartials } from "@ai-receptionist/backend/scraper/merge-partials";
+import type { ScraperOutput } from "@ai-receptionist/contracts";
 
 type Step = "input" | "preparing" | "review" | "provisioning";
 
@@ -214,6 +216,44 @@ export default function ProvisionPage() {
     prepareAbortRef.current?.abort();
     const controller = new AbortController();
     prepareAbortRef.current = controller;
+
+    // Chunked path (feature-flagged): three short JSON calls orchestrated
+    // here in the client. Sidesteps Vercel's 300s function-timeout ceiling
+    // by splitting Gemini consolidation across N parallel lambdas. Does NOT
+    // support session resume (acceptable for v1; resume is rarely used).
+    if (!opts.resumeSlug && process.env.NEXT_PUBLIC_USE_CHUNKED_PROVISION === "true") {
+      try {
+        const result = await runChunkedPipeline(draft.url, controller.signal, (line) =>
+          setProgress((p) => [...p, { ...line, timestamp: Date.now() }]),
+        );
+        setResumableSlug(null);
+        setResumableUrl(null);
+        try {
+          window.localStorage.removeItem(STORAGE_KEYS.resumableSession);
+        } catch {
+          // ignore
+        }
+        setDraft((d) => ({
+          ...d,
+          step: "review",
+          tenantName: result.suggestedTenantName,
+          knowledgeMarkdown: result.knowledgeMarkdown,
+          systemPrompt: result.systemPrompt,
+          scraperSummary: result.scraperSummary,
+          ...(result.coverage ? { coverage: result.coverage } : {}),
+        }));
+      } catch (err) {
+        const e = err as Error;
+        const isAbort = e.name === "AbortError" || controller.signal.aborted;
+        if (!isAbort) setError(e.message);
+        setDraft((d) => ({ ...d, step: "input" }));
+      } finally {
+        if (prepareAbortRef.current === controller) {
+          prepareAbortRef.current = null;
+        }
+      }
+      return;
+    }
 
     // Auto-resume: if the user pasted a URL that exactly matches the
     // cached scrape's URL, skip Firecrawl + rerank and reuse the on-disk
@@ -922,4 +962,135 @@ function CoverageBanner({ coverage }: { coverage: CoverageReport }) {
       </ul>
     </section>
   );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Chunked-provisioning pipeline (gated by NEXT_PUBLIC_USE_CHUNKED_PROVISION)
+//
+// Splits the long /api/prepare SSE run into three short JSON calls so the
+// Gemini consolidation step can be fanned out into N parallel batches and
+// no single lambda hits Vercel's 300s function-timeout ceiling.
+//
+//   /api/prepare/scrape          → map + filter + rerank + Firecrawl scrape
+//   /api/prepare/consolidate-batch → Gemini on N pages (× M batches in parallel)
+//   /api/prepare/finalize        → render markdown + system prompt + coverage
+//
+// Merge between consolidate-batch and finalize is pure-TS (mergePartials),
+// dedup keys are Polish-diacritic-stripped lowercase. No state in DB/KV —
+// the React component holds the data between calls.
+// ────────────────────────────────────────────────────────────────────────
+
+const CHUNK_BATCH_SIZE = 5;
+const CHUNK_PARALLELISM = 3;
+
+interface PrepareScrapeResponse {
+  pages: { url: string; markdown: string }[];
+  detectedLanguage: string | null;
+  primaryLanguage: string;
+  urlsMapped: number;
+  urlsDroppedByFilter: number;
+  pagesScraped: number;
+}
+
+async function runChunkedPipeline(
+  url: string,
+  signal: AbortSignal,
+  emit: (line: Omit<ProgressLine, "timestamp">) => void,
+): Promise<PrepareResponse> {
+  // 1. Scrape
+  emit({ phase: "scrape", percent: 5, message: `Starting scrape of ${url}` });
+  const scrapeRes = await fetch("/api/prepare/scrape", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ url }),
+    signal,
+  });
+  if (!scrapeRes.ok) {
+    const j = (await scrapeRes.json().catch(() => ({}))) as { error?: string; message?: string };
+    throw new Error(j.message ?? j.error ?? `Scrape failed (${scrapeRes.status})`);
+  }
+  const scrape = (await scrapeRes.json()) as PrepareScrapeResponse;
+  emit({
+    phase: "scrape",
+    percent: 35,
+    message: `Scraped ${scrape.pagesScraped} page${scrape.pagesScraped === 1 ? "" : "s"} · primary language: ${scrape.primaryLanguage}${scrape.detectedLanguage ? " (from root redirect)" : " (default)"}`,
+  });
+
+  // 2. Split into batches
+  const batches: { url: string; markdown: string }[][] = [];
+  for (let i = 0; i < scrape.pages.length; i += CHUNK_BATCH_SIZE) {
+    batches.push(scrape.pages.slice(i, i + CHUNK_BATCH_SIZE));
+  }
+  emit({
+    phase: "consolidate",
+    percent: 40,
+    message: `Consolidating ${batches.length} batch${batches.length === 1 ? "" : "es"} in parallel (Gemini)…`,
+  });
+
+  // 3. Parallel consolidate with bounded concurrency.
+  // sentinel = batch index reserved by a worker; null until a worker
+  // finishes; ScraperOutput when complete.
+  const partials: (ScraperOutput | null)[] = new Array(batches.length).fill(undefined);
+  let completed = 0;
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(CHUNK_PARALLELISM, batches.length) }, async () => {
+    while (true) {
+      if (signal.aborted) return;
+      const i = cursor++;
+      if (i >= batches.length) return;
+      partials[i] = null; // mark claimed
+      const res = await fetch("/api/prepare/consolidate-batch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ rootUrl: url, pages: batches[i] }),
+        signal,
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+        throw new Error(
+          `Batch ${i + 1}/${batches.length} failed: ${j.message ?? j.error ?? res.status}`,
+        );
+      }
+      const j = (await res.json()) as { partial: ScraperOutput; geminiMs: number };
+      partials[i] = j.partial;
+      completed++;
+      emit({
+        phase: "consolidate",
+        percent: 40 + Math.round((completed / batches.length) * 40),
+        message: `Consolidated batch ${completed}/${batches.length} · ${(j.geminiMs / 1000).toFixed(1)}s`,
+      });
+    }
+  });
+  await Promise.all(workers);
+
+  const validPartials = partials.filter((p): p is ScraperOutput => p !== null && p !== undefined);
+  if (validPartials.length === 0) {
+    throw new Error("All consolidation batches failed");
+  }
+
+  // 4. Merge in JS (pure-TS, instant)
+  emit({ phase: "merge", percent: 85, message: "Merging batch outputs…" });
+  const merged = mergePartials(validPartials);
+
+  // 5. Finalize: render markdown + system prompt + coverage
+  emit({ phase: "render", percent: 92, message: "Drafting agent brief…" });
+  const finalRes = await fetch("/api/prepare/finalize", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      merged,
+      rootUrl: url,
+      urlsMapped: scrape.urlsMapped,
+      urlsDroppedByFilter: scrape.urlsDroppedByFilter,
+      pagesScraped: scrape.pagesScraped,
+    }),
+    signal,
+  });
+  if (!finalRes.ok) {
+    const j = (await finalRes.json().catch(() => ({}))) as { error?: string; message?: string };
+    throw new Error(j.message ?? j.error ?? `Finalize failed (${finalRes.status})`);
+  }
+  const final = (await finalRes.json()) as PrepareResponse;
+  emit({ phase: "render", percent: 100, message: "Ready — review the brief below" });
+  return final;
 }

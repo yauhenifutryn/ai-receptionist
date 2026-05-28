@@ -63,10 +63,7 @@ function dedupeKey(s: string): string {
     .replace(/ł/g, "l"); // ł isn't NFD-decomposable
 }
 
-function firstNonEmpty<T>(
-  values: (T | undefined)[],
-  isEmpty: (v: T) => boolean,
-): T | undefined {
+function firstNonEmpty<T>(values: (T | undefined)[], isEmpty: (v: T) => boolean): T | undefined {
   for (const v of values) {
     if (v !== undefined && !isEmpty(v)) return v;
   }
@@ -103,9 +100,7 @@ function mergeTenant(tenants: ScraperTenantInfo[]): ScraperTenantInfo {
   return merged;
 }
 
-function mergeHours(
-  hours: NonNullable<ScraperTenantInfo["hours"]>[],
-): ScraperTenantInfo["hours"] {
+function mergeHours(hours: NonNullable<ScraperTenantInfo["hours"]>[]): ScraperTenantInfo["hours"] {
   if (hours.length === 0) return undefined;
   const days: Array<keyof NonNullable<ScraperTenantInfo["hours"]>> = [
     "monday",

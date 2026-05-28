@@ -1,10 +1,7 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { ScraperOutputSchema, type ScraperOutput } from "@ai-receptionist/contracts";
-import {
-  scraperOutputToMarkdown,
-  reportCoverage,
-} from "@ai-receptionist/backend/scraper";
+import { scraperOutputToMarkdown, reportCoverage } from "@ai-receptionist/backend/scraper";
 import { buildSystemPrompt, extractPolishCity } from "@ai-receptionist/backend/prompts";
 import { getOperatorOrJsonError } from "@/lib/supabase-server";
 

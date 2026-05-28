@@ -95,9 +95,7 @@ export async function POST(req: NextRequest) {
 
   // One discovery pass: pull internal links out of scraped markdown,
   // filter, rerank, scrape any new ones (subject to maxPages cap).
-  const seenCanonical = new Set(
-    validFirstPass.map((p) => canonicalizeUrl(p.url) ?? p.url),
-  );
+  const seenCanonical = new Set(validFirstPass.map((p) => canonicalizeUrl(p.url) ?? p.url));
   const discovered = extractInternalLinks(validFirstPass, url);
   const newLinks = discovered.filter((u) => !seenCanonical.has(u));
   let discoveredPages: FirecrawlPage[] = [];

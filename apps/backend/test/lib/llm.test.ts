@@ -115,6 +115,36 @@ describe("LLMClient (W2 foundation)", () => {
     });
   });
 
+  it("salvages JSON when the model prefixes reasoning text", async () => {
+    // Gemini 3 Preview's scratchpad-leak bug (vercel/ai#11396): model
+    // emits "Let me think... { actual json }" instead of clean JSON.
+    const provider = makeProvider(async () => ({
+      text:
+        "Reasoning: the caller said yes with high confidence.\n" +
+        '{"decision":"yes","confidence":0.95}\nEnd of thought.',
+    }));
+    const client = new LLMClient(provider, { sleep: noSleep });
+    const result = await client.generateStructured({
+      model: "gemini-2.5-pro",
+      user: "x",
+      schema: RESULT_SCHEMA,
+    });
+    expect(result.data).toEqual({ decision: "yes", confidence: 0.95 });
+  });
+
+  it("salvages JSON when text only has trailing junk", async () => {
+    const provider = makeProvider(async () => ({
+      text: '{"decision":"no","confidence":0.4}\n```\nDone.',
+    }));
+    const client = new LLMClient(provider, { sleep: noSleep });
+    const result = await client.generateStructured({
+      model: "gemini-2.5-pro",
+      user: "x",
+      schema: RESULT_SCHEMA,
+    });
+    expect(result.data).toEqual({ decision: "no", confidence: 0.4 });
+  });
+
   it("dedupes identical entries when the chain repeats the primary model", async () => {
     const calls: LLMModel[] = [];
     const provider = makeProvider(async ({ model }) => {

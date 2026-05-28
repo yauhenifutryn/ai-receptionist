@@ -162,7 +162,32 @@ function dedupe<T>(items: T[]): T[] {
 type ParseOk = { ok: true; value: unknown };
 type ParseErr = { ok: false; error: string };
 
+/**
+ * Parse JSON from an LLM response, tolerant of leading/trailing prose.
+ *
+ * Direct `JSON.parse` is the fast path. If it fails, we look for the
+ * outermost `{ ... }` substring and try that — handles the "Gemini 3
+ * leaks reasoning text before the JSON" pathology (vercel/ai#11396)
+ * without giving up the strict path when the response is clean.
+ *
+ * NB: we DON'T scan for an array; ScraperOutput is always an object.
+ * Adding array salvage would let truncated outputs parse as valid
+ * partial arrays, which silently drops data — worse than failing.
+ */
 function safeJsonParse(text: string): ParseOk | ParseErr {
+  const direct = tryParse(text);
+  if (direct.ok) return direct;
+
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return direct;
+
+  const salvaged = tryParse(text.slice(start, end + 1));
+  if (salvaged.ok) return salvaged;
+  return direct;
+}
+
+function tryParse(text: string): ParseOk | ParseErr {
   try {
     return { ok: true, value: JSON.parse(text) };
   } catch (e) {

@@ -65,22 +65,36 @@ const SCRAPER_OUTPUT_JSON_SCHEMA = {
           },
           requiresConsultationFirst: { type: "BOOLEAN" },
           // Universal price shape — handles exact / range / from / to /
-          // starting / unknown. All numeric fields optional so Gemini
-          // can omit min when only max is present, etc.
+          // starting / unknown.
+          //
+          // GROUNDING (critical): propertyOrdering forces Gemini to emit
+          // `display` (verbatim source quote) BEFORE the numeric fields.
+          // Autoregressive models commit to early tokens; once display
+          // is set ("1500 PLN"), min/max/qualifier flow from it
+          // mechanically. Without this, the model can satisfy the
+          // schema with `{currency:"PLN"}` and skip — the failure mode
+          // we observed where 28 services landed with `qualifier:
+          // "unknown"` while real prices sat in scratchpad text.
+          //
+          // `display` + `qualifier` are required so the model cannot
+          // emit a placeholder price. If a true unknown, emit
+          // qualifier="unknown" + display="brak ceny" rather than
+          // omitting price altogether.
           price: {
             type: "OBJECT",
+            propertyOrdering: ["display", "qualifier", "currency", "min", "max", "variant"],
             properties: {
-              currency: { type: "STRING", enum: ["PLN"] },
               display: { type: "STRING" },
-              min: { type: "NUMBER" },
-              max: { type: "NUMBER" },
               qualifier: {
                 type: "STRING",
                 enum: ["exact", "from", "to", "range", "starting", "unknown"],
               },
+              currency: { type: "STRING", enum: ["PLN"] },
+              min: { type: "NUMBER" },
+              max: { type: "NUMBER" },
               variant: { type: "STRING" },
             },
-            required: ["currency"],
+            required: ["display", "qualifier", "currency"],
           },
         },
         required: ["name"],
@@ -189,23 +203,21 @@ function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
 export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput> {
   const now = args.now ?? (() => new Date());
   const result = await args.llm.generateStructured({
-    // Primary `gemini-3-flash-preview`: quality is dramatically better
-    // on Polish dental sites — on dynastystomatology.pl it captured 44
-    // priced services + 69 FAQ entries vs 2.5-flash's 0 priced services
-    // and 44 FAQ entries on the same input. The cost is latency: 4-9
-    // minutes vs 30-60s. For a wedge product where the agent NEEDS real
-    // prices to be useful, quality wins. The anti-loop prompt + temp 0.2
-    // + streaming response keep the call from hanging indefinitely.
+    // Primary `gemini-2.5-pro`: only Gemini model that can ACTUALLY
+    // disable thinking (Gemini 3 Flash silently coerces thinkingBudget=0
+    // to "minimal" and leaks reasoning text into the response — see
+    // vercel/ai#11396 + the missing-prices incident 2026-05-28). Pro
+    // has 1M context, predictable 10-40s latency on our batch size,
+    // no scratchpad-leak bug, ~$1.80/provision.
     //
-    // Fallback to `gemini-2.5-flash` so a transient 3-preview failure
-    // (the model sometimes throws `fetch failed`) still produces SOME
-    // result, even if of lower quality.
+    // Fallback `gemini-2.5-flash` — faster but loops on long Polish
+    // service lists (the "dbałość o dbałość o..." pathology). Only
+    // useful as last-resort when Pro itself fails transport.
     //
-    // maxRetries=0: this is a long, expensive call. If the primary throws
-    // a transport error we want to fall through to the next model IMMEDIATELY
-    // — never retry the same model on the same giant prompt, which can
-    // double or triple the wall-clock with no quality win.
-    model: args.model ?? "gemini-3-flash-preview",
+    // maxRetries=0: long expensive calls. If primary throws transport
+    // error we want to fall through to next model IMMEDIATELY — never
+    // retry the same model on the same giant prompt.
+    model: args.model ?? "gemini-2.5-pro",
     fallbackChain: args.fallbackChain ?? ["gemini-2.5-flash"],
     maxRetries: 0,
     system: SYSTEM_PROMPT,

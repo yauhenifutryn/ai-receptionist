@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { type Route } from "next";
 import { useEffect, useRef, useState } from "react";
 import { mergePartials } from "@ai-receptionist/backend/scraper/merge-partials";
 import type { ScraperOutput } from "@ai-receptionist/contracts";
@@ -468,6 +470,12 @@ function Header({ step }: { step: Step }) {
   const stepNumber = step === "input" || step === "preparing" ? 1 : 2;
   return (
     <header className="flex flex-col gap-3">
+      <Link
+        href={"/dashboard" as Route}
+        className="text-sm text-neutral-500 transition hover:text-neutral-800"
+      >
+        ← Dashboard
+      </Link>
       <span className="font-mono text-xs uppercase tracking-wider text-neutral-400">
         Step {stepNumber} of 2 · {stepLabel(step)}
       </span>
@@ -980,8 +988,12 @@ function CoverageBanner({ coverage }: { coverage: CoverageReport }) {
 // the React component holds the data between calls.
 // ────────────────────────────────────────────────────────────────────────
 
-const CHUNK_BATCH_SIZE = 5;
-const CHUNK_PARALLELISM = 3;
+// Smaller batches = each Gemini call finishes faster, lower chance any
+// single batch trips Vercel's 300s function-timeout. Higher parallelism
+// stays well inside the 2M tokens/min paid-tier limit (4 * 3 * ~12k ≈
+// 144k tokens concurrent).
+const CHUNK_BATCH_SIZE = 3;
+const CHUNK_PARALLELISM = 4;
 
 interface PrepareScrapeResponse {
   pages: { url: string; markdown: string }[];
@@ -1028,9 +1040,12 @@ async function runChunkedPipeline(
   });
 
   // 3. Parallel consolidate with bounded concurrency.
-  // sentinel = batch index reserved by a worker; null until a worker
-  // finishes; ScraperOutput when complete.
-  const partials: (ScraperOutput | null)[] = new Array(batches.length).fill(undefined);
+  // A batch may legitimately fail (504 if Gemini exceeds 300s on one
+  // particularly heavy chunk). Capture failures per-batch instead of
+  // aborting the run — partial KB beats no KB, and the merge layer
+  // tolerates missing batches.
+  const partials: (ScraperOutput | null)[] = new Array(batches.length).fill(null);
+  const failures: string[] = [];
   let completed = 0;
   let cursor = 0;
   const workers = Array.from({ length: Math.min(CHUNK_PARALLELISM, batches.length) }, async () => {
@@ -1038,34 +1053,57 @@ async function runChunkedPipeline(
       if (signal.aborted) return;
       const i = cursor++;
       if (i >= batches.length) return;
-      partials[i] = null; // mark claimed
-      const res = await fetch("/api/prepare/consolidate-batch", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ rootUrl: url, pages: batches[i] }),
-        signal,
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-        throw new Error(
-          `Batch ${i + 1}/${batches.length} failed: ${j.message ?? j.error ?? res.status}`,
-        );
+      try {
+        const res = await fetch("/api/prepare/consolidate-batch", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ rootUrl: url, pages: batches[i] }),
+          signal,
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+          const why = j.message ?? j.error ?? String(res.status);
+          failures.push(`batch ${i + 1}: ${why}`);
+          emit({
+            phase: "consolidate",
+            percent: 40 + Math.round((completed / batches.length) * 40),
+            message: `Batch ${i + 1}/${batches.length} failed (${why}) — continuing with remaining batches`,
+          });
+          continue;
+        }
+        const j = (await res.json()) as { partial: ScraperOutput; geminiMs: number };
+        partials[i] = j.partial;
+        completed++;
+        emit({
+          phase: "consolidate",
+          percent: 40 + Math.round((completed / batches.length) * 40),
+          message: `Consolidated batch ${completed}/${batches.length} · ${(j.geminiMs / 1000).toFixed(1)}s`,
+        });
+      } catch (err) {
+        // Bubble user-initiated cancel; swallow everything else as a batch failure.
+        if (signal.aborted) return;
+        const msg = (err as Error).message;
+        failures.push(`batch ${i + 1}: ${msg}`);
+        emit({
+          phase: "consolidate",
+          percent: 40 + Math.round((completed / batches.length) * 40),
+          message: `Batch ${i + 1}/${batches.length} errored (${msg}) — continuing`,
+        });
       }
-      const j = (await res.json()) as { partial: ScraperOutput; geminiMs: number };
-      partials[i] = j.partial;
-      completed++;
-      emit({
-        phase: "consolidate",
-        percent: 40 + Math.round((completed / batches.length) * 40),
-        message: `Consolidated batch ${completed}/${batches.length} · ${(j.geminiMs / 1000).toFixed(1)}s`,
-      });
     }
   });
   await Promise.all(workers);
 
-  const validPartials = partials.filter((p): p is ScraperOutput => p !== null && p !== undefined);
+  const validPartials = partials.filter((p): p is ScraperOutput => p !== null);
   if (validPartials.length === 0) {
-    throw new Error("All consolidation batches failed");
+    throw new Error(`All ${batches.length} consolidation batches failed: ${failures.join("; ")}`);
+  }
+  if (failures.length > 0) {
+    emit({
+      phase: "consolidate",
+      percent: 82,
+      message: `${failures.length} of ${batches.length} batches failed — proceeding with ${validPartials.length} successful partials`,
+    });
   }
 
   // 4. Merge in JS (pure-TS, instant)

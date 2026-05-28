@@ -154,6 +154,16 @@ export interface ConsolidateArgs {
   now?: () => Date;
   /** Cancel the in-flight Gemini call when the client disconnects or hits Cancel. */
   signal?: AbortSignal;
+  /**
+   * Override the model chain. Chunked-batch callers should pass
+   * `{ model: "gemini-2.5-flash", fallbackChain: [] }` — on 3-page
+   * batches, 2.5-flash is both faster (~7s vs 6-300s+) and extracts more
+   * services than 3-flash-preview, AND it reliably finishes inside
+   * Vercel's 300s lambda window. 3-flash-preview's quality edge only
+   * matters on big (35-page) single-shot inputs.
+   */
+  model?: import("../lib/llm.js").LLMModel;
+  fallbackChain?: import("../lib/llm.js").LLMModel[];
 }
 
 /**
@@ -195,8 +205,8 @@ export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput>
     // a transport error we want to fall through to the next model IMMEDIATELY
     // — never retry the same model on the same giant prompt, which can
     // double or triple the wall-clock with no quality win.
-    model: "gemini-3-flash-preview",
-    fallbackChain: ["gemini-2.5-flash"],
+    model: args.model ?? "gemini-3-flash-preview",
+    fallbackChain: args.fallbackChain ?? ["gemini-2.5-flash"],
     maxRetries: 0,
     system: SYSTEM_PROMPT,
     user: buildUserPrompt(args.rootUrl, args.pages),

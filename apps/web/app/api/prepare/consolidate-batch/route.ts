@@ -45,11 +45,21 @@ export async function POST(req: NextRequest) {
   });
 
   const startedAt = Date.now();
+  // Soft deadline below the lambda's 300s ceiling. If consolidate hangs
+  // (Gemini 3-flash-preview occasionally stalls past 300s on heavy
+  // batches, and 2.5-flash falls into Polish repetition loops emitting
+  // 200K+ chars of duplicate service names), we return a clean 500
+  // before the gateway returns 504. The client's resilient pipeline
+  // treats either as a dropped batch and merges what succeeded.
+  const SOFT_TIMEOUT_MS = 270_000;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), SOFT_TIMEOUT_MS);
   try {
     const partial = await consolidate({
       rootUrl,
       pages: pages as FirecrawlPage[],
       llm,
+      signal: ac.signal,
     });
     return Response.json({
       partial,
@@ -58,9 +68,16 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     const message = (e as Error).message;
+    const timedOut = ac.signal.aborted;
     return Response.json(
-      { error: "consolidate_failed", message, geminiMs: Date.now() - startedAt },
+      {
+        error: timedOut ? "batch_timeout" : "consolidate_failed",
+        message: timedOut ? `Batch exceeded ${SOFT_TIMEOUT_MS / 1000}s deadline` : message,
+        geminiMs: Date.now() - startedAt,
+      },
       { status: 500 },
     );
+  } finally {
+    clearTimeout(timer);
   }
 }

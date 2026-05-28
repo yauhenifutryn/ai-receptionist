@@ -131,7 +131,6 @@ export default function ProvisionPage() {
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentAgent[]>([]);
-  const [restoredFromDraft, setRestoredFromDraft] = useState(false);
   const [progress, setProgress] = useState<ProgressLine[]>([]);
   /** Set whenever a prepare run starts and the server emits a session
    *  slug. Cleared on a clean success. If prepare errors after the
@@ -151,13 +150,16 @@ export default function ProvisionPage() {
 
   useEffect(() => {
     try {
+      // Restore the autosaved form but ALWAYS land on the input step — never
+      // auto-jump into a stale review. "Continue an in-progress agent" is the
+      // server draft's job: it shows in the dashboard "In progress" section,
+      // and re-pasting the URL here reloads it (with the sky "saved result"
+      // banner). The browser autosave is only a URL/edit convenience now, not
+      // a separate "draft restored" surface.
       const raw = window.localStorage.getItem(STORAGE_KEYS.draft);
       if (raw) {
         const parsed = JSON.parse(raw) as DraftState;
-        const step: Step =
-          parsed.step === "review" || parsed.step === "input" ? parsed.step : "input";
-        setDraft({ ...EMPTY_DRAFT, ...parsed, step });
-        setRestoredFromDraft(true);
+        setDraft({ ...EMPTY_DRAFT, ...parsed, step: "input" });
       }
       const recentRaw = window.localStorage.getItem(STORAGE_KEYS.recent);
       if (recentRaw) {
@@ -275,41 +277,6 @@ export default function ProvisionPage() {
       }
       return deduped;
     });
-  }
-
-  function clearDraft() {
-    // Capture the URL before wiping local state so we can also drop the
-    // server-side cached draft — otherwise re-pasting the same URL would
-    // hit the cache again, defeating "Start fresh".
-    const urlToForget = draft.url;
-    setDraft(EMPTY_DRAFT);
-    setError(null);
-    setRestoredFromDraft(false);
-    setLoadedFromCache(false);
-    try {
-      window.localStorage.removeItem(STORAGE_KEYS.draft);
-    } catch {
-      // ignore
-    }
-    if (urlToForget) {
-      // Fire-and-forget: deleting the server cache is best-effort. The
-      // lookup is by canonical_url so the exact id isn't needed — but our
-      // delete endpoint is by id, so look it up then delete.
-      void forgetServerDraft(urlToForget);
-    }
-  }
-
-  /** Delete the server-side cached draft for a URL (best-effort). */
-  async function forgetServerDraft(url: string) {
-    try {
-      const res = await fetch(`/api/drafts?url=${encodeURIComponent(url)}`);
-      if (!res.ok) return;
-      const j = (await res.json().catch(() => null)) as { draft?: DraftDTO | null } | null;
-      const id = j?.draft?.id;
-      if (id) await fetch(`/api/drafts/${id}`, { method: "DELETE" });
-    } catch {
-      // ignore
-    }
   }
 
   function cancelPrepare() {
@@ -582,10 +549,8 @@ export default function ProvisionPage() {
         <InputCard
           url={draft.url}
           submitting={draft.step === "preparing"}
-          restoredFromDraft={restoredFromDraft && draft.url !== ""}
           onChangeUrl={(url) => setDraft((d) => ({ ...d, url }))}
           onSubmit={(e) => handlePrepare(e)}
-          onClearDraft={clearDraft}
           error={error}
           progress={progress}
           resumableSlug={resumableSlug}
@@ -700,10 +665,8 @@ function RecentAgents({
 function InputCard(props: {
   url: string;
   submitting: boolean;
-  restoredFromDraft: boolean;
   onChangeUrl: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  onClearDraft: () => void;
   error: string | null;
   progress: ProgressLine[];
   resumableSlug: string | null;
@@ -713,10 +676,8 @@ function InputCard(props: {
   const {
     url,
     submitting,
-    restoredFromDraft,
     onChangeUrl,
     onSubmit,
-    onClearDraft,
     error,
     progress,
     resumableSlug,
@@ -728,19 +689,6 @@ function InputCard(props: {
       onSubmit={onSubmit}
       className="flex flex-col gap-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8"
     >
-      {restoredFromDraft ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-          <span>Draft restored from this browser.</span>
-          <button
-            type="button"
-            onClick={onClearDraft}
-            className="font-medium underline transition hover:text-emerald-900"
-          >
-            Start fresh
-          </button>
-        </div>
-      ) : null}
-
       <Field
         id="url"
         label="Business website URL"
@@ -1309,7 +1257,7 @@ async function runChunkedPipeline(
             emit({
               phase: "consolidate",
               percent: 40 + Math.round((completed / batches.length) * 40),
-              message: `Consolidated batch ${completed}/${batches.length} · ${(j.geminiMs / 1000).toFixed(1)}s`,
+              message: `Consolidated batch ${i + 1}/${batches.length} (${completed} done) · ${(j.geminiMs / 1000).toFixed(1)}s`,
             });
           } catch (err) {
             if (signal.aborted) return;

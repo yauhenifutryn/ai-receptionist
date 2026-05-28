@@ -13,7 +13,6 @@ import {
   pickByScore,
   reportCoverage,
   extractInternalLinks,
-  DEFAULT_RELEVANCE_QUERY,
   PER_PAGE_CHAR_CAP,
 } from "@ai-receptionist/backend/scraper";
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
@@ -187,10 +186,12 @@ export async function POST(req: NextRequest) {
             type: "log",
             phase: "map",
             percent: 8,
-            message: "Mapping site with Firecrawl (relevance-ranked)…",
+            message: "Mapping site with Firecrawl…",
           });
+          // No `search`: it collapses bot-protected WP sites to 1 URL.
+          // Relevance handled downstream by filterCandidates + rerankUrls.
+          void searchQuery;
           const links = await firecrawl.map(url, {
-            search: searchQuery ?? DEFAULT_RELEVANCE_QUERY,
             limit: FIRECRAWL_MAP_LIMIT,
           });
           if (aborted()) return;

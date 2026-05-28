@@ -47,9 +47,8 @@ const {
 const { mergePartials } = await import("./../apps/backend/dist/scraper/merge-partials.js");
 const { LLMClient } = await import("./../apps/backend/dist/lib/llm.js");
 const { createGeminiProvider } = await import("./../apps/backend/dist/lib/gemini-provider.js");
-const { buildSystemPrompt, extractPolishCity } = await import(
-  "./../apps/backend/dist/prompts/system-prompt.js"
-);
+const { buildSystemPrompt, extractPolishCity } =
+  await import("./../apps/backend/dist/prompts/system-prompt.js");
 
 const firecrawl = createFirecrawlClient({ apiKey: FIRECRAWL_KEY });
 const llm = new LLMClient(createGeminiProvider({ apiKey: GEMINI_KEY }), { defaultMaxRetries: 1 });
@@ -58,9 +57,14 @@ const llm = new LLMClient(createGeminiProvider({ apiKey: GEMINI_KEY }), { defaul
 log("scrape", `Starting scrape of ${URL_ARG}`);
 const detectedPrimary = await detectPrimaryLanguage(URL_ARG);
 const primaryLang = detectedPrimary ?? "pl";
-log("scrape", `Primary language: ${primaryLang} (${detectedPrimary ? "from root redirect" : "default"})`);
+log(
+  "scrape",
+  `Primary language: ${primaryLang} (${detectedPrimary ? "from root redirect" : "default"})`,
+);
 
-const links = await firecrawl.map(URL_ARG, { search: DEFAULT_RELEVANCE_QUERY, limit: 150 });
+// No `search` — it collapses bot-protected WP sites to 1 URL. Mirrors the route.
+void DEFAULT_RELEVANCE_QUERY;
+const links = await firecrawl.map(URL_ARG, { limit: 150 });
 const ranked = [URL_ARG, ...links.filter((l) => l !== URL_ARG)];
 const filter = filterCandidates(ranked, primaryLang);
 log("scrape", `Mapped ${ranked.length} URLs, ${filter.kept.length} kept after filter`);
@@ -114,7 +118,10 @@ if (discovered.length > 0 && firstPass.length < MAX_PAGES) {
   }
 }
 const pages = [...firstPass, ...discoveredPages];
-log("scrape", `Total pages: ${pages.length} (firstPass=${firstPass.length}, discovered=${discoveredPages.length})`);
+log(
+  "scrape",
+  `Total pages: ${pages.length} (firstPass=${firstPass.length}, discovered=${discoveredPages.length})`,
+);
 
 if (pages.length === 0) {
   console.error("No pages scraped — abort");
@@ -124,7 +131,10 @@ if (pages.length === 0) {
 // ── Phase 2: parallel consolidate batches ─────────────────────────────
 const batches = [];
 for (let i = 0; i < pages.length; i += BATCH_SIZE) batches.push(pages.slice(i, i + BATCH_SIZE));
-log("consolidate", `Split into ${batches.length} batches (${BATCH_SIZE} pages each, ${PARALLELISM} parallel)`);
+log(
+  "consolidate",
+  `Split into ${batches.length} batches (${BATCH_SIZE} pages each, ${PARALLELISM} parallel)`,
+);
 
 const partials = new Array(batches.length).fill(null);
 const failures = [];
@@ -149,11 +159,17 @@ const workers = Array.from({ length: Math.min(PARALLELISM, batches.length) }, as
       partials[i] = partial;
       completed++;
       const ms = performance.now() - batchStart;
-      log("consolidate", `Batch ${completed}/${batches.length} OK · ${(ms / 1000).toFixed(1)}s · ${partial.services.length} svc, ${partial.staff.length} staff, ${partial.faq.length} faq`);
+      log(
+        "consolidate",
+        `Batch ${completed}/${batches.length} OK · ${(ms / 1000).toFixed(1)}s · ${partial.services.length} svc, ${partial.staff.length} staff, ${partial.faq.length} faq`,
+      );
     } catch (e) {
       const ms = performance.now() - batchStart;
       failures.push(`batch ${i + 1}: ${e.message}`);
-      log("consolidate", `Batch ${i + 1}/${batches.length} FAIL after ${(ms / 1000).toFixed(1)}s — ${e.message}`);
+      log(
+        "consolidate",
+        `Batch ${i + 1}/${batches.length} FAIL after ${(ms / 1000).toFixed(1)}s — ${e.message}`,
+      );
     } finally {
       clearTimeout(timer);
     }
@@ -162,7 +178,10 @@ const workers = Array.from({ length: Math.min(PARALLELISM, batches.length) }, as
 await Promise.all(workers);
 
 const valid = partials.filter(Boolean);
-log("consolidate", `${valid.length}/${batches.length} batches succeeded (${failures.length} failed)`);
+log(
+  "consolidate",
+  `${valid.length}/${batches.length} batches succeeded (${failures.length} failed)`,
+);
 
 if (valid.length === 0) {
   console.error("All batches failed — abort");
@@ -173,13 +192,22 @@ if (valid.length === 0) {
 // ── Phase 3: merge + finalize ─────────────────────────────────────────
 log("merge", "Merging partials in JS");
 const merged = mergePartials(valid);
-log("merge", `Merged → ${merged.services.length} svc, ${merged.staff.length} staff, ${merged.faq.length} faq`);
+log(
+  "merge",
+  `Merged → ${merged.services.length} svc, ${merged.staff.length} staff, ${merged.faq.length} faq`,
+);
 
 const md = scraperOutputToMarkdown(merged);
 const city = extractPolishCity(merged.tenant.address);
-const sysPrompt = buildSystemPrompt({ tenantDisplayName: merged.tenant.name, ...(city ? { city } : {}) });
+const sysPrompt = buildSystemPrompt({
+  tenantDisplayName: merged.tenant.name,
+  ...(city ? { city } : {}),
+});
 const coverage = reportCoverage(merged);
-log("finalize", `KB markdown ${md.length} chars · sysPrompt ${sysPrompt.length} chars · coverage ${(coverage.score * 100).toFixed(0)}%`);
+log(
+  "finalize",
+  `KB markdown ${md.length} chars · sysPrompt ${sysPrompt.length} chars · coverage ${(coverage.score * 100).toFixed(0)}%`,
+);
 
 console.log("\n────────────── SUMMARY ──────────────");
 console.log(`URL                : ${URL_ARG}`);
@@ -187,7 +215,9 @@ console.log(`Total wall time    : ${((performance.now() - t0) / 1000).toFixed(1)
 console.log(`Pages scraped      : ${pages.length}`);
 console.log(`Batches            : ${batches.length} (${valid.length} ok, ${failures.length} fail)`);
 console.log(`Services           : ${merged.services.length}`);
-console.log(`Services w/ price  : ${merged.services.filter((s) => s.price?.qualifier && s.price.qualifier !== "unknown").length}`);
+console.log(
+  `Services w/ price  : ${merged.services.filter((s) => s.price?.qualifier && s.price.qualifier !== "unknown").length}`,
+);
 console.log(`Staff              : ${merged.staff.length}`);
 console.log(`FAQ                : ${merged.faq.length}`);
 console.log(`Tenant name        : ${merged.tenant.name}`);

@@ -20,7 +20,7 @@ export default function ProvisionDraftsSection({ drafts }: { drafts: DraftListIt
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function onDelete(id: string) {
+  async function onDelete(id: string, sourceUrl: string) {
     setError(null);
     setDeleting(id);
     try {
@@ -30,6 +30,10 @@ export default function ProvisionDraftsSection({ drafts }: { drafts: DraftListIt
         setError(j.message ?? j.error ?? `Delete failed (${res.status})`);
         return;
       }
+      // The provision page autosaves an in-progress draft to localStorage
+      // (separate from the server row). Clear it if it's the same URL, so
+      // navigating to /provision doesn't resurrect the deleted draft.
+      forgetLocalDraft(sourceUrl);
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -90,7 +94,7 @@ export default function ProvisionDraftsSection({ drafts }: { drafts: DraftListIt
               </Link>
               <button
                 type="button"
-                onClick={() => onDelete(d.id)}
+                onClick={() => onDelete(d.id, d.sourceUrl)}
                 disabled={deleting === d.id}
                 className="rounded-full border border-neutral-200 bg-white px-3 py-2 text-xs font-medium text-neutral-600 transition hover:border-rose-300 hover:text-rose-700 disabled:opacity-50"
               >
@@ -102,6 +106,26 @@ export default function ProvisionDraftsSection({ drafts }: { drafts: DraftListIt
       </ul>
     </section>
   );
+}
+
+/** localStorage key the provision page autosaves its in-progress draft under.
+ *  Must stay in sync with STORAGE_KEYS.draft in app/provision/page.tsx. */
+const PROVISION_DRAFT_KEY = "ai-receptionist:provision:draft-v3";
+
+/** Clear the provision page's localStorage draft if it's for `sourceUrl`.
+ *  Compared loosely (exact, or ignoring a trailing slash) since the stored
+ *  value is the raw URL the user typed. */
+function forgetLocalDraft(sourceUrl: string) {
+  try {
+    const raw = window.localStorage.getItem(PROVISION_DRAFT_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { url?: string };
+    const a = (parsed.url ?? "").replace(/\/+$/, "");
+    const b = sourceUrl.replace(/\/+$/, "");
+    if (a && a === b) window.localStorage.removeItem(PROVISION_DRAFT_KEY);
+  } catch {
+    // ignore corrupt / unavailable storage
+  }
 }
 
 function formatDate(iso: string): string {

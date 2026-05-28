@@ -39,6 +39,10 @@ export function createGeminiProvider(opts: CreateGeminiProviderOptions = {}): LL
           ...(args.thinkingBudget !== undefined
             ? { thinkingConfig: { thinkingBudget: args.thinkingBudget } }
             : {}),
+          ...(args.frequencyPenalty !== undefined
+            ? { frequencyPenalty: args.frequencyPenalty }
+            : {}),
+          ...(args.presencePenalty !== undefined ? { presencePenalty: args.presencePenalty } : {}),
           ...(args.abortSignal !== undefined ? { abortSignal: args.abortSignal } : {}),
         },
       });

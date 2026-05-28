@@ -1175,11 +1175,37 @@ function CoverageBanner({ coverage }: { coverage: CoverageReport }) {
 const CHUNK_BATCH_SIZE = 3;
 const CHUNK_PARALLELISM = 4;
 
-// Failed Gemini batches are retried this many extra rounds. Each batch is a
-// fresh lambda with its own 300s budget, so a transient 504 / DEADLINE_EXCEEDED
-// usually clears on the next attempt — this is the main lever for getting past
-// Vercel's per-call ceiling without losing coverage.
-const CHUNK_RETRY_ROUNDS = 2;
+// Failed Gemini batches are retried this many extra rounds, but ONLY for
+// transient failures (timeout / 504 / network). A deterministic failure
+// (truncated/unparseable JSON) would just fail the same way, so retrying it
+// only wastes minutes — those are dropped immediately and the merge proceeds
+// on what succeeded. One round is enough: a transient blip usually clears on
+// the next fresh lambda.
+const CHUNK_RETRY_ROUNDS = 1;
+
+/** A failure is worth retrying only if it looks transient. Truncated JSON,
+ *  schema-validation, and parse errors are deterministic on the same input. */
+function isTransientBatchError(why: string): boolean {
+  const w = why.toLowerCase();
+  if (
+    w.includes("json parse") ||
+    w.includes("unterminated") ||
+    w.includes("zod") ||
+    w.includes("validation")
+  ) {
+    return false;
+  }
+  return (
+    w.includes("timeout") ||
+    w.includes("deadline") ||
+    w.includes("504") ||
+    w.includes("502") ||
+    w.includes("503") ||
+    w.includes("network") ||
+    w.includes("fetch failed") ||
+    w.includes("econn")
+  );
+}
 
 interface PrepareScrapeResponse {
   pages: { url: string; markdown: string }[];
@@ -1241,8 +1267,10 @@ async function runChunkedPipeline(
   const partials: (ScraperOutput | null)[] = new Array(batches.length).fill(null);
   let completed = 0;
 
+  // Returns the subset of indices that failed TRANSIENTLY (worth retrying).
+  // Deterministic failures (truncated/invalid JSON) are logged and dropped.
   async function runBatchIndices(indices: number[]): Promise<number[]> {
-    const stillFailed: number[] = [];
+    const retryable: number[] = [];
     let cursor = 0;
     const workers = Array.from(
       { length: Math.min(CHUNK_PARALLELISM, indices.length) },
@@ -1265,11 +1293,13 @@ async function runChunkedPipeline(
                 message?: string;
               };
               const why = j.message ?? j.error ?? String(res.status);
-              stillFailed.push(i);
+              if (isTransientBatchError(why)) retryable.push(i);
               emit({
                 phase: "consolidate",
                 percent: 40 + Math.round((completed / batches.length) * 40),
-                message: `Batch ${i + 1}/${batches.length} failed (${why})`,
+                message: `Batch ${i + 1}/${batches.length} failed (${why})${
+                  isTransientBatchError(why) ? " — will retry" : ""
+                }`,
               });
               continue;
             }
@@ -1283,18 +1313,21 @@ async function runChunkedPipeline(
             });
           } catch (err) {
             if (signal.aborted) return;
-            stillFailed.push(i);
+            const why = (err as Error).message;
+            if (isTransientBatchError(why)) retryable.push(i);
             emit({
               phase: "consolidate",
               percent: 40 + Math.round((completed / batches.length) * 40),
-              message: `Batch ${i + 1}/${batches.length} errored (${(err as Error).message})`,
+              message: `Batch ${i + 1}/${batches.length} errored (${why})${
+                isTransientBatchError(why) ? " — will retry" : ""
+              }`,
             });
           }
         }
       },
     );
     await Promise.all(workers);
-    return stillFailed;
+    return retryable;
   }
 
   let pending = batches.map((_, i) => i);
@@ -1316,11 +1349,12 @@ async function runChunkedPipeline(
   if (validPartials.length === 0) {
     throw new Error(`All ${batches.length} consolidation batches failed after retries`);
   }
-  if (pending.length > 0) {
+  const missing = batches.length - validPartials.length;
+  if (missing > 0) {
     emit({
       phase: "consolidate",
       percent: 82,
-      message: `${pending.length} of ${batches.length} batches still failing — proceeding with ${validPartials.length} that succeeded`,
+      message: `${missing} of ${batches.length} batches failed — proceeding with ${validPartials.length} that succeeded`,
     });
   }
 

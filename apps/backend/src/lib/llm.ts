@@ -24,6 +24,18 @@ export interface GenerateJsonArgs {
    */
   thinkingBudget?: number;
   /**
+   * Penalize tokens by how often they've already appeared (Gemini range
+   * -2..2). A positive value strongly discourages the degenerate
+   * repetition loops that make structured extraction on long Polish
+   * service lists run away to the output-token ceiling and truncate
+   * mid-JSON. Scales with count, so it punishes a runaway loop far harder
+   * than the bounded, legitimate repetition of JSON keys.
+   */
+  frequencyPenalty?: number;
+  /** Penalize tokens that have appeared at all (Gemini range -2..2). Use
+   *  sparingly — it also discourages legitimate repeated JSON structure. */
+  presencePenalty?: number;
+  /**
    * Client-side abort signal. Aborting cancels the in-flight HTTP call
    * to Google. NOTE per Google: cancellation does not stop server-side
    * processing — you may still be billed for tokens already consumed.
@@ -47,6 +59,10 @@ export interface GenerateStructuredRequest<Schema extends z.ZodTypeAny> {
   maxRetries?: number;
   /** See GenerateJsonArgs.thinkingBudget. 0 disables thinking. */
   thinkingBudget?: number;
+  /** See GenerateJsonArgs.frequencyPenalty. Anti-repetition-loop. */
+  frequencyPenalty?: number;
+  /** See GenerateJsonArgs.presencePenalty. */
+  presencePenalty?: number;
   /** See GenerateJsonArgs.abortSignal. Cancels in-flight HTTP call. */
   abortSignal?: AbortSignal;
 }
@@ -106,6 +122,10 @@ export class LLMClient {
             ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
             ...(req.maxOutputTokens !== undefined ? { maxOutputTokens: req.maxOutputTokens } : {}),
             ...(req.thinkingBudget !== undefined ? { thinkingBudget: req.thinkingBudget } : {}),
+            ...(req.frequencyPenalty !== undefined
+              ? { frequencyPenalty: req.frequencyPenalty }
+              : {}),
+            ...(req.presencePenalty !== undefined ? { presencePenalty: req.presencePenalty } : {}),
             ...(req.abortSignal !== undefined ? { abortSignal: req.abortSignal } : {}),
           });
           const parsedJson = safeJsonParse(text);

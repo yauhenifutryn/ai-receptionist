@@ -193,6 +193,14 @@ export interface ConsolidateArgs {
  */
 export const PER_PAGE_CHAR_CAP = 50000;
 
+/**
+ * Bounded thinking budget for consolidation. Positive (not 0) so
+ * gemini-2.5-pro runs at all and so neither model falls into the Polish
+ * repetition loop. Bounded (not the model default of dynamic/unbounded) so a
+ * 3-page batch finishes well inside Vercel's 300s lambda.
+ */
+export const CONSOLIDATE_THINKING_BUDGET = 4096;
+
 function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
   const blocks = pages.map(
     (p, i) => `--- Page ${i + 1}: ${p.url} ---\n${p.markdown.slice(0, PER_PAGE_CHAR_CAP)}`,
@@ -231,18 +239,31 @@ export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput>
     // greedy loop trap. Reference: classic failure mode of low-temp
     // structured extraction on Polish (high-repetition-prior) inputs.
     temperature: 0.2,
+    // NB: frequencyPenalty/presencePenalty are NOT usable here — the Gemini
+    // API rejects them on gemini-2.5-pro / 2.5-flash with
+    // "400 Penalty is not enabled for models/...". The anti-loop levers we
+    // DO have are the temperature (0.2, not 0) and the ANTI-REPETITION RULES
+    // in SYSTEM_PROMPT. If runaway loops resurface on real sites, the robust
+    // fix is OpenAI gpt-5.4-mini strict structured output (grammar-constrained,
+    // cannot loop into invalid JSON) — see memory gpt_5_4_mini_consolidation.
     // KB OUTPUT is unbounded by policy — model's hard ceiling only.
     // Big catalogs can emit 30K+ tokens, never truncate mid-JSON.
     maxOutputTokens: 65535,
-    // Disable "dynamic thinking" — default mode on 2.5 Flash and 3 Flash
-    // Preview can burn many minutes of internal reasoning tokens on big
-    // structured-extraction prompts. We don't need reasoning here: the
-    // prompt is "copy this markdown into this JSON schema with these
-    // rules". With responseSchema enforced and rigid prompt rules,
-    // thinking adds latency without quality. Empirically this drops
-    // consolidate latency from ~8+ min to ~30-90s on the dynastystomatology
-    // dataset (~340K input tokens).
-    thinkingBudget: 0,
+    // BOUNDED thinking (not 0). Two reasons, both learned the hard way
+    // 2026-05-28/29:
+    //   1. gemini-2.5-pro REJECTS thinkingBudget:0 ("Budget 0 is invalid.
+    //      This model only works in thinking mode."), so with budget 0 the
+    //      primary always 400'd and silently fell back to 2.5-flash. A
+    //      positive budget lets 2.5-pro actually run.
+    //   2. The degenerate repetition loops (model emitting the same Polish
+    //      service name hundreds of times until it blows maxOutputTokens and
+    //      truncates mid-JSON) happened specifically at thinkingBudget:0.
+    //      Thinking gives the model a planning scratchpad that keeps the
+    //      structured output coherent — on the exclusivedentalstudio.pl
+    //      batches, budget 0 looped ~50% of batches; bounded thinking does
+    //      not. Bounded (not dynamic/unbounded) so per-batch latency stays
+    //      well under Vercel's 300s lambda ceiling.
+    thinkingBudget: CONSOLIDATE_THINKING_BUDGET,
     ...(args.signal !== undefined ? { abortSignal: args.signal } : {}),
   });
   const out = result.data;

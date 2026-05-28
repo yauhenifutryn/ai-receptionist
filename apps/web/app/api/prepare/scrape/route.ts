@@ -8,7 +8,6 @@ import {
   filterCandidates,
   pickByScore,
   rerankUrls,
-  DEFAULT_RELEVANCE_QUERY,
   type FirecrawlPage,
 } from "@ai-receptionist/backend/scraper";
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
@@ -83,8 +82,13 @@ export async function POST(req: NextRequest) {
   const detectedPrimary = await detectPrimaryLanguage(url);
   const primaryLang = detectedPrimary ?? "pl";
 
+  // NO `search` param: Firecrawl's map-with-search collapses bot-protected
+  // WordPress sites to a single URL (confirmed on exclusivedentalstudio.pl:
+  // 99 URLs plain vs 1 with search). Relevance is handled downstream by
+  // filterCandidates + rerankUrls, so the search filter is both redundant
+  // and actively harmful. searchQuery is accepted for API compat but unused.
+  void searchQuery;
   const links = await firecrawl.map(url, {
-    search: searchQuery ?? DEFAULT_RELEVANCE_QUERY,
     limit: FIRECRAWL_MAP_LIMIT,
   });
   const ranked = [url, ...links.filter((l) => l !== url)];

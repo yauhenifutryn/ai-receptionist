@@ -1,4 +1,5 @@
 import type { FirecrawlPage } from "./firecrawl.js";
+import { canonicalizeUrl } from "./url-filter.js";
 
 /**
  * Extract internal links from already-scraped page markdown so the
@@ -7,16 +8,24 @@ import type { FirecrawlPage } from "./firecrawl.js";
  * sitemap is incomplete).
  *
  * Strategy: parse standard markdown link syntax `[text](url)`. Keep
- * only same-origin absolute URLs. Strip fragments and query strings
- * for deduplication. Universal — no per-site rules.
+ * only same-origin absolute URLs (www and apex variants of the same
+ * apex domain count as same-origin — clinic sites universally alias
+ * www to apex). Return links as canonicalized URLs so callers can
+ * compare against an already-canonicalized seenUrls set without
+ * double-scraping the same logical page.
  */
 
 const MARKDOWN_LINK_RE = /\[(?:[^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
 
+function apexHost(host: string): string {
+  const lower = host.toLowerCase();
+  return lower.startsWith("www.") ? lower.slice(4) : lower;
+}
+
 export function extractInternalLinks(pages: FirecrawlPage[], rootUrl: string): string[] {
-  let rootHost: string;
+  let rootApex: string;
   try {
-    rootHost = new URL(rootUrl).hostname;
+    rootApex = apexHost(new URL(rootUrl).hostname);
   } catch {
     return [];
   }
@@ -33,15 +42,10 @@ export function extractInternalLinks(pages: FirecrawlPage[], rootUrl: string): s
       } catch {
         continue;
       }
-      // Same origin only
-      if (parsed.hostname !== rootHost) continue;
-      // Normalize: drop fragment + query, keep pathname only
-      const normalized = `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`;
-      if (normalized === parsed.origin) {
-        found.add(parsed.origin);
-      } else {
-        found.add(normalized);
-      }
+      // Same apex-host only (treats www and non-www as identical).
+      if (apexHost(parsed.hostname) !== rootApex) continue;
+      const canonical = canonicalizeUrl(rawUrl);
+      if (canonical) found.add(canonical);
     }
   }
   return Array.from(found);

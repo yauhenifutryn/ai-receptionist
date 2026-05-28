@@ -12,6 +12,7 @@ export {
 } from "./consolidate.js";
 export { scraperOutputToMarkdown } from "./to-markdown.js";
 export {
+  canonicalizeUrl,
   shouldScrape,
   dedupeByLanguage,
   detectLanguagePrefixes,

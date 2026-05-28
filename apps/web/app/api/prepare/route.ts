@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import {
+  canonicalizeUrl,
   consolidate,
   createFirecrawlClient,
   scraperOutputToMarkdown,
@@ -373,9 +374,15 @@ export async function POST(req: NextRequest) {
           // scraped markdown to catch URLs Firecrawl's /map missed
           // (e.g. /cennik when not in the sitemap). One pass only to
           // avoid infinite crawl. Universal — no canonical path probes.
-          const seenUrls = new Set(validPages.map((p) => p.url));
+          //
+          // Compare via canonicalizeUrl so www/non-www and trailing-
+          // slash variants of the same logical page don't get scraped
+          // twice. extractInternalLinks already emits canonical URLs;
+          // validPages[i].url comes from Firecrawl's sourceURL metadata
+          // which may include a www prefix the user's input didn't.
+          const seenCanonical = new Set(validPages.map((p) => canonicalizeUrl(p.url) ?? p.url));
           const discovered = extractInternalLinks(validPages, url);
-          const newLinks = discovered.filter((u) => !seenUrls.has(u));
+          const newLinks = discovered.filter((u) => !seenCanonical.has(u));
           if (newLinks.length > 0 && !aborted()) {
             const newFilter = filterCandidates(newLinks, primaryLang);
             const newKept = newFilter.kept;

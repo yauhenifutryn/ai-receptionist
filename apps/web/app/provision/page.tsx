@@ -318,7 +318,7 @@ export default function ProvisionPage() {
 
   async function handlePrepare(
     e: React.FormEvent | null,
-    opts: { resumeSlug?: string; skipCache?: boolean } = {},
+    opts: { resumeSlug?: string; skipCache?: boolean; forceFresh?: boolean } = {},
   ) {
     if (e) e.preventDefault();
     setError(null);
@@ -366,8 +366,11 @@ export default function ProvisionPage() {
     // support session resume (acceptable for v1; resume is rarely used).
     if (!opts.resumeSlug && process.env.NEXT_PUBLIC_USE_CHUNKED_PROVISION === "true") {
       try {
-        const result = await runChunkedPipeline(draft.url, controller.signal, (line) =>
-          setProgress((p) => [...p, { ...line, timestamp: Date.now() }]),
+        const result = await runChunkedPipeline(
+          draft.url,
+          controller.signal,
+          (line) => setProgress((p) => [...p, { ...line, timestamp: Date.now() }]),
+          { forceFresh: opts.forceFresh ?? false },
         );
         setResumableSlug(null);
         setResumableUrl(null);
@@ -596,7 +599,8 @@ export default function ProvisionPage() {
           draft={draft}
           submitting={draft.step === "provisioning"}
           loadedFromCache={loadedFromCache}
-          onRescrape={() => handlePrepare(null, { skipCache: true })}
+          onReconsolidate={() => handlePrepare(null, { skipCache: true, forceFresh: false })}
+          onRescrape={() => handlePrepare(null, { skipCache: true, forceFresh: true })}
           onChangeTenantName={(tenantName) => setDraft((d) => ({ ...d, tenantName }))}
           onChangeKnowledge={(knowledgeMarkdown) => setDraft((d) => ({ ...d, knowledgeMarkdown }))}
           onChangeSystemPrompt={(systemPrompt) => setDraft((d) => ({ ...d, systemPrompt }))}
@@ -847,6 +851,7 @@ function ReviewCard(props: {
   draft: DraftState;
   submitting: boolean;
   loadedFromCache: boolean;
+  onReconsolidate: () => void;
   onRescrape: () => void;
   onChangeTenantName: (v: string) => void;
   onChangeKnowledge: (v: string) => void;
@@ -859,6 +864,7 @@ function ReviewCard(props: {
     draft,
     submitting,
     loadedFromCache,
+    onReconsolidate,
     onRescrape,
     onChangeTenantName,
     onChangeKnowledge,
@@ -871,18 +877,30 @@ function ReviewCard(props: {
   return (
     <div className="flex flex-col gap-6">
       {loadedFromCache && !submitting ? (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-          <span>
-            Loaded a saved scrape for this URL — no re-scraping needed. Edit below and provision, or
-            re-scrape if the site changed.
-          </span>
-          <button
-            type="button"
-            onClick={onRescrape}
-            className="shrink-0 rounded-full border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-800 shadow-sm transition hover:bg-sky-100"
-          >
-            Re-scrape fresh
-          </button>
+        <div className="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-sky-900">
+            <div className="font-medium">Saved result loaded from a previous run</div>
+            <div className="text-xs text-sky-700">
+              Edit and provision as-is, or regenerate. Re-running consolidation reuses the cached
+              scrape (fast); scraping from scratch re-fetches every page.
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={onReconsolidate}
+              className="rounded-full bg-sky-900 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-sky-800"
+            >
+              Re-run consolidation
+            </button>
+            <button
+              type="button"
+              onClick={onRescrape}
+              className="rounded-full border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-800 shadow-sm transition hover:bg-sky-100"
+            >
+              Scrape from scratch
+            </button>
+          </div>
         </div>
       ) : null}
       {draft.coverage ? <CoverageBanner coverage={draft.coverage} /> : null}
@@ -1157,6 +1175,12 @@ function CoverageBanner({ coverage }: { coverage: CoverageReport }) {
 const CHUNK_BATCH_SIZE = 3;
 const CHUNK_PARALLELISM = 4;
 
+// Failed Gemini batches are retried this many extra rounds. Each batch is a
+// fresh lambda with its own 300s budget, so a transient 504 / DEADLINE_EXCEEDED
+// usually clears on the next attempt — this is the main lever for getting past
+// Vercel's per-call ceiling without losing coverage.
+const CHUNK_RETRY_ROUNDS = 2;
+
 interface PrepareScrapeResponse {
   pages: { url: string; markdown: string }[];
   detectedLanguage: string | null;
@@ -1164,19 +1188,25 @@ interface PrepareScrapeResponse {
   urlsMapped: number;
   urlsDroppedByFilter: number;
   pagesScraped: number;
+  pagesFromCache: number;
 }
 
 async function runChunkedPipeline(
   url: string,
   signal: AbortSignal,
   emit: (line: Omit<ProgressLine, "timestamp">) => void,
+  opts: { forceFresh?: boolean } = {},
 ): Promise<PrepareResponse> {
-  // 1. Scrape
-  emit({ phase: "scrape", percent: 5, message: `Starting scrape of ${url}` });
+  // 1. Scrape (per-page cached server-side; forceFresh re-scrapes all)
+  emit({
+    phase: "scrape",
+    percent: 5,
+    message: opts.forceFresh ? `Re-scraping ${url} from scratch` : `Starting scrape of ${url}`,
+  });
   const scrapeRes = await fetch("/api/prepare/scrape", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ url, forceFresh: opts.forceFresh ?? false }),
     signal,
   });
   if (!scrapeRes.ok) {
@@ -1184,10 +1214,11 @@ async function runChunkedPipeline(
     throw new Error(j.message ?? j.error ?? `Scrape failed (${scrapeRes.status})`);
   }
   const scrape = (await scrapeRes.json()) as PrepareScrapeResponse;
+  const cacheNote = scrape.pagesFromCache > 0 ? ` (${scrape.pagesFromCache} from cache)` : "";
   emit({
     phase: "scrape",
     percent: 35,
-    message: `Scraped ${scrape.pagesScraped} page${scrape.pagesScraped === 1 ? "" : "s"} · primary language: ${scrape.primaryLanguage}${scrape.detectedLanguage ? " (from root redirect)" : " (default)"}`,
+    message: `Scraped ${scrape.pagesScraped} page${scrape.pagesScraped === 1 ? "" : "s"}${cacheNote} · primary language: ${scrape.primaryLanguage}${scrape.detectedLanguage ? " (from root redirect)" : " (default)"}`,
   });
 
   // 2. Split into batches
@@ -1201,70 +1232,95 @@ async function runChunkedPipeline(
     message: `Consolidating ${batches.length} batch${batches.length === 1 ? "" : "es"} in parallel (Gemini)…`,
   });
 
-  // 3. Parallel consolidate with bounded concurrency.
-  // A batch may legitimately fail (504 if Gemini exceeds 300s on one
-  // particularly heavy chunk). Capture failures per-batch instead of
-  // aborting the run — partial KB beats no KB, and the merge layer
-  // tolerates missing batches.
+  // 3. Parallel consolidate with bounded concurrency, then auto-retry any
+  // failed batches up to CHUNK_RETRY_ROUNDS times. A batch may fail (504 /
+  // DEADLINE_EXCEEDED if Gemini stalls); since each batch is a fresh lambda,
+  // re-running just the failures usually succeeds and beats the timeout.
+  // partials[i] stays null for a batch that never succeeds — the merge layer
+  // tolerates gaps, so partial KB beats no KB.
   const partials: (ScraperOutput | null)[] = new Array(batches.length).fill(null);
-  const failures: string[] = [];
   let completed = 0;
-  let cursor = 0;
-  const workers = Array.from({ length: Math.min(CHUNK_PARALLELISM, batches.length) }, async () => {
-    while (true) {
-      if (signal.aborted) return;
-      const i = cursor++;
-      if (i >= batches.length) return;
-      try {
-        const res = await fetch("/api/prepare/consolidate-batch", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ rootUrl: url, pages: batches[i] }),
-          signal,
-        });
-        if (!res.ok) {
-          const j = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-          const why = j.message ?? j.error ?? String(res.status);
-          failures.push(`batch ${i + 1}: ${why}`);
-          emit({
-            phase: "consolidate",
-            percent: 40 + Math.round((completed / batches.length) * 40),
-            message: `Batch ${i + 1}/${batches.length} failed (${why}) — continuing with remaining batches`,
-          });
-          continue;
+
+  async function runBatchIndices(indices: number[]): Promise<number[]> {
+    const stillFailed: number[] = [];
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(CHUNK_PARALLELISM, indices.length) },
+      async () => {
+        while (true) {
+          if (signal.aborted) return;
+          const k = cursor++;
+          if (k >= indices.length) return;
+          const i = indices[k]!;
+          try {
+            const res = await fetch("/api/prepare/consolidate-batch", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ rootUrl: url, pages: batches[i] }),
+              signal,
+            });
+            if (!res.ok) {
+              const j = (await res.json().catch(() => ({}))) as {
+                error?: string;
+                message?: string;
+              };
+              const why = j.message ?? j.error ?? String(res.status);
+              stillFailed.push(i);
+              emit({
+                phase: "consolidate",
+                percent: 40 + Math.round((completed / batches.length) * 40),
+                message: `Batch ${i + 1}/${batches.length} failed (${why})`,
+              });
+              continue;
+            }
+            const j = (await res.json()) as { partial: ScraperOutput; geminiMs: number };
+            partials[i] = j.partial;
+            completed++;
+            emit({
+              phase: "consolidate",
+              percent: 40 + Math.round((completed / batches.length) * 40),
+              message: `Consolidated batch ${completed}/${batches.length} · ${(j.geminiMs / 1000).toFixed(1)}s`,
+            });
+          } catch (err) {
+            if (signal.aborted) return;
+            stillFailed.push(i);
+            emit({
+              phase: "consolidate",
+              percent: 40 + Math.round((completed / batches.length) * 40),
+              message: `Batch ${i + 1}/${batches.length} errored (${(err as Error).message})`,
+            });
+          }
         }
-        const j = (await res.json()) as { partial: ScraperOutput; geminiMs: number };
-        partials[i] = j.partial;
-        completed++;
-        emit({
-          phase: "consolidate",
-          percent: 40 + Math.round((completed / batches.length) * 40),
-          message: `Consolidated batch ${completed}/${batches.length} · ${(j.geminiMs / 1000).toFixed(1)}s`,
-        });
-      } catch (err) {
-        // Bubble user-initiated cancel; swallow everything else as a batch failure.
-        if (signal.aborted) return;
-        const msg = (err as Error).message;
-        failures.push(`batch ${i + 1}: ${msg}`);
-        emit({
-          phase: "consolidate",
-          percent: 40 + Math.round((completed / batches.length) * 40),
-          message: `Batch ${i + 1}/${batches.length} errored (${msg}) — continuing`,
-        });
-      }
-    }
-  });
-  await Promise.all(workers);
+      },
+    );
+    await Promise.all(workers);
+    return stillFailed;
+  }
+
+  let pending = batches.map((_, i) => i);
+  pending = await runBatchIndices(pending);
+  for (
+    let round = 1;
+    round <= CHUNK_RETRY_ROUNDS && pending.length > 0 && !signal.aborted;
+    round++
+  ) {
+    emit({
+      phase: "consolidate",
+      percent: 40 + Math.round((completed / batches.length) * 40),
+      message: `Retrying ${pending.length} failed batch${pending.length === 1 ? "" : "es"} (round ${round}/${CHUNK_RETRY_ROUNDS})…`,
+    });
+    pending = await runBatchIndices(pending);
+  }
 
   const validPartials = partials.filter((p): p is ScraperOutput => p !== null);
   if (validPartials.length === 0) {
-    throw new Error(`All ${batches.length} consolidation batches failed: ${failures.join("; ")}`);
+    throw new Error(`All ${batches.length} consolidation batches failed after retries`);
   }
-  if (failures.length > 0) {
+  if (pending.length > 0) {
     emit({
       phase: "consolidate",
       percent: 82,
-      message: `${failures.length} of ${batches.length} batches failed — proceeding with ${validPartials.length} successful partials`,
+      message: `${pending.length} of ${batches.length} batches still failing — proceeding with ${validPartials.length} that succeeded`,
     });
   }
 

@@ -14,6 +14,7 @@ import {
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
 import { createGeminiProvider } from "@ai-receptionist/backend/lib/gemini-provider";
 import { getOperatorOrJsonError } from "@/lib/supabase-server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,12 +25,18 @@ const SCRAPE_CEILING_MAX = 50;
 const RERANK_INPUT_CAP = 100;
 const FIRECRAWL_MAP_LIMIT = 150;
 const DEFAULT_CONCURRENCY = 3;
+/** Cached page is reused if scraped within this window; clinic sites change,
+ *  so a week-old page is re-scraped on the next provisioning run. */
+const PAGE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const BodySchema = z.object({
   url: z.string().url(),
   searchQuery: z.string().min(1).max(500).optional(),
   maxPages: z.number().int().min(SCRAPE_FLOOR).max(SCRAPE_CEILING_MAX).default(35),
   rerankThreshold: z.number().min(0).max(1).default(0.4),
+  /** Bypass the per-page cache: re-scrape every candidate from scratch and
+   *  overwrite cached markdown. Wired to the UI's "Scrape from scratch". */
+  forceFresh: z.boolean().default(false),
 });
 
 export interface PrepareScrapeResponse {
@@ -39,6 +46,8 @@ export interface PrepareScrapeResponse {
   urlsMapped: number;
   urlsDroppedByFilter: number;
   pagesScraped: number;
+  /** How many of the scraped pages came from the cache vs fresh Firecrawl. */
+  pagesFromCache: number;
 }
 
 export async function POST(req: NextRequest) {
@@ -55,7 +64,7 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  const { url, searchQuery, maxPages, rerankThreshold } = parsed.data;
+  const { url, searchQuery, maxPages, rerankThreshold, forceFresh } = parsed.data;
 
   const firecrawlKey = process.env.FIRECRAWL_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -90,7 +99,8 @@ export async function POST(req: NextRequest) {
     ceiling: maxPages,
   });
 
-  const firstPass = await scrapeAll(firecrawl, candidates, DEFAULT_CONCURRENCY);
+  const cache: PageCache = { supabase: operator.supabase, forceFresh, hits: 0 };
+  const firstPass = await scrapeAll(firecrawl, candidates, DEFAULT_CONCURRENCY, cache);
   const validFirstPass = firstPass.filter((p) => p.markdown.length > 0);
 
   // One discovery pass: pull internal links out of scraped markdown,
@@ -114,7 +124,7 @@ export async function POST(req: NextRequest) {
         ceiling: remainingBudget,
       });
       if (newCandidates.length > 0) {
-        const more = await scrapeAll(firecrawl, newCandidates, DEFAULT_CONCURRENCY);
+        const more = await scrapeAll(firecrawl, newCandidates, DEFAULT_CONCURRENCY, cache);
         discoveredPages = more.filter((p) => p.markdown.length > 0);
       }
     }
@@ -140,23 +150,81 @@ export async function POST(req: NextRequest) {
     urlsMapped: ranked.length,
     urlsDroppedByFilter: filter.droppedJunk.length + filter.droppedTranslations.length,
     pagesScraped: pages.length,
+    pagesFromCache: cache.hits,
   };
   return Response.json(body);
 }
 
+interface PageCache {
+  supabase: SupabaseClient;
+  /** When true, ignore cached markdown and re-scrape every URL fresh. */
+  forceFresh: boolean;
+  /** Mutated as scrapeAll runs — counts pages served from cache. */
+  hits: number;
+}
+
+interface CachedRow {
+  url: string;
+  markdown: string;
+  scraped_at: string;
+}
+
+/**
+ * Scrape `urls`, reusing the per-page cache (scraped_pages) for any URL
+ * scraped within PAGE_CACHE_TTL_MS. Only cache misses (and, when forceFresh,
+ * everything) hit Firecrawl. Successful fresh scrapes are written back to the
+ * cache so the slow 408-prone pages are paid for at most once.
+ *
+ * Cache reads/writes are best-effort: a Supabase failure degrades to a plain
+ * Firecrawl scrape, never an error.
+ */
 async function scrapeAll(
   firecrawl: ReturnType<typeof createFirecrawlClient>,
   urls: string[],
   concurrency: number,
+  cache: PageCache,
 ): Promise<FirecrawlPage[]> {
+  const canonicalByIndex = urls.map((u) => canonicalizeUrl(u) ?? u);
+
+  // Batch-read the cache once for all candidate URLs.
+  const cached = new Map<string, string>();
+  if (!cache.forceFresh) {
+    try {
+      const { data } = await cache.supabase
+        .from("scraped_pages")
+        .select("url, markdown, scraped_at")
+        .in("url", Array.from(new Set(canonicalByIndex)));
+      const cutoff = Date.now() - PAGE_CACHE_TTL_MS;
+      for (const row of (data ?? []) as CachedRow[]) {
+        if (new Date(row.scraped_at).getTime() >= cutoff && row.markdown.length > 0) {
+          cached.set(row.url, row.markdown);
+        }
+      }
+    } catch (e) {
+      console.warn("scraped_pages cache read failed (non-fatal):", (e as Error).message);
+    }
+  }
+
   const out: FirecrawlPage[] = new Array(urls.length);
+  const freshWrites: { url: string; markdown: string }[] = [];
   let idx = 0;
   const workers = Array.from({ length: Math.min(concurrency, urls.length) }, async () => {
     while (true) {
       const i = idx++;
       if (i >= urls.length) return;
+      const canonical = canonicalByIndex[i]!;
+      const hit = cached.get(canonical);
+      if (hit !== undefined) {
+        out[i] = { url: urls[i]!, markdown: hit };
+        cache.hits++;
+        continue;
+      }
       try {
-        out[i] = await firecrawl.scrape(urls[i]!);
+        const page = await firecrawl.scrape(urls[i]!);
+        out[i] = page;
+        if (page.markdown.length > 0) {
+          freshWrites.push({ url: canonical, markdown: page.markdown });
+        }
       } catch (e) {
         console.warn("firecrawl.scrape failed", urls[i], (e as Error).message);
         out[i] = { url: urls[i]!, markdown: "" };
@@ -164,5 +232,22 @@ async function scrapeAll(
     }
   });
   await Promise.all(workers);
+
+  // Persist successful fresh scrapes for next time (best-effort upsert).
+  if (freshWrites.length > 0) {
+    try {
+      await cache.supabase.from("scraped_pages").upsert(
+        freshWrites.map((w) => ({
+          url: w.url,
+          markdown: w.markdown,
+          scraped_at: new Date().toISOString(),
+        })),
+        { onConflict: "url" },
+      );
+    } catch (e) {
+      console.warn("scraped_pages cache write failed (non-fatal):", (e as Error).message);
+    }
+  }
+
   return out;
 }

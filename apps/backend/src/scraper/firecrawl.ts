@@ -12,10 +12,24 @@ export interface MapOptions {
   includeSubdomains?: boolean;
 }
 
+export interface ScrapeOptions {
+  /**
+   * Per-page Firecrawl timeout in ms. Firecrawl's default (~30s) is too
+   * tight for heavy WordPress clinic pages once our ~4.3s of accordion-
+   * reveal actions are added on top — they return 408 SCRAPE_TIMEOUT.
+   * 45s lets the slow-but-alive pages finish. Bounded so total wall time
+   * stays under the 300s lambda ceiling at concurrency 3 (~5 waves).
+   */
+  timeoutMs?: number;
+}
+
 export interface FirecrawlClient {
   map(url: string, opts?: MapOptions): Promise<string[]>;
-  scrape(url: string): Promise<FirecrawlPage>;
+  scrape(url: string, opts?: ScrapeOptions): Promise<FirecrawlPage>;
 }
+
+/** Default per-page scrape timeout. See ScrapeOptions.timeoutMs. */
+export const DEFAULT_SCRAPE_TIMEOUT_MS = 45000;
 
 export interface CreateFirecrawlClientOptions {
   apiKey?: string;
@@ -108,7 +122,7 @@ export function createFirecrawlClient(opts: CreateFirecrawlClientOptions = {}): 
       return body.links ?? [];
     },
 
-    async scrape(url: string): Promise<FirecrawlPage> {
+    async scrape(url: string, scrapeOpts: ScrapeOptions = {}): Promise<FirecrawlPage> {
       // Universal accordion / dropdown handler — runs on every scrape
       // with zero per-site config. Reveals content hidden behind:
       //   - HTML5 <details> elements (plain HTML, Bootstrap 5)
@@ -125,6 +139,7 @@ export function createFirecrawlClient(opts: CreateFirecrawlClientOptions = {}): 
       }>("/v1/scrape", {
         url,
         formats: ["markdown"],
+        timeout: scrapeOpts.timeoutMs ?? DEFAULT_SCRAPE_TIMEOUT_MS,
         actions: [
           { type: "wait", milliseconds: 2000 },
           {

@@ -91,7 +91,9 @@ async function main(): Promise<void> {
   for (const row of rows) {
     if (!row.provider_agent_id) {
       skipped += 1;
-      console.log(`[lang-backfill] row=${row.id} tenant=${row.tenant_id} skip (no provider_agent_id)`);
+      console.log(
+        `[lang-backfill] row=${row.id} tenant=${row.tenant_id} skip (no provider_agent_id)`,
+      );
       continue;
     }
     const id = row.provider_agent_id;
@@ -124,7 +126,9 @@ async function main(): Promise<void> {
       const toolIdsAfter = Array.isArray(ap?.tool_ids) ? ap.tool_ids.length : 0;
       if (!rulePresent) throw new Error("rule not present after PATCH");
       if (hadToolIds > 0 && toolIdsAfter < hadToolIds) {
-        console.warn(`[lang-backfill] agent=${id} WARNING tool_ids changed ${hadToolIds}->${toolIdsAfter}`);
+        console.warn(
+          `[lang-backfill] agent=${id} WARNING tool_ids changed ${hadToolIds}->${toolIdsAfter}`,
+        );
       }
       ok += 1;
       console.log(
@@ -132,7 +136,9 @@ async function main(): Promise<void> {
       );
     } catch (e) {
       failed += 1;
-      console.error(`[lang-backfill] agent=${id} tenant=${row.tenant_id} FAIL: ${(e as Error).message}`);
+      console.error(
+        `[lang-backfill] agent=${id} tenant=${row.tenant_id} FAIL: ${(e as Error).message}`,
+      );
     }
   }
   console.log(

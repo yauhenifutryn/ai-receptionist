@@ -35,8 +35,8 @@ export default function AccessExpired() {
             Dostęp do demo wygasł.
           </h2>
           <p className="mt-4 text-base leading-relaxed text-neutral-600">
-            Dziękujemy za przetestowanie systemu. Aby przedłużyć dostęp lub w razie pytań, napisz
-            do nas w dowolnej chwili.
+            Dziękujemy za przetestowanie systemu. Aby przedłużyć dostęp lub w razie pytań, napisz do
+            nas w dowolnej chwili.
           </p>
         </div>
 

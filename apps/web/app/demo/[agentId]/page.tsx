@@ -4,6 +4,7 @@ import { DEMO_STRINGS, isDemoLocale, type DemoLocale } from "@/lib/demo-i18n";
 import DemoVoiceClient from "./demo-voice-client";
 import LanguageSwitcher from "./language-switcher";
 import PastSessionsPane from "./past-sessions-pane";
+import AccessExpired from "./access-expired";
 
 interface PageProps {
   params: Promise<{ agentId: string }>;
@@ -16,9 +17,7 @@ export default async function PublicDemoPage({ params, searchParams }: PageProps
   const { agentId } = await params;
   const { pin, lang } = await searchParams;
 
-  if (!pin || !/^\d{4,6}$/.test(pin)) {
-    notFound();
-  }
+  // Truly malformed agent IDs are junk URLs, keep a hard 404 for those.
   if (!/^agent_[A-Za-z0-9]+$/.test(agentId)) {
     notFound();
   }
@@ -32,8 +31,10 @@ export default async function PublicDemoPage({ params, searchParams }: PageProps
     .select("id, pin_code, tenants(display_name)")
     .eq("provider_agent_id", agentId)
     .maybeSingle();
-  if (error || !data || data.pin_code !== pin) {
-    notFound();
+  // Access can't be granted: PIN regenerated (old demo-day link), missing/wrong
+  // PIN, or unknown agent. Show the calm bilingual "expired" page, not a 404.
+  if (error || !data || !pin || data.pin_code !== pin) {
+    return <AccessExpired />;
   }
 
   const tenants = Array.isArray(data.tenants) ? data.tenants[0] : data.tenants;

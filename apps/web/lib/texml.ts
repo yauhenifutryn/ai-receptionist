@@ -16,6 +16,7 @@ export interface GatherOptions {
 }
 
 export function gatherPinTexml({ baseUrl, attempt }: GatherOptions): string {
+  if (/["&<>]/.test(baseUrl)) throw new Error("baseUrl contains XML-unsafe characters");
   const prompt = attempt > 1 ? "pin-invalid.mp3" : "pin-prompt.mp3";
   const action = `${baseUrl}/api/telnyx/demo-line/resolve?attempt=${attempt}`;
   const onSilence = `${baseUrl}/api/telnyx/demo-line?attempt=${attempt + 1}`;
@@ -41,7 +42,7 @@ export interface DialSipOptions {
 
 export function dialSipTexml({ virtualE164, pin }: DialSipOptions): string {
   if (!/^\d{6}$/.test(pin)) throw new Error("pin must be exactly 6 digits");
-  if (!/^\+\d{6,15}$/.test(virtualE164)) throw new Error("virtualE164 must be E.164");
+  if (!/^\+\d{7,15}$/.test(virtualE164)) throw new Error("virtualE164 must be E.164");
   const uri = `sip:${virtualE164}@sip.rtc.elevenlabs.io:5061;transport=tls?X-demo-pin=${pin}`;
   return [XML_HEADER, `<Response>`, `<Dial>`, `<Sip>${uri}</Sip>`, `</Dial>`, `</Response>`].join(
     "",
@@ -49,6 +50,7 @@ export function dialSipTexml({ virtualE164, pin }: DialSipOptions): string {
 }
 
 export function goodbyeTexml(baseUrl: string): string {
+  if (/["&<>]/.test(baseUrl)) throw new Error("baseUrl contains XML-unsafe characters");
   return [
     XML_HEADER,
     `<Response>`,

@@ -22,6 +22,14 @@ describe("gatherPinTexml", () => {
     const xml = gatherPinTexml({ baseUrl: BASE, attempt: 2 });
     expect(xml).toContain(`<Play>${BASE}/ivr/pin-invalid.mp3</Play>`);
   });
+
+  it("at the final attempt, redirect points past the cap (route will goodbye)", () => {
+    const xml = gatherPinTexml({ baseUrl: BASE, attempt: MAX_PIN_ATTEMPTS });
+    expect(xml).toContain(
+      `<Redirect method="POST">${BASE}/api/telnyx/demo-line?attempt=${MAX_PIN_ATTEMPTS + 1}</Redirect>`,
+    );
+    expect(xml).toContain(`<Play>${BASE}/ivr/pin-invalid.mp3</Play>`);
+  });
 });
 
 describe("dialSipTexml", () => {
@@ -48,4 +56,11 @@ describe("goodbyeTexml", () => {
 
 it("exposes the attempt cap used by the routes", () => {
   expect(MAX_PIN_ATTEMPTS).toBe(3);
+});
+
+describe("XML-unsafe baseUrl guard", () => {
+  it("rejects XML-unsafe baseUrl (defense in depth)", () => {
+    expect(() => gatherPinTexml({ baseUrl: 'https://x"y', attempt: 1 })).toThrow();
+    expect(() => goodbyeTexml("https://x&y")).toThrow();
+  });
 });

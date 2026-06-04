@@ -40,8 +40,8 @@ describe("planUnassign", () => {
   it("removing down to one agent → flip back to direct", () => {
     const effects = planUnassign({ currentAgentIds: ["a1", "a2"], removeAgentId: "a2" });
     expect(effects).toEqual([
-      { kind: "delete_assignment", agentId: "a2" },
       { kind: "delete_virtual", agentId: "a2" },
+      { kind: "delete_assignment", agentId: "a2" },
       { kind: "delete_virtual", agentId: "a1" },
       { kind: "bind_real_resource", agentId: "a1" },
       { kind: "point_telnyx_to", target: "fqdn" },
@@ -53,6 +53,7 @@ describe("planUnassign", () => {
     const effects = planUnassign({ currentAgentIds: ["a1"], removeAgentId: "a1" });
     expect(effects).toEqual([
       { kind: "delete_assignment", agentId: "a1" },
+      { kind: "unbind_real_resource" },
       { kind: "set_mode", mode: "direct" },
     ]);
   });
@@ -60,8 +61,8 @@ describe("planUnassign", () => {
   it("removing one of 3+ keeps pin mode", () => {
     const effects = planUnassign({ currentAgentIds: ["a1", "a2", "a3"], removeAgentId: "a3" });
     expect(effects).toEqual([
-      { kind: "delete_assignment", agentId: "a3" },
       { kind: "delete_virtual", agentId: "a3" },
+      { kind: "delete_assignment", agentId: "a3" },
     ]);
   });
 

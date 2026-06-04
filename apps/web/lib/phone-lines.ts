@@ -12,7 +12,8 @@ export type Effect =
   | { kind: "point_telnyx_to"; target: "fqdn" | "texml" }
   | { kind: "set_mode"; mode: "direct" | "pin" }
   | { kind: "insert_assignment"; agentId: string; needsVirtual: boolean }
-  | { kind: "delete_assignment"; agentId: string };
+  | { kind: "delete_assignment"; agentId: string }
+  | { kind: "unbind_real_resource" };
 
 export function planAssign(input: { currentAgentIds: string[]; newAgentId: string }): Effect[] {
   const { currentAgentIds, newAgentId } = input;
@@ -52,25 +53,29 @@ export function planUnassign(input: {
   if (!currentAgentIds.includes(removeAgentId)) throw new Error("agent not assigned to this line");
   const remaining = currentAgentIds.filter((id) => id !== removeAgentId);
   if (remaining.length === 0) {
+    // Last agent: unbind the real EL resource so the line stops answering.
     return [
       { kind: "delete_assignment", agentId: removeAgentId },
+      { kind: "unbind_real_resource" },
       { kind: "set_mode", mode: "direct" },
     ];
   }
   const survivor = remaining[0];
   if (remaining.length === 1 && survivor !== undefined) {
+    // delete_virtual must run BEFORE delete_assignment: it reads the row.
     return [
-      { kind: "delete_assignment", agentId: removeAgentId },
       { kind: "delete_virtual", agentId: removeAgentId },
+      { kind: "delete_assignment", agentId: removeAgentId },
       { kind: "delete_virtual", agentId: survivor },
       { kind: "bind_real_resource", agentId: survivor },
       { kind: "point_telnyx_to", target: "fqdn" },
       { kind: "set_mode", mode: "direct" },
     ];
   }
+  // delete_virtual before delete_assignment: reads the row first.
   return [
-    { kind: "delete_assignment", agentId: removeAgentId },
     { kind: "delete_virtual", agentId: removeAgentId },
+    { kind: "delete_assignment", agentId: removeAgentId },
   ];
 }
 
@@ -89,10 +94,9 @@ export interface LineContext {
   texmlAppId: string; // TELNYX_DEMO_TEXML_APP_ID
 }
 
-/** agentId (our uuid) → provider (EL) agent id + the phone_line_agents row id. */
+/** agentId (our uuid) → provider (EL) agent id. */
 export interface AgentRef {
   providerAgentId: string;
-  rowId: string;
 }
 
 /**
@@ -135,7 +139,7 @@ async function txFetch(path: string, method: string, body?: unknown) {
   return r.json().catch(() => ({}));
 }
 
-/** Random never-dialable identifier; retried on unique-index collision. */
+/** Random never-dialable identifier. No collision retry: ~10^7 space vs tens of rows makes a collision vanishingly unlikely at demo scale; a hit surfaces as a unique-index 502 on assign and a manual retry. */
 function randomVirtualE164(): string {
   const digits = Array.from({ length: 7 }, () => Math.floor(Math.random() * 10)).join("");
   return `+48000${digits}`;
@@ -230,6 +234,21 @@ export async function executeEffects(
         if (error) throw new Error(`phone-lines: delete_assignment → ${error.message}`);
         break;
       }
+
+      case "unbind_real_resource": {
+        // Best-effort: null out the EL real-number's agent binding so the line
+        // stops answering after the last agent is removed.
+        // EL may reject null agent_id — if so, the stale binding is harmless
+        // while Telnyx routing is verified at E2E; revisit with DELETE+reimport if needed.
+        try {
+          await elFetch(`/phone-numbers/${line.elPhoneNumberId}`, "PATCH", { agent_id: null });
+        } catch (e) {
+          console.warn(
+            `phone-lines: unbind_real_resource EL PATCH failed (stale binding left): ${String(e)}`,
+          );
+        }
+        break;
+      }
     }
   }
 }
@@ -247,13 +266,16 @@ async function ensureVirtual(
   supabase: SupabaseClient,
   pendingVirtuals: PendingVirtuals,
 ): Promise<void> {
-  const { providerAgentId, rowId } = mustGet(agents, agentId);
+  const { providerAgentId } = mustGet(agents, agentId);
 
   // Already provisioned (row exists with a virtual)? Idempotent no-op.
+  // Composite-key SELECT: phone_line_agents has no stable single-column PK
+  // we carry in AgentRef; (phone_line_id, agent_id) is the authoritative key.
   const { data: existing, error: selErr } = await supabase
     .from("phone_line_agents")
     .select("el_virtual_e164")
-    .eq("id", rowId)
+    .eq("phone_line_id", line.lineId)
+    .eq("agent_id", agentId)
     .maybeSingle();
   if (selErr) throw new Error(`phone-lines: ensure_virtual select → ${selErr.message}`);
   if (existing?.el_virtual_e164) return;
@@ -266,7 +288,14 @@ async function ensureVirtual(
     provider: "sip_trunk",
     inbound_trunk_config: { media_encryption: "allowed" },
   });
-  const elVirtualPhoneNumberId = String(created?.phone_number_id ?? created?.id ?? "");
+
+  // Guard: EL must return an id; no silent empty-string fallback.
+  const elVirtualPhoneNumberId = created?.phone_number_id ?? created?.id;
+  if (!elVirtualPhoneNumberId) {
+    throw new Error(
+      `phone-lines: EL POST /phone-numbers returned no id; body: ${JSON.stringify(created)}`,
+    );
+  }
 
   // Bind the agent to its virtual resource.
   await elFetch(`/phone-numbers/${elVirtualPhoneNumberId}`, "PATCH", {
@@ -282,7 +311,8 @@ async function ensureVirtual(
         el_virtual_e164: virtualE164,
         el_virtual_phone_number_id: elVirtualPhoneNumberId,
       })
-      .eq("id", rowId);
+      .eq("phone_line_id", line.lineId)
+      .eq("agent_id", agentId);
     if (error) throw new Error(`phone-lines: ensure_virtual update → ${error.message}`);
   } else {
     pendingVirtuals.set(agentId, {
@@ -303,12 +333,16 @@ async function deleteVirtual(
   agents: Map<string, AgentRef>,
   supabase: SupabaseClient,
 ): Promise<void> {
-  const { rowId } = mustGet(agents, agentId);
+  // mustGet validates the agent is known; providerAgentId unused here but
+  // kept in the destructure to surface a missing-agent bug early.
+  mustGet(agents, agentId);
 
+  // Composite-key SELECT: must run before delete_assignment deletes the row.
   const { data: row, error: selErr } = await supabase
     .from("phone_line_agents")
     .select("el_virtual_phone_number_id")
-    .eq("id", rowId)
+    .eq("phone_line_id", line.lineId)
+    .eq("agent_id", agentId)
     .maybeSingle();
   if (selErr) throw new Error(`phone-lines: delete_virtual select → ${selErr.message}`);
 
@@ -322,13 +356,11 @@ async function deleteVirtual(
     }
   }
 
+  // Composite-key UPDATE: null out both virtual columns.
   const { error } = await supabase
     .from("phone_line_agents")
     .update({ el_virtual_e164: null, el_virtual_phone_number_id: null })
-    .eq("id", rowId);
+    .eq("phone_line_id", line.lineId)
+    .eq("agent_id", agentId);
   if (error) throw new Error(`phone-lines: delete_virtual update → ${error.message}`);
-
-  // 'line' is part of the executor's shared signature; referenced for parity
-  // with sibling helpers even though delete keys off the stable row id.
-  void line;
 }

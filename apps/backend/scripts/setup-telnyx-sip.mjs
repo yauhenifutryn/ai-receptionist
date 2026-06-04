@@ -1,6 +1,7 @@
 // Telnyx SIP wiring for the caller agent: outbound voice profile + credential connection
 // (ElevenLabs authenticates against it) + assign the DID (clears "Required for calls").
 // Run: set -a; . ./.env.local; set +a; node apps/backend/scripts/setup-telnyx-sip.mjs
+import { randomBytes } from "node:crypto";
 const KEY = process.env.TELNYX_API_KEY;
 const NUMBER = process.env.TELNYX_CALLER_NUMBER; // +48585006116
 if (!KEY || !NUMBER) throw new Error("Missing TELNYX_API_KEY or TELNYX_CALLER_NUMBER");
@@ -26,8 +27,8 @@ const ovp = await api("POST", "/outbound_voice_profiles", {
 console.log("OVP:", ovp.id);
 
 // 2. Credential connection ElevenLabs uses to authenticate outbound INVITEs.
-const user = `el${Math.random().toString(36).slice(2, 12)}`; // alphanumeric, 4-32
-const pass = `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2).toUpperCase()}`;
+const user = `el${randomBytes(6).toString("hex")}`; // alphanumeric, 14 chars
+const pass = randomBytes(24).toString("hex"); // 192-bit, alphanumeric (Telnyx-safe)
 const conn = await api("POST", "/credential_connections", {
   connection_name: "elevenlabs-caller",
   user_name: user,

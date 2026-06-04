@@ -81,15 +81,20 @@ export default function PhoneLinePanel({ providerAgentId, pinCode }: Props) {
   );
 
   async function handleAssign(line: PhoneLine) {
+    // Guard BEFORE the blocking confirm: keeps every action button disabled
+    // while the dialog is open (review: double-click window).
+    setBusy(true);
+    setError(null);
     const hasExistingAgents = line.phone_line_agents.length >= 1;
     if (hasExistingAgents) {
       const ok = window.confirm(
         "This line will switch to PIN mode — all callers will be asked for a 6-digit code. Continue?",
       );
-      if (!ok) return;
+      if (!ok) {
+        setBusy(false);
+        return;
+      }
     }
-    setBusy(true);
-    setError(null);
     try {
       const res = await fetch("/api/phone-lines/assign", {
         method: "POST",
@@ -182,6 +187,7 @@ export default function PhoneLinePanel({ providerAgentId, pinCode }: Props) {
             </div>
             <div className="flex shrink-0 flex-col items-end gap-2">
               <button
+                type="button"
                 onClick={() => void copyEmailSnippet(deployedLine)}
                 disabled={busy}
                 className="rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -189,6 +195,7 @@ export default function PhoneLinePanel({ providerAgentId, pinCode }: Props) {
                 {copied ? "Copied ✓" : "Copy email snippet"}
               </button>
               <button
+                type="button"
                 onClick={() => void handleUnassign(deployedLine)}
                 disabled={busy}
                 className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -233,6 +240,7 @@ export default function PhoneLinePanel({ providerAgentId, pinCode }: Props) {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => void handleAssign(line)}
                 disabled={busy}
                 className="shrink-0 rounded-full bg-neutral-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"

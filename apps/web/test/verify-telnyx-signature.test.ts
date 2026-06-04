@@ -37,7 +37,26 @@ describe("verifyTelnyxSignature", () => {
   });
 
   it("rejects when no public key is configured", () => {
-    const res = verifyTelnyxSignature(body, "sig", "0", { publicKey: undefined });
+    const res = verifyTelnyxSignature(body, "sig", String(Math.floor(Date.now() / 1000)), {
+      publicKey: undefined,
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.reason).toContain("not configured");
+  });
+
+  it("rejects a malformed base64 signature", () => {
+    const ts = String(Math.floor(Date.now() / 1000));
+    const { publicKeyB64 } = makeKeyAndSign(body, ts);
+    const res = verifyTelnyxSignature(body, "not!valid!base64!!!!", ts, {
+      publicKey: publicKeyB64,
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects a wrong-length public key", () => {
+    const ts = String(Math.floor(Date.now() / 1000));
+    const shortKey = Buffer.alloc(16).toString("base64");
+    const res = verifyTelnyxSignature(body, "anysig", ts, { publicKey: shortKey });
     expect(res.ok).toBe(false);
   });
 });

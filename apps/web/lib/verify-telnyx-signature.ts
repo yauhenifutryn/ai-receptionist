@@ -49,6 +49,8 @@ export function verifyTelnyxSignature(
     );
     return valid ? { ok: true } : { ok: false, reason: "signature mismatch" };
   } catch (e) {
-    return { ok: false, reason: `verification threw: ${(e as Error).message}` };
+    // Log detail server-side; never surface OpenSSL/Node internals to callers.
+    console.error("[verify-telnyx] verification threw:", (e as Error).message);
+    return { ok: false, reason: "verification failed" };
   }
 }

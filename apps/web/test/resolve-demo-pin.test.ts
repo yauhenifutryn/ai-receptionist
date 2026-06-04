@@ -18,7 +18,10 @@ describe("pickAgentByPin", () => {
   });
 
   it("never matches agents with a rotated (null) pin", () => {
+    // Empty string: caught by the format guard.
     expect(pickAgentByPin(assignments, "")).toBeNull();
+    // Valid 6-digit input vs a3 (pinCode null): caught by the null-pin guard.
+    expect(pickAgentByPin(assignments, "000000")).toBeNull();
   });
 
   it("rejects malformed digits (length, non-numeric)", () => {

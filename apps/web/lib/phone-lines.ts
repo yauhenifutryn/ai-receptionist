@@ -258,6 +258,12 @@ export async function executeEffects(
  * el_virtual_e164 we do nothing. Otherwise: create the EL resource for a
  * never-dialable E.164, bind the agent to it, then persist — UPDATE the row if
  * it exists, else stash in the request-scoped pending map for insert_assignment.
+ *
+ * Known race (accepted at demo scale): two concurrent assigns for the same
+ * (line, agent) can both pass the DB read and both POST an EL resource before
+ * the unique index rejects the second insert — leaving one orphaned EL
+ * phone-number resource. Orphans are visible in the EL dashboard and safe to
+ * delete manually. Guard with a pg advisory lock if this ever runs multi-operator.
  */
 async function ensureVirtual(
   agentId: string,

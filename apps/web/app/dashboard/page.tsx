@@ -73,6 +73,21 @@ export default async function DashboardPage() {
     };
   });
 
+  // Phone-line deployment badges: build a map of agent_id → {e164, mode}.
+  const { data: lineAgentRows } = await supabase
+    .from("phone_line_agents")
+    .select("agent_id, phone_lines(e164, mode)");
+  const phoneLineMap = new Map<string, { e164: string; mode: string }>();
+  for (const row of lineAgentRows ?? []) {
+    const pl = Array.isArray(row.phone_lines) ? row.phone_lines[0] : row.phone_lines;
+    if (pl && pl.e164) {
+      phoneLineMap.set(row.agent_id as string, {
+        e164: pl.e164 as string,
+        mode: pl.mode as string,
+      });
+    }
+  }
+
   // Resolve provisioner display names via service-role read of operators table.
   // (operators RLS may not be permissive to all operators; service-role
   // ensures cross-operator dashboards always render owner names.)
@@ -205,11 +220,21 @@ export default async function DashboardPage() {
                       {a.phone_number ?? <span className="text-neutral-300">— unset</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <AgentDemoActions
-                        providerAgentId={a.provider_agent_id}
-                        initialPin={a.pin_code}
-                        origin={origin}
-                      />
+                      <div className="flex flex-col gap-1.5">
+                        <AgentDemoActions
+                          providerAgentId={a.provider_agent_id}
+                          initialPin={a.pin_code}
+                          origin={origin}
+                        />
+                        {phoneLineMap.has(a.id) ? (
+                          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] text-emerald-800">
+                            &#9990; {phoneLineMap.get(a.id)!.e164}
+                            {phoneLineMap.get(a.id)!.mode === "pin" ? (
+                              <span className="text-amber-700"> &middot; PIN</span>
+                            ) : null}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs uppercase tracking-wider text-neutral-500">
                       {a.default_language}

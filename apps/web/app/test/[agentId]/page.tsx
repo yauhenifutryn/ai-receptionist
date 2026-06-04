@@ -9,6 +9,7 @@ import ELAnalysisStatusCard from "./el-analysis-status-card";
 import DemoAccessPanel from "./demo-access-panel";
 import OwnerInvitePanel from "./owner-invite-panel";
 import PhoneNumberPanel from "./phone-number-panel";
+import PhoneLinePanel from "./phone-line-panel";
 import TestAgentClient from "./test-client";
 
 interface PageProps {
@@ -76,6 +77,7 @@ export default async function TestAgentPage({ params }: PageProps) {
         providerAgentId={agentId}
         existingPhoneNumber={agentRow?.phone_number ?? null}
       />
+      <PhoneLinePanel providerAgentId={agentId} pinCode={agentRow?.pin_code ?? null} />
       <OwnerInvitePanel agentId={agentId} />
       <AgentManagementPanel providerAgentId={agentId} tenantDisplayName={tenantDisplayName} />
       <TestAgentClient agentId={agentId} />

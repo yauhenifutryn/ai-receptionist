@@ -3,6 +3,7 @@ import { getServiceRoleSupabase } from "@/lib/supabase-server";
 import { gatherPinTexml, dialSipTexml, goodbyeTexml, MAX_PIN_ATTEMPTS } from "@/lib/texml";
 import { verifyTelnyxSignature } from "@/lib/verify-telnyx-signature";
 import { pickAgentByPin, type LineAssignment } from "@/lib/resolve-demo-pin";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,24 +27,52 @@ export async function POST(req: NextRequest) {
   const params = new URLSearchParams(rawBody);
   const digits = params.get("Digits") ?? "";
   const to = params.get("To") ?? "";
-  const attempt = Number(req.nextUrl.searchParams.get("attempt") ?? "1") || 1;
+  const rawAttempt = Number(req.nextUrl.searchParams.get("attempt") ?? "1");
+  const attempt =
+    Number.isFinite(rawAttempt) && rawAttempt >= 1
+      ? Math.min(Math.ceil(rawAttempt), MAX_PIN_ATTEMPTS + 1)
+      : 1;
+
+  // Rate-limit: both the initial route (route.ts) and this resolve route share the
+  // same "demo-line:${from}" bucket intentionally — one funnel. A normal successful
+  // call costs 2 of the 5 hourly tokens (1 initial POST + 1 resolve POST), so a
+  // caller can still complete 2 full demo calls per hour before being gated.
+  const from = params.get("From") ?? "unknown";
+  const limited = checkRateLimit({
+    key: `demo-line:${from}`,
+    maxAttempts: 5,
+    windowSec: 3600,
+  });
+  if (!limited.allowed) {
+    console.warn(`demo-line: rate-limited caller ***${from.slice(-3)}`);
+    return xml(goodbyeTexml(base));
+  }
 
   const supabase = getServiceRoleSupabase();
-  const { data: line } = await supabase
+  const { data: line, error: lineErr } = await supabase
     .from("phone_lines")
     .select("id, mode")
     .eq("e164", to)
     .eq("status", "active")
     .maybeSingle();
+  if (lineErr) {
+    // DB outage must not masquerade as "unknown number" — log code only (no PII).
+    console.error("demo-line: phone_lines query error", lineErr.code);
+    return xml(goodbyeTexml(base));
+  }
   if (!line) {
     console.log("demo-line: no active line for dialed number");
     return xml(goodbyeTexml(base));
   }
 
-  const { data: rows } = await supabase
+  const { data: rows, error: rowsErr } = await supabase
     .from("phone_line_agents")
     .select("agent_id, el_virtual_e164, agents(provider_agent_id, pin_code)")
     .eq("phone_line_id", line.id);
+  if (rowsErr) {
+    console.error("demo-line: phone_line_agents query error", rowsErr.code);
+    return xml(goodbyeTexml(base));
+  }
 
   const assignments: LineAssignment[] = (rows ?? []).map((r) => {
     const agent = Array.isArray(r.agents) ? r.agents[0] : r.agents;
@@ -65,7 +94,15 @@ export async function POST(req: NextRequest) {
 }
 
 function baseUrl(req: NextRequest): string {
-  return process.env.DEMO_LINE_BASE_URL ?? new URL(req.url).origin;
+  const envBase = process.env.DEMO_LINE_BASE_URL;
+  if (envBase) return envBase;
+  const origin = new URL(req.url).origin;
+  if (process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production") {
+    // Behind Vercel's proxy the request origin is not the public hostname;
+    // TeXML audio/callback URLs built from it will be unreachable by Telnyx.
+    console.error("demo-line: DEMO_LINE_BASE_URL unset in production; TeXML URLs likely broken");
+  }
+  return origin;
 }
 
 function xml(body: string, status = 200): Response {

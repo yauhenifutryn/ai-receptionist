@@ -36,17 +36,29 @@ export async function POST(req: NextRequest) {
     windowSec: 3600,
   });
   if (!limited.allowed) {
-    console.log(`demo-line: rate-limited caller ***${from.slice(-3)}`);
+    console.warn(`demo-line: rate-limited caller ***${from.slice(-3)}`);
     return xml(goodbyeTexml(base));
   }
 
-  const attempt = Number(req.nextUrl.searchParams.get("attempt") ?? "1") || 1;
+  const rawAttempt = Number(req.nextUrl.searchParams.get("attempt") ?? "1");
+  const attempt =
+    Number.isFinite(rawAttempt) && rawAttempt >= 1
+      ? Math.min(Math.ceil(rawAttempt), MAX_PIN_ATTEMPTS + 1)
+      : 1;
   if (attempt > MAX_PIN_ATTEMPTS) return xml(goodbyeTexml(base));
   return xml(gatherPinTexml({ baseUrl: base, attempt }));
 }
 
 function baseUrl(req: NextRequest): string {
-  return process.env.DEMO_LINE_BASE_URL ?? new URL(req.url).origin;
+  const envBase = process.env.DEMO_LINE_BASE_URL;
+  if (envBase) return envBase;
+  const origin = new URL(req.url).origin;
+  if (process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production") {
+    // Behind Vercel's proxy the request origin is not the public hostname;
+    // TeXML audio/callback URLs built from it will be unreachable by Telnyx.
+    console.error("demo-line: DEMO_LINE_BASE_URL unset in production; TeXML URLs likely broken");
+  }
+  return origin;
 }
 
 function xml(body: string, status = 200): Response {

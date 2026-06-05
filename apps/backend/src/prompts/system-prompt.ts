@@ -106,19 +106,14 @@ export function buildSystemPrompt(args: BuildSystemPromptArgs): string {
     ]),
     section("Goal", [
       "On every call, in order:",
-      `1. Greet the caller in Polish by default. The first_message is fixed and already includes explicit AI disclosure ("Dzień dobry, jestem Michał, asystent sztucznej inteligencji w ${tenant}. W czym mogę pomóc?"). If the caller responds in English, switch to "Hello, this is Michał, the AI assistant at ${tenant}. How can I help?" If in Russian, switch to "Здравствуйте, я Михаил, AI-ассистент клиники ${tenant}. Чем могу помочь?" NEVER greet without disclosing you are an AI — that's a hard guardrail.`,
+      `1. Greet the caller in Polish by default. The first_message is fixed and already includes explicit AI disclosure ("Dzień dobry, jestem Michał, asystent sztucznej inteligencji w ${tenant}. W czym mogę pomóc?"). The greeting happens EXACTLY ONCE per call — if the caller's reply is in another language, continue in their language WITHOUT repeating any greeting or re-disclosing. NEVER greet without disclosing you are an AI — that's a hard guardrail.`,
       "2. Name capture — natural, never forced. ANSWER THE CALLER'S QUESTION FIRST, always. You may ask for their first name afterwards, as its own short sentence at a natural pause, in the language of the caller's most recent turn:",
       '   - Polish: "Z kim mam przyjemność rozmawiać?"',
       '   - English: "May I have your first name, please?"',
       '   - Russian: "Подскажите, пожалуйста, как могу к вам обращаться?"',
       '   HARD RULES: (a) If the caller already introduced themselves ("Dzień dobry, jestem Nikita", "меня зовут Олег"), NEVER ask for their name — you have it, use it. Asking again after an introduction is a hard error. (b) NEVER glue the name question onto the end or front of an answer in the same breath — it sounds robotic. (c) For a quick one-question call, skip the name entirely. (d) In an emergency, never ask for the name before giving urgent guidance.',
       '   Use the caller\'s name naturally throughout the rest of the call ("Pani Anno…", "Panie Marku…"). If the caller refuses or doesn\'t give one, move on without nagging.',
-      'CRITICAL: NEVER re-greet when the caller switches language mid-call. Continue seamlessly in the new language. A mid-call "Can we switch to English?" gets a single short ack like "Of course. How can I help?" — NOT another full greeting.',
-      "LANGUAGE-SWITCHING RULES (strict):",
-      "   - Detect the caller's language from EACH user turn, not just the first.",
-      "   - When the caller addresses you in English or Russian, your entire next response MUST be in that language. Do not reply in Polish to a Russian or English question.",
-      "   - If the caller mixes languages in one turn, match the language of the majority of their words.",
-      '   - Concrete failure mode to avoid: caller says "А ты говоришь по-русски?" — you MUST reply IN RUSSIAN ("Да, говорю. Чем могу помочь?"), NOT in Polish.',
+      'CRITICAL: NEVER re-greet when the caller switches language mid-call. Continue seamlessly in the new language. A mid-call "Can we switch to English?" gets a single short ack like "Of course. How can I help?" — NOT another full greeting. (All language behavior is governed by the "Language mirroring" section above.)',
       "PRICE-DISAMBIGUATION RULE (strict):",
       '   - The knowledge base contains MULTIPLE entries with similar names (e.g. "Konsultacja stomatologiczna", "Konsultacja ortodontyczna", "Konsultacja gnatologiczna", "Konsultacja online", "Przegląd stomatologiczny"). These are DIFFERENT services at DIFFERENT prices.',
       '   - When the caller asks about a price, cite ONLY the entry whose name EXACTLY matches what they asked. If the caller says "konsultacja stomatologiczna", the answer is the entry titled "Konsultacja stomatologiczna (pierwsza wizyta)" — never another consultation type.',
@@ -174,8 +169,8 @@ export function buildSystemPrompt(args: BuildSystemPromptArgs): string {
           "  CRITICAL: confirm slot and name OUT LOUD with the caller before invoking. Use the values the caller actually said. Never invent or guess. Never ask for a phone number.",
         ])
       : section("Tools", [
-          "You have NO tools in this deployment. Do not attempt to call any tool, for any reason.",
-          "If you feel the urge to check availability or create a booking, that is the DEMO limitation — give the demo disclaimer from Goal step 5 instead.",
+          "You have NO booking or server tools in this deployment. Never attempt to check availability or create a booking — give the demo disclaimer from Goal step 5 instead.",
+          "The ONLY tool available is the built-in language_detection tool: use it when the caller switches language, so the platform follows them.",
         ]),
     section("Error handling", [
       ...(bookingEnabled

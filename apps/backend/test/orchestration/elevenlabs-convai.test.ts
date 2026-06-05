@@ -142,11 +142,20 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     expect(agent.first_message).not.toContain("zachowanie zapisu");
     expect(agent.disable_first_message_interruptions).toBe(false);
     expect((conv.tts as Record<string, unknown>).model_id).toBe("eleven_flash_v2_5");
-    // 2026-05-22 final calibration after A/B vs extreme test on Dynasty.
+    // 2026-05-22 calibration (stability/similarity); 2026-06-05 latency audit
+    // (speed 1.0, max streaming optimization, RAG on, turn 3s/eager).
     expect((conv.tts as Record<string, unknown>).stability).toBe(0.7);
-    expect((conv.tts as Record<string, unknown>).speed).toBe(0.9);
+    expect((conv.tts as Record<string, unknown>).speed).toBe(1.0);
+    expect((conv.tts as Record<string, unknown>).optimize_streaming_latency).toBe(4);
     expect((conv.tts as Record<string, unknown>).similarity_boost).toBe(0.8);
     expect((conv.asr as Record<string, unknown>).provider).toBe("scribe_realtime");
+    const rag = (prompt as Record<string, any>).rag;
+    expect(rag.enabled).toBe(true);
+    expect(rag.embedding_model).toBe("multilingual_e5_large_instruct");
+    expect(rag.max_retrieved_rag_chunks_count).toBe(12);
+    const turn = conv.turn as Record<string, unknown>;
+    expect(turn.turn_timeout).toBe(3);
+    expect(turn.turn_eagerness).toBe("eager");
 
     expect((prompt.prompt as string).toLowerCase()).toContain("klinika łapka");
     // Option B consent pivot 2026-05-22: consent question removed from the

@@ -139,6 +139,17 @@ export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 // audible cause of the "calm in literature" register the user disliked.
 export const DEFAULT_TTS_MODEL_ID = "eleven_flash_v2_5";
 
+// 2026-06-05 latency audit: with rag.enabled=false EL stuffs ALL attached KB
+// docs (~88k chars for Dynasty) into the prompt EVERY turn — ~30k tokens of
+// prefill, measured +1s LLM TTFB on every model tested. RAG retrieval costs
+// ~0.15s and cuts the per-turn prompt to the retrieved chunks. Multilingual
+// embedder: Russian/English callers query Polish KB text (a RU hygiene-price
+// retrieval miss reproduced until this embedder + a KB-structure fix landed).
+// Chunk count 12: at 6 the doctor-name fact lost its retrieval slot; 20 (EL
+// default) showed no measured TTFB gain over 12.
+export const RAG_EMBEDDING_MODEL = "multilingual_e5_large_instruct";
+export const RAG_MAX_CHUNKS = 12;
+
 // Kept as an exported interface so older imports (backfill script, tests)
 // don't break. We no longer ship any tags by default — the empty array is
 // passed through to EL so the agent uses the voice's natural register.
@@ -330,6 +341,29 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
     if (!documentId) {
       throw new Error("ElevenLabs upload returned no document id");
     }
+    // Build the RAG index immediately so agents provisioned with this doc can
+    // retrieve from it (rag.enabled=true is the provisioning default since the
+    // 2026-06-05 latency audit). Non-fatal: the index computes asynchronously
+    // server-side; we poll briefly and warn instead of failing the upload.
+    try {
+      await this.request("POST", `/v1/convai/knowledge-base/${documentId}/rag-index`, {
+        model: RAG_EMBEDDING_MODEL,
+      });
+      for (let i = 0; i < 12; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        const status = await this.request<{
+          indexes?: Array<{ model?: string; status?: string }>;
+        }>("GET", `/v1/convai/knowledge-base/${documentId}/rag-index`);
+        const idx = (status.indexes ?? []).find((x) => x.model === RAG_EMBEDDING_MODEL);
+        if (idx?.status === "succeeded") break;
+        if (idx?.status === "failed") {
+          console.warn(`[elevenlabs] RAG index failed for ${documentId}`);
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn(`[elevenlabs] RAG indexing skipped for ${documentId}: ${(e as Error).message}`);
+    }
     return { documentId };
   }
 
@@ -433,6 +467,14 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
               built_in_tools: {
                 language_detection: { name: "language_detection", description: "" },
               },
+              // RAG ON (2026-06-05 latency audit) — see RAG_EMBEDDING_MODEL
+              // comment. rag.enabled=false silently prompt-stuffs every
+              // attached doc, costing ~1s of LLM TTFB per turn.
+              rag: {
+                enabled: true,
+                embedding_model: RAG_EMBEDDING_MODEL,
+                max_retrieved_rag_chunks_count: RAG_MAX_CHUNKS,
+              },
             },
             language,
           },
@@ -457,19 +499,19 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
             // family. expressive_mode false + no audio tags = the voice's
             // natural register.
             //
-            // 2026-05-22 final calibration (confirmed by A/B test against
-            // extreme 0.9/0.7 on Dynasty): the dial is real and audible —
-            // earlier 0.6/0.95 nudge was simply too subtle. Locking
-            // stability 0.7, speed 0.9, similarity 0.8 as production
-            // defaults — clearly stable + perceptibly unhurried + slightly
-            // tighter voice match than the EL default.
+            // 2026-05-22 calibration locked stability 0.7 / similarity 0.8.
+            // 2026-06-05 latency audit: speed 0.9 → 1.0 — the "unhurried"
+            // register read as sluggish on real phone calls once response
+            // latency was fixed; founder ear-test preferred 1.0. Streaming
+            // latency optimization maxed (4) for the same reason.
             model_id: DEFAULT_TTS_MODEL_ID,
             voice_id: voiceId,
             expressive_mode: false,
             suggested_audio_tags: [],
             stability: 0.7,
             similarity_boost: 0.8,
-            speed: 0.9,
+            speed: 1.0,
+            optimize_streaming_latency: 4,
           },
           asr: {
             // `scribe_realtime` is ElevenLabs' streaming ASR (their newest):
@@ -481,7 +523,13 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
             quality: "high",
             user_input_audio_format: "pcm_16000",
           },
-          turn: { turn_timeout: 7, mode: "turn" },
+          // 2026-06-05 latency audit: turn_v2 intermittently fails to detect
+          // end-of-speech on the SIP path and falls back to turn_timeout —
+          // measured 8s dead-air gaps that matched the founder's "5-7s"
+          // complaint exactly (LLM+TTS were <1s in the same turns). 3s caps
+          // the worst case; eager fires detection sooner. Pilot note: 3s may
+          // talk over very slow elderly speakers — consider 4-5s per-clinic.
+          turn: { turn_timeout: 3, mode: "turn", turn_eagerness: "eager" },
         },
         platform_settings: {
           privacy: {

@@ -100,6 +100,7 @@ export function buildSystemPrompt(args: BuildSystemPromptArgs): string {
       "Speak naturally and conversationally. Keep replies to ONE or TWO short sentences. The caller is on a phone — long answers are painful.",
       "Do NOT use markdown, bullet points, lists, asterisks, or emojis — your output is read aloud by a text-to-speech engine. Write in plain prose only.",
       'Numbers, prices, and times: say them as a human would ("sto osiemdziesiąt złotych" or "o dziesiątej rano"), not as digits.',
+      'Phone numbers: NEVER write them as one digit blob like "+48576676266" — the speech engine reads that badly. Write them digit by digit in words, grouped in twos and threes, in the caller\'s language: "plus cztery osiem, pięć siedem sześć, sześć siedem sześć, dwa sześć sześć" / "плюс четыре восемь, пять семь шесть, шесть семь шесть, два шесть шесть" / "plus four eight, five seven six, six seven six, two six six".',
       "Pause between distinct thoughts so the caller can interrupt. Never deliver a monologue.",
       "Match the caller's register: formal Pan/Pani by default; relax only if they do.",
     ]),

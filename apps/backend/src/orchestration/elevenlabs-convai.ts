@@ -116,13 +116,17 @@ export function buildGuardrails(bookingEnabled: boolean): Record<string, unknown
  */
 
 export const DEFAULT_VOICE_ID = "mr1ubFaLs5xVrh1EqWtc";
-// 2026-06-05 big bake-off (4 finalists × 26 sims, hand-verified failures —
-// docs/engineering/llm-bakeoff-2026-06-05.md): gemini-2.5-flash-lite 26/26
-// (only model to pass the ≥25/26 gate; aced mid-call PL→RU switching 6/6),
-// qwen35-397b 24/26, haiku-4-5 20/26 (0/6 mid-call switch!), gemini-2.5-flash
-// 18/26. flash-lite is also the cheapest (~$0.0153/min) and ~599ms. Re-run the
-// bench before changing; EL test suite (EL_DEFAULT_TEST_IDS) is the gate.
-export const DEFAULT_AGENT_LLM = "gemini-2.5-flash-lite";
+// 2026-06-05 SEMANTIC re-bench (6 models × 20 sims, every transcript human-read
+// — docs/engineering/llm-bakeoff-2026-06-05.md). This REVERSED the earlier
+// regex-scored verdict: flash-lite (previous pick) never named the requested
+// doctor, quoted the children's hygiene price to adults, and phrased answers
+// mechanically (matched live-call complaints). gemini-2.5-flash was the ONLY
+// model with zero fact errors and clean honest deflections; qwen397 fabricated
+// a price bound once (disqualifying), haiku promised callbacks it can't make
+// + costs 10x, gpt-5.4-mini mixes PL/RU inside sentences (unspeakable by TTS).
+// Console: flash ~776ms / $0.0230/min. Re-run the bench before changing;
+// EL test suite (EL_DEFAULT_TEST_IDS) is the gate.
+export const DEFAULT_AGENT_LLM = "gemini-2.5-flash";
 export const DEFAULT_AGENT_TEMPERATURE = 0.3;
 export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 

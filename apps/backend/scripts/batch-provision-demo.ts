@@ -51,14 +51,15 @@ const firecrawl = createFirecrawlClient({ apiKey: env("FIRECRAWL_API_KEY") });
 const llm = new LLMClient(createGeminiProvider({ apiKey: env("GEMINI_API_KEY") }), {});
 const provider = new ElevenLabsConvAIProvider({ apiKey: env("ELEVENLABS_API_KEY") });
 
-// Operator id for audit columns: reuse the id that provisioned the fleet.
-const { data: anyAgent } = await supabase
-  .from("agents")
-  .select("provisioned_by_user_id")
-  .not("provisioned_by_user_id", "is", null)
-  .limit(1)
+// Operator id for audit columns: resolve by email. Picking "any agent row"
+// here once mis-attributed a batch to another operator (Rem) — never again.
+const OPERATOR_EMAIL = process.env.BATCH_OPERATOR_EMAIL ?? "yauheni.futryn@gmail.com";
+const { data: operator } = await supabase
+  .from("operators")
+  .select("user_id")
+  .eq("email", OPERATOR_EMAIL)
   .single();
-const operatorId = anyAgent?.provisioned_by_user_id ?? null;
+const operatorId = operator?.user_id ?? null;
 
 async function generatePin(agentRowId: string): Promise<string> {
   for (let i = 0; i < 5; i++) {

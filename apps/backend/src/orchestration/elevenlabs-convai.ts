@@ -116,12 +116,12 @@ export function buildGuardrails(bookingEnabled: boolean): Record<string, unknown
  */
 
 export const DEFAULT_VOICE_ID = "mr1ubFaLs5xVrh1EqWtc";
-// 2026-06-05: swapped qwen36-35b-a3b → claude-haiku-4-5 (the documented
-// fallback in PROJECT_LOG "if Polish quality disappoints"). Qwen drifted to
-// English on Polish input ~1/3 of simulations even after prompt hardening
-// (always the English name-capture phrase); Haiku went 4/4 Polish + clean RU.
-// Cost ~3×, latency ~223ms→~676ms model-side — correctness wins for demos.
-export const DEFAULT_AGENT_LLM = "claude-haiku-4-5";
+// 2026-06-05 model bake-off on the PL-mirroring failure (plain Polish question
+// answered in English): qwen36-35b-a3b failed 3/4 even after prompt hardening
+// and the switch-on-ask rule; claude-haiku-4-5 4/4 but ~676ms; gemini-2.5-flash
+// 4/4 PL + 2/2 RU, faster and cheaper than Haiku. Re-benchmark before changing:
+// the EL test suite (EL_DEFAULT_TEST_IDS) is the regression gate.
+export const DEFAULT_AGENT_LLM = "gemini-2.5-flash";
 export const DEFAULT_AGENT_TEMPERATURE = 0.3;
 export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 

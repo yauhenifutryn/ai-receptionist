@@ -35,12 +35,14 @@ export async function POST(req: NextRequest) {
 
   // Rate-limit: both the initial route (route.ts) and this resolve route share the
   // same "demo-line:${from}" bucket intentionally — one funnel. A normal successful
-  // call costs 2 of the 5 hourly tokens (1 initial POST + 1 resolve POST), so a
-  // caller can still complete 2 full demo calls per hour before being gated.
+  // call costs 2 hourly tokens (1 initial POST + 1 resolve POST). 15/hr ≈ 7 full
+  // demo calls per hour: enough for a prospect re-dialing and retrying PINs
+  // (2026-06-05: the original 5/hr locked out the founder mid-test), while PIN
+  // brute force stays bounded at ~21 guesses/hr against a 1M namespace.
   const from = params.get("From") ?? "unknown";
   const limited = checkRateLimit({
     key: `demo-line:${from}`,
-    maxAttempts: 5,
+    maxAttempts: 15,
     windowSec: 3600,
   });
   if (!limited.allowed) {

@@ -30,9 +30,10 @@ export async function POST(req: NextRequest) {
 
   const params = new URLSearchParams(rawBody);
   const from = params.get("From") ?? "unknown";
+  // 15/hr shared with the resolve route — see the rationale comment there.
   const limited = checkRateLimit({
     key: `demo-line:${from}`,
-    maxAttempts: 5,
+    maxAttempts: 15,
     windowSec: 3600,
   });
   if (!limited.allowed) {

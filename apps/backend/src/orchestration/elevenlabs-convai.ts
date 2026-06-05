@@ -116,12 +116,13 @@ export function buildGuardrails(bookingEnabled: boolean): Record<string, unknown
  */
 
 export const DEFAULT_VOICE_ID = "mr1ubFaLs5xVrh1EqWtc";
-// 2026-06-05 model bake-off on the PL-mirroring failure (plain Polish question
-// answered in English): qwen36-35b-a3b failed 3/4 even after prompt hardening
-// and the switch-on-ask rule; claude-haiku-4-5 4/4 but ~676ms; gemini-2.5-flash
-// 4/4 PL + 2/2 RU, faster and cheaper than Haiku. Re-benchmark before changing:
-// the EL test suite (EL_DEFAULT_TEST_IDS) is the regression gate.
-export const DEFAULT_AGENT_LLM = "gemini-2.5-flash";
+// 2026-06-05 big bake-off (4 finalists × 26 sims, hand-verified failures —
+// docs/engineering/llm-bakeoff-2026-06-05.md): gemini-2.5-flash-lite 26/26
+// (only model to pass the ≥25/26 gate; aced mid-call PL→RU switching 6/6),
+// qwen35-397b 24/26, haiku-4-5 20/26 (0/6 mid-call switch!), gemini-2.5-flash
+// 18/26. flash-lite is also the cheapest (~$0.0153/min) and ~599ms. Re-run the
+// bench before changing; EL test suite (EL_DEFAULT_TEST_IDS) is the gate.
+export const DEFAULT_AGENT_LLM = "gemini-2.5-flash-lite";
 export const DEFAULT_AGENT_TEMPERATURE = 0.3;
 export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 

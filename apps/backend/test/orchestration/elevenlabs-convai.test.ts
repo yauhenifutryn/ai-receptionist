@@ -38,8 +38,10 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
 
   it("provisionAgent POSTs hardened privacy + locked voice + tool_ids", async () => {
     // EL ConvAI deprecated inline `prompt.tools: [...]` in favor of a
-    // workspace catalog referenced by `prompt.tool_ids`. provisionAgent now
-    // calls ensureBookingTools() first to get the ids, then attaches them.
+    // workspace catalog referenced by `prompt.tool_ids`. provisionAgent
+    // calls ensureBookingTools() first to get the ids, then attaches them —
+    // but ONLY when bookingEnabled (2026-06-05: demo deployments get no
+    // tools; a dead tool webhook killed a live call).
     // The 3 GET/POST traffic for the catalog comes first; agents/create last.
     const fetcher = vi
       .fn()
@@ -75,6 +77,7 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
       knowledgeBaseDocumentIds: ["doc-1", "doc-2"],
       serverToolBaseUrl: "https://backend.example.com",
       postCallWebhookUrl: "https://backend.example.com/post-call",
+      bookingEnabled: true,
     });
     expect(result.agentId).toBe("agent-77");
     expect(result.browserTestUrl).toContain("agent-77");
@@ -152,22 +155,9 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
   });
 
   it("provisionAgent applies a caller-provided voice override when given", async () => {
-    // Two catalog GETs + one agents/create POST. Tools already exist so no
-    // catalog POSTs.
-    const catalogListFactory = () =>
-      Promise.resolve(
-        jsonResponse({
-          tools: [
-            { id: "tool_ca", tool_config: { name: "check_availability" } },
-            { id: "tool_cb", tool_config: { name: "create_booking" } },
-          ],
-        }),
-      );
-    const fetcher = vi
-      .fn()
-      .mockImplementationOnce(catalogListFactory)
-      .mockImplementationOnce(catalogListFactory)
-      .mockResolvedValueOnce(jsonResponse({ agent_id: "agent-1" }));
+    // Demo default (bookingEnabled absent): no catalog traffic at all —
+    // agents/create is the ONLY call.
+    const fetcher = vi.fn().mockResolvedValueOnce(jsonResponse({ agent_id: "agent-1" }));
     const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });
     await provider.provisionAgent({
       tenantId: "t-1",
@@ -183,6 +173,38 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     const body = parseBody(fetcher.mock.calls[createIdx] as [unknown, RequestInit | undefined]);
     const conv = body.conversation_config as Record<string, Record<string, unknown>>;
     expect((conv.tts as Record<string, unknown>).voice_id).toBe("custom-voice-xyz");
+  });
+
+  it("provisionAgent in demo mode (default) binds NO tools and ships the demo disclaimer", async () => {
+    // Invariant: a demo agent never gets booking tools — a tool call against
+    // a dead webhook killed a live call. The prompt explains the limitation.
+    const fetcher = vi.fn().mockResolvedValueOnce(jsonResponse({ agent_id: "agent-demo" }));
+    const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });
+    await provider.provisionAgent({
+      tenantId: "t-1",
+      tenantDisplayName: "Klinika Demo",
+      knowledgeBaseDocumentIds: [],
+      serverToolBaseUrl: "https://x",
+      postCallWebhookUrl: "https://x/p",
+    });
+    // No workspace-catalog traffic: agents/create is the FIRST call (the
+    // second is the post-create coaching PATCH, unrelated to tools).
+    const firstUrl = fetcher.mock.calls[0]?.[0] as string;
+    expect(firstUrl).toContain("/v1/convai/agents/create");
+    expect(
+      fetcher.mock.calls.some(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes("/v1/convai/tools"),
+      ),
+    ).toBe(false);
+    const body = parseBody(fetcher.mock.calls[0] as [unknown, RequestInit | undefined]);
+    const conv = body.conversation_config as Record<string, Record<string, unknown>>;
+    const prompt = (conv.agent as Record<string, Record<string, unknown>>).prompt as Record<
+      string,
+      unknown
+    >;
+    expect(prompt.tool_ids).toEqual([]);
+    expect(prompt.prompt as string).toContain("wersja demonstracyjna");
+    expect(prompt.prompt as string).not.toContain("check_availability");
   });
 
   it("updateAgentKnowledge PATCHes only the knowledge_base list", async () => {

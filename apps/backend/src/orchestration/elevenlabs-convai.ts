@@ -264,23 +264,32 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
   async provisionAgent(input: ProvisionAgentInput): Promise<ProvisionAgentResult> {
     const voiceId = input.voiceId ?? this.defaultVoiceId;
     const language = input.defaultLanguage ?? "pl";
+    const bookingEnabled = input.bookingEnabled ?? false;
     const systemPrompt =
       input.systemPromptOverride ??
       buildSystemPrompt({
         tenantDisplayName: input.tenantDisplayName,
+        bookingEnabled,
       });
 
     // Workspace tool catalog: ensure the two booking tools exist (create if
     // missing) and grab their ids. EL ignores inline `prompt.tools` now, so
     // ids are the only attachment mechanism that actually binds tools.
-    const catalog = new ElevenLabsToolsCatalog({
-      apiKey: this.apiKey,
-      baseUrl: this.baseUrl,
-      fetcher: this.doFetch,
-    });
-    const { checkAvailabilityId, createBookingId } = await catalog.ensureBookingTools(
-      input.serverToolBaseUrl,
-    );
+    // Demo deployments (bookingEnabled false) get NO tools: a tool call
+    // against a dead webhook killed a live call (2026-06-05 incident), and
+    // the demo prompt explains the limitation instead.
+    let toolIds: string[] = [];
+    if (bookingEnabled) {
+      const catalog = new ElevenLabsToolsCatalog({
+        apiKey: this.apiKey,
+        baseUrl: this.baseUrl,
+        fetcher: this.doFetch,
+      });
+      const { checkAvailabilityId, createBookingId } = await catalog.ensureBookingTools(
+        input.serverToolBaseUrl,
+      );
+      toolIds = [checkAvailabilityId, createBookingId];
+    }
 
     // Knowledge base wiring:
     //   - The ontology (5 files: services, triage, scripts, emergency-keywords,
@@ -336,7 +345,8 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
               // form — PATCH returns 200 but the field is silently dropped.
               // Backend handlers at apps/backend/src/tools/{check-availability,
               // create-booking}.ts run against SimulatedCalendarProvider.
-              tool_ids: [checkAvailabilityId, createBookingId],
+              // Empty in demo mode (bookingEnabled false).
+              tool_ids: toolIds,
             },
             language,
           },

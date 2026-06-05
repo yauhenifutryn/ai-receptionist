@@ -17,7 +17,7 @@
  *     [--server-tool-base-url https://app.example.com/api]
  *
  * If --server-tool-base-url is not provided, falls back to env
- * SERVER_TOOL_BASE_URL, then to https://ai-receptionist.vercel.app/api.
+ * SERVER_TOOL_BASE_URL, then to https://ai-receptionist-seven-sigma.vercel.app/api.
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -52,7 +52,10 @@ async function main(): Promise<void> {
   const serverToolBaseUrl =
     parseArg("server-tool-base-url") ??
     process.env.SERVER_TOOL_BASE_URL ??
-    "https://ai-receptionist.vercel.app/api";
+    // 2026-06-05: was ai-receptionist.vercel.app — NOT our deployment (404s).
+    // That stale default created catalog tools with a dead webhook URL and
+    // killed a live demo call mid-booking. Keep in sync with DEMO_LINE_BASE_URL.
+    "https://ai-receptionist-seven-sigma.vercel.app/api";
 
   console.log(`[backfill] serverToolBaseUrl=${serverToolBaseUrl}`);
 

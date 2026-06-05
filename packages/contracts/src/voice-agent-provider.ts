@@ -30,6 +30,11 @@ export interface ProvisionAgentInput {
    *  template. Pass when the wizard let the user review/edit the prompt
    *  before provisioning. */
   systemPromptOverride?: string;
+  /** Attach booking tools (check_availability/create_booking). Default FALSE:
+   *  demo deployments have no calendar integration — the agent explains the
+   *  demo limitation instead of calling a tool. Flip to true only when a real
+   *  calendar provider is wired for the tenant. */
+  bookingEnabled?: boolean;
 }
 
 export interface ProvisionAgentResult {

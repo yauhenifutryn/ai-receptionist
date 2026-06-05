@@ -17,7 +17,11 @@ import {
 } from "@ai-receptionist/backend/scraper";
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
 import { createGeminiProvider } from "@ai-receptionist/backend/lib/gemini-provider";
-import { buildSystemPrompt, extractPolishCity } from "@ai-receptionist/backend/prompts";
+import {
+  buildSystemPrompt,
+  clinicFactsFromScraperTenant,
+  extractPolishCity,
+} from "@ai-receptionist/backend/prompts";
 import type { FirecrawlPage } from "@ai-receptionist/backend/scraper";
 import { openTestSession, openExistingSession } from "@/lib/test-session-logger";
 import { getOperatorOrJsonError } from "@/lib/supabase-server";
@@ -587,6 +591,7 @@ export async function POST(req: NextRequest) {
         const systemPrompt = buildSystemPrompt({
           tenantDisplayName: scraperOutput.tenant.name,
           ...(detectedCity ? { city: detectedCity } : {}),
+          clinicFacts: clinicFactsFromScraperTenant(scraperOutput.tenant),
         });
         await session?.write("06-knowledge.md", knowledgeMarkdown);
         await session?.write("07-system-prompt.md", systemPrompt);

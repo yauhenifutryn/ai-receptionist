@@ -48,6 +48,47 @@ describe("buildSystemPrompt booking modes", () => {
     expect(prompt).toContain("NEVER ask for their name");
   });
 
+  // Invariant (2026-06-06): core clinic facts are baked into the prompt so
+  // RAG retrieval variance can never lose hours/address/phone (a live call
+  // had the agent deny knowing the opening hours, then find them on re-ask).
+  it("clinicFacts: renders the always-true block; absent when omitted", () => {
+    const facts = {
+      address: "Kraków, ul. Romanowicza 1",
+      phone: "+48576676266",
+      hoursLines: ["Poniedziałek: 08:00-20:00", "Sobota: 08:00-14:00"],
+    };
+    const withFacts = buildSystemPrompt({ tenantDisplayName: "Testowa", clinicFacts: facts });
+    expect(withFacts).toContain("CORE CLINIC FACTS");
+    expect(withFacts).toContain("Poniedziałek: 08:00-20:00");
+    expect(withFacts).toContain("+48576676266");
+
+    const without = buildSystemPrompt({ tenantDisplayName: "Testowa" });
+    expect(without).not.toContain("CORE CLINIC FACTS");
+  });
+
+  it("clinicFactsFromKnowledgeMarkdown parses the generated knowledge.md shape", async () => {
+    const { clinicFactsFromKnowledgeMarkdown } = await import("../../src/prompts/system-prompt.js");
+    const md = [
+      "# Klinika X",
+      "## Klinika",
+      "Opis.",
+      "",
+      "- Adres: Kraków, ul. Testowa 5, 30-001",
+      "- Telefon: +48123456789",
+      "",
+      "## Godziny otwarcia (znane także jako: godziny pracy)",
+      "",
+      "- Poniedziałek: 08:00-20:00",
+      "- Sobota: 08:00-14:00",
+      "- Niedziela: zamknięte",
+    ].join("\n");
+    expect(clinicFactsFromKnowledgeMarkdown(md)).toEqual({
+      address: "Kraków, ul. Testowa 5, 30-001",
+      phone: "+48123456789",
+      hoursLines: ["Poniedziałek: 08:00-20:00", "Sobota: 08:00-14:00", "Niedziela: zamknięte"],
+    });
+  });
+
   it("bookingEnabled: true keeps the full booking flow", () => {
     const prompt = buildSystemPrompt({
       tenantDisplayName: "Testowa Klinika",

@@ -26,7 +26,11 @@ import {
 import { LLMClient } from "../src/lib/llm.js";
 import { createGeminiProvider } from "../src/lib/gemini-provider.js";
 import { ElevenLabsConvAIProvider } from "../src/orchestration/elevenlabs-convai.js";
-import { buildSystemPrompt, extractPolishCity } from "../src/prompts/system-prompt.js";
+import {
+  buildSystemPrompt,
+  clinicFactsFromScraperTenant,
+  extractPolishCity,
+} from "../src/prompts/system-prompt.js";
 
 const env = (k: string): string => {
   const v = process.env[k];
@@ -125,6 +129,7 @@ for (const clinic of clinics) {
     const systemPrompt = buildSystemPrompt({
       tenantDisplayName: output.tenant?.name ?? clinic.name,
       ...(detectedCity ? { city: detectedCity } : {}),
+      ...(output.tenant ? { clinicFacts: clinicFactsFromScraperTenant(output.tenant) } : {}),
     });
     const prov = await provider.provisionAgent({
       tenantId: tenantRow.id,

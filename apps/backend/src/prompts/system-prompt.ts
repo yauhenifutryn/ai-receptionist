@@ -1,7 +1,21 @@
+export interface ClinicFacts {
+  address?: string;
+  phone?: string;
+  /** Pre-formatted day lines, e.g. "Poniedziałek: 08:00-20:00". */
+  hoursLines?: string[];
+}
+
 export interface BuildSystemPromptArgs {
   tenantDisplayName: string;
   /** Optional vertical hint surfaced in the Environment + Goal sections. */
   verticalHint?: string;
+  /** Core clinic facts baked INTO the prompt (2026-06-06): hours/address/
+   *  phone are the most-asked facts and tiny (~200 chars), but RAG retrieval
+   *  intermittently lost them to generic-ontology chunks on semantically
+   *  thin queries ("w jakich godzinach jesteście otwarci?") — a live call
+   *  had the agent deny knowing the hours, then find them on re-ask. Static
+   *  facts in the prompt cannot lose the retrieval lottery. */
+  clinicFacts?: ClinicFacts;
   /** Optional city to localize the persona (e.g. "Kraków"). When provided,
    *  the agent presents itself as "a Polish, <city>-based receptionist".
    *  When omitted, the agent presents as "a Polish receptionist". */
@@ -85,6 +99,7 @@ export function buildSystemPrompt(args: BuildSystemPromptArgs): string {
       bookingEnabled
         ? "You have access to: (a) a knowledge base with this business's services, prices, hours, staff, and FAQ; (b) two server tools for checking availability and creating bookings; (c) the caller's live transcript."
         : "You have access to: (a) a knowledge base with this business's services, prices, hours, staff, and FAQ; (b) the caller's live transcript. You have NO booking tools and NO access to the clinic's calendar in this deployment.",
+      ...clinicFactsLines(args.clinicFacts),
     ]),
     section("Tone", [
       "Speak naturally and conversationally. Keep replies to ONE or TWO short sentences. The caller is on a phone — long answers are painful.",
@@ -183,4 +198,80 @@ export function buildSystemPrompt(args: BuildSystemPromptArgs): string {
 
 function section(title: string, lines: string[]): string {
   return [`## ${title}`, ...lines].join("\n");
+}
+
+/** Render the always-true clinic facts block for the Environment section. */
+function clinicFactsLines(facts: ClinicFacts | undefined): string[] {
+  if (!facts || (!facts.address && !facts.phone && !facts.hoursLines?.length)) return [];
+  const lines = [
+    "CORE CLINIC FACTS — always true for this clinic, answer from here INSTANTLY. Never say you don't know these and never quote different values from anywhere else:",
+  ];
+  if (facts.address) lines.push(`- Adres: ${facts.address}`);
+  if (facts.phone) lines.push(`- Telefon recepcji: ${facts.phone}`);
+  if (facts.hoursLines?.length) {
+    lines.push("- Godziny otwarcia:");
+    for (const l of facts.hoursLines) lines.push(`  - ${l}`);
+  }
+  return lines;
+}
+
+/** Build ClinicFacts from a ScraperOutput tenant (wizard + batch provisioning). */
+export function clinicFactsFromScraperTenant(tenant: {
+  address?: string | undefined;
+  phone?: string | undefined;
+  hours?:
+    | ({
+        [day in
+          | "monday"
+          | "tuesday"
+          | "wednesday"
+          | "thursday"
+          | "friday"
+          | "saturday"
+          | "sunday"]?: string | undefined;
+      } & { notes?: string | undefined })
+    | undefined;
+}): ClinicFacts {
+  const days: Array<[keyof NonNullable<typeof tenant.hours> & string, string]> = [
+    ["monday", "Poniedziałek"],
+    ["tuesday", "Wtorek"],
+    ["wednesday", "Środa"],
+    ["thursday", "Czwartek"],
+    ["friday", "Piątek"],
+    ["saturday", "Sobota"],
+    ["sunday", "Niedziela"],
+  ];
+  const hoursLines: string[] = [];
+  if (tenant.hours) {
+    for (const [key, label] of days) {
+      const val = tenant.hours[key];
+      if (typeof val === "string" && val) hoursLines.push(`${label}: ${val}`);
+    }
+  }
+  return {
+    ...(tenant.address ? { address: tenant.address } : {}),
+    ...(tenant.phone ? { phone: tenant.phone } : {}),
+    ...(hoursLines.length ? { hoursLines } : {}),
+  };
+}
+
+/**
+ * Parse ClinicFacts back out of a generated knowledge.md (the "## Klinika" +
+ * "## Godziny otwarcia" sections emitted by scraperOutputToMarkdown). Used by
+ * fleet prompt-push tooling where the scraper output is no longer at hand but
+ * the uploaded KB document is.
+ */
+export function clinicFactsFromKnowledgeMarkdown(markdown: string): ClinicFacts {
+  const address = markdown.match(/^- Adres: (.+)$/m)?.[1]?.trim();
+  const phone = markdown.match(/^- Telefon: (.+)$/m)?.[1]?.trim();
+  const hoursLines = [
+    ...markdown.matchAll(
+      /^- (Poniedziałek|Wtorek|Środa|Czwartek|Piątek|Sobota|Niedziela): (.+)$/gm,
+    ),
+  ].map((m) => `${m[1]}: ${(m[2] ?? "").trim()}`);
+  return {
+    ...(address ? { address } : {}),
+    ...(phone ? { phone } : {}),
+    ...(hoursLines.length ? { hoursLines } : {}),
+  };
 }

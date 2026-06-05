@@ -6,7 +6,11 @@ import {
   reportCoverage,
   canonicalizeUrl,
 } from "@ai-receptionist/backend/scraper";
-import { buildSystemPrompt, extractPolishCity } from "@ai-receptionist/backend/prompts";
+import {
+  buildSystemPrompt,
+  clinicFactsFromScraperTenant,
+  extractPolishCity,
+} from "@ai-receptionist/backend/prompts";
 import { getOperatorOrJsonError } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -43,6 +47,7 @@ export async function POST(req: NextRequest) {
   const systemPrompt = buildSystemPrompt({
     tenantDisplayName: scraperOutput.tenant.name,
     ...(detectedCity ? { city: detectedCity } : {}),
+    clinicFacts: clinicFactsFromScraperTenant(scraperOutput.tenant),
   });
   const coverage = reportCoverage(scraperOutput);
 

@@ -15,7 +15,11 @@
  *   pnpm tsx apps/backend/scripts/push-system-prompt.ts
  */
 
-import { buildSystemPrompt, extractPolishCity } from "../src/prompts/system-prompt.js";
+import {
+  buildSystemPrompt,
+  clinicFactsFromKnowledgeMarkdown,
+  extractPolishCity,
+} from "../src/prompts/system-prompt.js";
 import { buildOpeningMessage } from "../src/orchestration/elevenlabs-convai.js";
 import { createClient } from "@supabase/supabase-js";
 
@@ -63,14 +67,42 @@ for (const row of rows) {
     continue;
   }
 
-  // city: no tenants.address column yet — pass undefined; the prompt falls
-  // back to "Polish receptionist" without geo qualifier. Wire address through
-  // a future migration if/when city localisation becomes a P0.
+  // Core clinic facts (hours/address/phone) + city: parsed from the agent's
+  // own clinic KB document on EL (the scraper output is long gone, but the
+  // uploaded knowledge.md carries the same lines). 2026-06-06: facts are
+  // baked into the prompt so RAG retrieval variance can never lose them.
+  let clinicFacts = {};
+  let detectedCity: string | null = null;
+  try {
+    const agentRes = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${agentId}`, {
+      headers: { "xi-api-key": apiKey },
+    });
+    const agentCfg = (await agentRes.json()) as {
+      conversation_config?: {
+        agent?: { prompt?: { knowledge_base?: Array<{ id: string; name: string }> } };
+      };
+    };
+    const docs = agentCfg.conversation_config?.agent?.prompt?.knowledge_base ?? [];
+    const clinicDoc = docs.find((d) => !d.name.startsWith("ontology"));
+    if (clinicDoc) {
+      const content = await (
+        await fetch(`https://api.elevenlabs.io/v1/convai/knowledge-base/${clinicDoc.id}/content`, {
+          headers: { "xi-api-key": apiKey },
+        })
+      ).text();
+      clinicFacts = clinicFactsFromKnowledgeMarkdown(content);
+      const address = (clinicFacts as { address?: string }).address;
+      detectedCity = extractPolishCity(address);
+    }
+  } catch (e) {
+    console.error(`  WARN: clinic-facts parse failed: ${(e as Error).message}`);
+  }
   const systemPrompt = buildSystemPrompt({
     tenantDisplayName: tenant.display_name,
+    ...(detectedCity ? { city: detectedCity } : {}),
+    ...(Object.keys(clinicFacts).length ? { clinicFacts } : {}),
   });
   const firstMessage = buildOpeningMessage(tenant.display_name);
-  void extractPolishCity; // keep import resolvable for future use
 
   console.error(`${agentId} (${tenant.display_name})`);
   console.error(

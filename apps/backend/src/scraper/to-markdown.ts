@@ -23,6 +23,9 @@ export function scraperOutputToMarkdown(out: ScraperOutput): string {
 
   blocks.push(klinikaBlock(out));
 
+  const hours = hoursBlock(out);
+  if (hours) blocks.push(hours);
+
   if (out.staff.length > 0) {
     blocks.push(staffBlock(out));
   }
@@ -52,22 +55,38 @@ function klinikaBlock(out: ScraperOutput): string {
   if (t.address) lines.push(`- Adres: ${t.address}`);
   if (t.phone) lines.push(`- Telefon: ${t.phone}`);
   if (t.email) lines.push(`- Email: ${t.email}`);
-  if (t.hours) {
-    const days: Array<[keyof typeof t.hours, string]> = [
-      ["monday", "Poniedziałek"],
-      ["tuesday", "Wtorek"],
-      ["wednesday", "Środa"],
-      ["thursday", "Czwartek"],
-      ["friday", "Piątek"],
-      ["saturday", "Sobota"],
-      ["sunday", "Niedziela"],
-    ];
-    for (const [key, label] of days) {
-      const val = t.hours[key];
-      if (val) lines.push(`- ${label}: ${val}`);
-    }
-    if (t.hours.notes) lines.push(`- Uwagi godzinowe: ${t.hours.notes}`);
+  return lines.join("\n");
+}
+
+/**
+ * Opening hours as their OWN H2 chunk with trilingual synonyms front-loaded.
+ * 2026-06-05 RAG lesson: with hours buried as bullets inside "## Klinika",
+ * a bare "w jakich godzinach jesteście otwarci?" / "какие у вас часы
+ * работы?" query missed retrieval entirely — and the agent then fabricated
+ * plausible-but-wrong hours. Queries mentioning the address still matched
+ * (address and hours shared a chunk), which made the failure intermittent.
+ */
+function hoursBlock(out: ScraperOutput): string | null {
+  const t = out.tenant;
+  if (!t.hours) return null;
+  const lines: string[] = [
+    "## Godziny otwarcia (znane także jako: godziny pracy, kiedy otwarte, w jakich godzinach przyjmujecie; RU: часы работы, график работы, когда открыто; EN: opening hours, working hours)",
+    "",
+  ];
+  const days: Array<[keyof typeof t.hours, string]> = [
+    ["monday", "Poniedziałek"],
+    ["tuesday", "Wtorek"],
+    ["wednesday", "Środa"],
+    ["thursday", "Czwartek"],
+    ["friday", "Piątek"],
+    ["saturday", "Sobota"],
+    ["sunday", "Niedziela"],
+  ];
+  for (const [key, label] of days) {
+    const val = t.hours[key];
+    if (val) lines.push(`- ${label}: ${val}`);
   }
+  if (t.hours.notes) lines.push(`- Uwagi godzinowe: ${t.hours.notes}`);
   return lines.join("\n");
 }
 

@@ -152,7 +152,7 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     const rag = (prompt as Record<string, any>).rag;
     expect(rag.enabled).toBe(true);
     expect(rag.embedding_model).toBe("multilingual_e5_large_instruct");
-    expect(rag.max_retrieved_rag_chunks_count).toBe(12);
+    expect(rag.max_retrieved_rag_chunks_count).toBe(20);
     const turn = conv.turn as Record<string, unknown>;
     expect(turn.turn_timeout).toBe(3);
     expect(turn.turn_eagerness).toBe("eager");

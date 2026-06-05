@@ -145,10 +145,14 @@ export const DEFAULT_TTS_MODEL_ID = "eleven_flash_v2_5";
 // ~0.15s and cuts the per-turn prompt to the retrieved chunks. Multilingual
 // embedder: Russian/English callers query Polish KB text (a RU hygiene-price
 // retrieval miss reproduced until this embedder + a KB-structure fix landed).
-// Chunk count 12: at 6 the doctor-name fact lost its retrieval slot; 20 (EL
-// default) showed no measured TTFB gain over 12.
+// Chunk count 20 (EL default): the 0.69s-TTFB phone measurement was taken AT
+// 20 chunks. Trimming to 12 had no measured latency gain and a MEASURED
+// recall cost — the general-hours chunk dropped out and the agent fabricated
+// "9-19" opening hours in Polish (RU/EN turns honestly declined). At 6 even
+// the doctor-name fact lost its slot. Do not trim below 20 without re-running
+// the fact-recall battery AND a fabrication probe.
 export const RAG_EMBEDDING_MODEL = "multilingual_e5_large_instruct";
-export const RAG_MAX_CHUNKS = 12;
+export const RAG_MAX_CHUNKS = 20;
 
 // Kept as an exported interface so older imports (backfill script, tests)
 // don't break. We no longer ship any tags by default — the empty array is

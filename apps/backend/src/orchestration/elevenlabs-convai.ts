@@ -40,6 +40,68 @@ export function buildOpeningMessage(tenantDisplayName: string): string {
 }
 
 /**
+ * EN/RU openers used by `language_presets`: when the language_detection
+ * system tool switches the conversation language, EL swaps the first_message
+ * (and TTS language mode) to the preset. These mirror the trilingual greeting
+ * lines already baked into the system prompt's Goal section.
+ */
+export function buildOpeningMessageEn(tenantDisplayName: string): string {
+  return `Hello, this is ${AGENT_PERSONA_NAME}, the AI assistant at ${tenantDisplayName}. How can I help?`;
+}
+
+export function buildOpeningMessageRu(tenantDisplayName: string): string {
+  return `Здравствуйте, я Михаил, AI-ассистент клиники ${tenantDisplayName}. Чем могу помочь?`;
+}
+
+/**
+ * Default guardrails for every provisioned agent (EL Guardrails, Alpha):
+ * focus + prompt-injection on; all content categories on EXCEPT
+ * medical_and_legal_information (a dental receptionist legitimately discusses
+ * medical-adjacent content — that category would false-positive on core
+ * conversations); demo agents additionally get the custom "no-fake-bookings"
+ * tripwire (streaming + end_call: retry-mode requires blocking execution,
+ * which gates every spoken turn on the guardrail verdict — too slow for
+ * voice).
+ */
+export function buildGuardrails(bookingEnabled: boolean): Record<string, unknown> {
+  const contentCategory = { is_enabled: true, threshold: "medium" };
+  return {
+    version: "1",
+    focus: { is_enabled: true },
+    prompt_injection: { is_enabled: true },
+    content: {
+      execution_mode: "streaming",
+      config: {
+        sexual: contentCategory,
+        violence: contentCategory,
+        harassment: contentCategory,
+        self_harm: contentCategory,
+        profanity: contentCategory,
+        religion_or_politics: contentCategory,
+        medical_and_legal_information: { is_enabled: false, threshold: "medium" },
+      },
+      trigger_action: { type: "end_call" },
+    },
+    custom: {
+      config: {
+        configs: bookingEnabled
+          ? []
+          : [
+              {
+                is_enabled: true,
+                name: "no-fake-bookings",
+                prompt:
+                  "Violation: the agent states or implies that an appointment has been successfully booked, rescheduled, or cancelled, or reads out a booking confirmation. The agent is a demo with no calendar access — when asked to book it must explain that limitation instead. Explaining the demo limitation is NOT a violation.",
+                execution_mode: "streaming",
+                trigger_action: { type: "end_call" },
+              },
+            ],
+      },
+    },
+  };
+}
+
+/**
  * ElevenLabs ConvAI implementation of the VoiceAgentProvider contract.
  *
  * - Voice ID defaults to mr1ubFaLs5xVrh1EqWtc (Polish-native multilingual,
@@ -54,7 +116,12 @@ export function buildOpeningMessage(tenantDisplayName: string): string {
  */
 
 export const DEFAULT_VOICE_ID = "mr1ubFaLs5xVrh1EqWtc";
-export const DEFAULT_AGENT_LLM = "qwen36-35b-a3b";
+// 2026-06-05: swapped qwen36-35b-a3b → claude-haiku-4-5 (the documented
+// fallback in PROJECT_LOG "if Polish quality disappoints"). Qwen drifted to
+// English on Polish input ~1/3 of simulations even after prompt hardening
+// (always the English name-capture phrase); Haiku went 4/4 Polish + clean RU.
+// Cost ~3×, latency ~223ms→~676ms model-side — correctness wins for demos.
+export const DEFAULT_AGENT_LLM = "claude-haiku-4-5";
 export const DEFAULT_AGENT_TEMPERATURE = 0.3;
 export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 
@@ -265,6 +332,13 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
     const voiceId = input.voiceId ?? this.defaultVoiceId;
     const language = input.defaultLanguage ?? "pl";
     const bookingEnabled = input.bookingEnabled ?? false;
+    // Workspace-level EL test ids (comma-separated) attached to every new
+    // agent. Created 2026-06-05: no-booking-claim, EN mirror, no-invented-
+    // price, emergency-escalation.
+    const defaultTestIds = (process.env.EL_DEFAULT_TEST_IDS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     const systemPrompt =
       input.systemPromptOverride ??
       buildSystemPrompt({
@@ -347,8 +421,30 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
               // create-booking}.ts run against SimulatedCalendarProvider.
               // Empty in demo mode (bookingEnabled false).
               tool_ids: toolIds,
+              // language_detection system tool: switches the conversation
+              // language (TTS/ASR mode) when the caller changes language,
+              // instead of relying purely on prompt-level mirroring. Added
+              // 2026-06-05 after a live call drifted into Russian unprompted.
+              built_in_tools: {
+                language_detection: { name: "language_detection", description: "" },
+              },
             },
             language,
+          },
+          // Per-language openers consumed by language_detection switches.
+          language_presets: {
+            en: {
+              overrides: {
+                agent: { first_message: buildOpeningMessageEn(input.tenantDisplayName) },
+                tts: null,
+              },
+            },
+            ru: {
+              overrides: {
+                agent: { first_message: buildOpeningMessageRu(input.tenantDisplayName) },
+                tts: null,
+              },
+            },
           },
           tts: {
             // flash_v2_5 — same model EL's voice preview uses for Polish
@@ -403,6 +499,14 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
             criteria: [...DEFAULT_EVALUATION_CRITERIA],
           },
           data_collection: DEFAULT_DATA_COLLECTION,
+          // Guardrails (Alpha) — see buildGuardrails for the rationale on
+          // category choices and execution modes.
+          guardrails: buildGuardrails(bookingEnabled),
+          // Regression tests (EL agent testing). Workspace test ids come from
+          // env so code stays workspace-agnostic; empty/unset = none attached.
+          ...(defaultTestIds.length > 0
+            ? { testing: { attached_tests: defaultTestIds.map((id) => ({ test_id: id })) } }
+            : {}),
         },
       },
     );

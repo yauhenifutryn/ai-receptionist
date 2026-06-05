@@ -205,6 +205,71 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     expect(prompt.tool_ids).toEqual([]);
     expect(prompt.prompt as string).toContain("wersja demonstracyjna");
     expect(prompt.prompt as string).not.toContain("check_availability");
+
+    // 2026-06-05 safety + multilingual defaults, baked into provisioning:
+    // language_detection system tool, EN/RU presets, guardrails with the
+    // demo-only no-fake-bookings custom rule.
+    const builtIn = prompt.built_in_tools as Record<string, unknown>;
+    expect(builtIn.language_detection).toMatchObject({ name: "language_detection" });
+    const presets = conv.language_presets as Record<string, unknown>;
+    expect(Object.keys(presets).sort()).toEqual(["en", "ru"]);
+    const platform = body.platform_settings as Record<string, Record<string, unknown>>;
+    const guardrails = platform.guardrails as {
+      focus: { is_enabled: boolean };
+      prompt_injection: { is_enabled: boolean };
+      content: { config: Record<string, { is_enabled: boolean }> };
+      custom: { config: { configs: Array<{ name: string }> } };
+    };
+    expect(guardrails.focus.is_enabled).toBe(true);
+    expect(guardrails.prompt_injection.is_enabled).toBe(true);
+    expect(guardrails.content.config.sexual?.is_enabled).toBe(true);
+    // Dental receptionist legitimately discusses medical-adjacent content.
+    expect(guardrails.content.config.medical_and_legal_information?.is_enabled).toBe(false);
+    expect(guardrails.custom.config.configs.map((c) => c.name)).toEqual(["no-fake-bookings"]);
+  });
+
+  it("provisionAgent with bookingEnabled drops the no-fake-bookings custom guardrail", async () => {
+    const fetcher = vi
+      .fn()
+      .mockImplementationOnce(() =>
+        Promise.resolve(
+          jsonResponse({
+            tools: [
+              { id: "tool_ca", tool_config: { name: "check_availability" } },
+              { id: "tool_cb", tool_config: { name: "create_booking" } },
+            ],
+          }),
+        ),
+      )
+      .mockImplementationOnce(() =>
+        Promise.resolve(
+          jsonResponse({
+            tools: [
+              { id: "tool_ca", tool_config: { name: "check_availability" } },
+              { id: "tool_cb", tool_config: { name: "create_booking" } },
+            ],
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(jsonResponse({ agent_id: "agent-b" }));
+    const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });
+    await provider.provisionAgent({
+      tenantId: "t-1",
+      tenantDisplayName: "Klinika",
+      knowledgeBaseDocumentIds: [],
+      serverToolBaseUrl: "https://x",
+      postCallWebhookUrl: "https://x/p",
+      bookingEnabled: true,
+    });
+    const createIdx = fetcher.mock.calls.findIndex(
+      (c) => typeof c[0] === "string" && (c[0] as string).endsWith("/v1/convai/agents/create"),
+    );
+    const body = parseBody(fetcher.mock.calls[createIdx] as [unknown, RequestInit | undefined]);
+    const platform = body.platform_settings as Record<string, Record<string, unknown>>;
+    const guardrails = platform.guardrails as {
+      custom: { config: { configs: unknown[] } };
+    };
+    expect(guardrails.custom.config.configs).toEqual([]);
   });
 
   it("updateAgentKnowledge PATCHes only the knowledge_base list", async () => {

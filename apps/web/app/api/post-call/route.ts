@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  adaptElevenLabsPostCall,
   createSupabasePostCallRepository,
   handlePostCall,
 } from "@ai-receptionist/backend/post-call";
@@ -29,8 +30,12 @@ export async function POST(req: NextRequest) {
   if (body == null) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
+  // EL sends { type: "post_call_transcription", data: {…} } (snake_case);
+  // adapt to the internal contract. Non-EL bodies (tests, internal senders)
+  // pass through and validate against the schema as before.
+  const adapted = adaptElevenLabsPostCall(body);
   const repo = createSupabasePostCallRepository(getServiceRoleSupabase());
-  const result = await handlePostCall(body, { repo });
+  const result = await handlePostCall(adapted ?? body, { repo });
   if (result.ok) {
     return NextResponse.json(
       {

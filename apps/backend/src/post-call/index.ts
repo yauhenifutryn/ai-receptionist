@@ -1,4 +1,5 @@
 export { handlePostCall } from "./handler.js";
+export { adaptElevenLabsPostCall } from "./elevenlabs-adapter.js";
 export type { HandlePostCallDeps, HandlePostCallResult } from "./handler.js";
 export { createPostCallRouter } from "./router.js";
 export type { CreatePostCallRouterArgs } from "./router.js";

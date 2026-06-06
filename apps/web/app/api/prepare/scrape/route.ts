@@ -22,7 +22,11 @@ export const maxDuration = 300;
 
 const SCRAPE_FLOOR = 8;
 const SCRAPE_CEILING_MAX = 50;
-const RERANK_INPUT_CAP = 100;
+// rerankUrls chunks internally (parallel ≤100-URL calls), so the FULL
+// kept list is scored — a hard input slice made selection depend on
+// Firecrawl's unstable map order on 600+-URL sites (dentus.szczecin.pl).
+// This cap is only a runaway guard for pathological maps.
+const RERANK_INPUT_CAP = 1000;
 const FIRECRAWL_MAP_LIMIT = 150;
 // 2026-06-06: the Firecrawl plan allows maxConcurrency=2 (verified via
 // /v2/concurrency-check). Running 3 queues the third request server-side

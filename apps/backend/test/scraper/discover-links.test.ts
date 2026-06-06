@@ -16,6 +16,27 @@ describe("extractInternalLinks", () => {
     expect(links).toContain("https://klinika.pl/zespol");
   });
 
+  it("REGRESSION annadentalclinic.com: matches links with markdown title attributes", () => {
+    // Firecrawl renders the site's nav as
+    //   [Cennik](https://www.annadentalclinic.com/cennik "Cennik usług stomatologicznych")
+    // — URL followed by a space + quoted title. The old regex demanded ')'
+    // right after the URL, so the ONE link to the pricing page was
+    // invisible to the discovery pass (the /cennik page is absent from
+    // the sitemap, so discovery was its only way in).
+    const pages = [
+      page(
+        "https://annadentalclinic.com",
+        '[Cennik](https://www.annadentalclinic.com/cennik "Cennik usług stomatologicznych") ' +
+          "[Oferta](https://www.annadentalclinic.com/oferta) " +
+          "[Kontakt](https://www.annadentalclinic.com/kontakt 'Kontakt z nami')",
+      ),
+    ];
+    const links = extractInternalLinks(pages, "https://annadentalclinic.com");
+    expect(links).toContain("https://annadentalclinic.com/cennik");
+    expect(links).toContain("https://annadentalclinic.com/oferta");
+    expect(links).toContain("https://annadentalclinic.com/kontakt");
+  });
+
   it("treats www and apex variants of the root host as same-origin", () => {
     // Bug fixed here: when user pastes 'https://indexmedica.com' but the
     // site canonicalizes to 'https://www.indexmedica.com', markdown links

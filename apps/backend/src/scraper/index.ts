@@ -63,14 +63,6 @@ const DEFAULT_CRAWL_CONCURRENCY = 2;
  * "Invalid upstream proxy credentials" (42 chars, dci.waw.pl batch).
  */
 export const MIN_PAGE_CHARS = 200;
-/**
- * Cap on URLs sent to the LLM rerank in one call. Bounded by the rerank's
- * maxOutputTokens (8192) — ~100 scored entries fit; 600+ would truncate
- * mid-JSON and fail the whole rerank. Key pages sit well inside the first
- * 100 kept URLs on every site measured (dentus.szczecin.pl, 620 kept:
- * /kontakt #29, /zespol #27, /zakres-uslug #38-61).
- */
-const RERANK_INPUT_CAP = 100;
 /** Mirror of the onboarding wizard's rerank defaults (prepare/scrape). */
 const RERANK_THRESHOLD = 0.4;
 const SCRAPE_FLOOR = 8;
@@ -121,23 +113,15 @@ export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Prom
     [args.url, ...upgraded.filter((l) => l !== args.url)],
     primaryLang,
   );
-  // Deterministic candidate order: path depth asc, then lexicographic.
-  // Firecrawl's map order is unstable run-to-run (observed 626→0→626
-  // links on dentus.szczecin.pl within minutes); with 620 kept URLs the
-  // RERANK_INPUT_CAP slice randomly included or excluded the pricing
-  // pages — two consecutive runs produced 13 vs 2 priced services.
-  // Shallow paths are the content pages on clinic sites; deep paths are
-  // attachments/photo junk, so depth-first is also a relevance proxy.
-  const deduped = dedupeByCanonicalUrl(filter.kept).sort((a, b) => {
-    const depth = (u: string): number => {
-      try {
-        return new URL(u).pathname.split("/").filter(Boolean).length;
-      } catch {
-        return 99;
-      }
-    };
-    return depth(a) - depth(b) || a.localeCompare(b);
-  });
+  // Deterministic candidate order (plain lexicographic). Firecrawl's map
+  // order is unstable run-to-run (observed 626→0→626 links on
+  // dentus.szczecin.pl within minutes), which made selection — and
+  // therefore KB content — vary across identical runs. NO depth/topic
+  // heuristics here: a depth-first variant crowded the rerank with
+  // depth-1 campaign stubs (dentus-kids-1..17) and produced a 0-priced
+  // KB. Every kept URL is scored by the chunked rerank; the LLM is the
+  // only content judge.
+  const deduped = dedupeByCanonicalUrl(filter.kept).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const maxPages = args.maxPages ?? DEFAULT_MAX_PAGES;
 
   // LLM rerank — same selection the onboarding wizard uses. Without it,
@@ -200,9 +184,11 @@ export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Prom
 }
 
 /**
- * Rerank-and-pick with map-order fallback. `floor > 0` also force-includes
- * the root page — clinics hide hours/phone in its footer (wadental.pl), and
- * a low rerank score must not drop it.
+ * Rerank-and-pick with sorted-order fallback. The FULL url list is scored
+ * (rerankUrls chunks internally), so selection never depends on which
+ * URLs happen to land inside an arbitrary input cap. `floor > 0` also
+ * force-includes the root page — clinics hide hours/phone in its footer
+ * (wadental.pl), and a low rerank score must not drop it.
  */
 async function selectCandidates(
   args: ScrapeAndConsolidateArgs,
@@ -215,7 +201,7 @@ async function selectCandidates(
   try {
     const reranked = await rerankUrls({
       rootUrl: args.url,
-      urls: urls.slice(0, RERANK_INPUT_CAP),
+      urls,
       llm: args.llm,
     });
     picked = pickByScore(reranked, { threshold: RERANK_THRESHOLD, floor, ceiling });

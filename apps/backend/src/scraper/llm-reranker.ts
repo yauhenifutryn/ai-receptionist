@@ -108,13 +108,34 @@ function buildUserPrompt(args: RerankArgs): string {
 }
 
 /**
+ * Max URLs per rerank LLM call — ~100 scored entries fit the 8192
+ * maxOutputTokens; more truncates mid-JSON and fails the whole call.
+ * Bigger inputs are chunked into parallel calls and merged, so EVERY
+ * kept URL gets a score. REGRESSION (dentus.szczecin.pl, 620 kept
+ * URLs): slicing the input to the first 100 made selection depend on
+ * Firecrawl's unstable map order — 13 vs 2 priced services across two
+ * otherwise-identical runs.
+ */
+const RERANK_CHUNK_SIZE = 100;
+
+/**
  * Score every URL with Flash Lite and return them sorted desc by score.
  * Preserves all input URLs (Zod schema is permissive on count). If the
- * LLM omits a URL, it's appended at score 0.5 (neutral) so it isn't
- * silently lost.
+ * LLM omits a URL, it's appended at score 0 so junk the model implicitly
+ * rejected can't sneak past pickByScore. Inputs over RERANK_CHUNK_SIZE
+ * are scored in parallel chunked calls.
  */
 export async function rerankUrls(args: RerankArgs): Promise<RerankItem[]> {
   if (args.urls.length === 0) return [];
+
+  if (args.urls.length > RERANK_CHUNK_SIZE) {
+    const chunks: string[][] = [];
+    for (let i = 0; i < args.urls.length; i += RERANK_CHUNK_SIZE) {
+      chunks.push(args.urls.slice(i, i + RERANK_CHUNK_SIZE));
+    }
+    const results = await Promise.all(chunks.map((c) => rerankUrls({ ...args, urls: c })));
+    return results.flat().sort((a, b) => b.score - a.score);
+  }
 
   const result = await args.llm.generateStructured({
     model: "gemini-3.1-flash-lite",

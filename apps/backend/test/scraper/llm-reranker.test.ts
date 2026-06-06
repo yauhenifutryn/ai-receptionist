@@ -140,3 +140,44 @@ describe("rerankUrls (LLM call)", () => {
     expect(provider.generateJson).not.toHaveBeenCalled();
   });
 });
+
+describe("rerankUrls (chunking — REGRESSION dentus.szczecin.pl 620 kept URLs)", () => {
+  // A single call caps at ~100 scored entries (8192 output tokens). Large
+  // sites must be reranked in FULL via parallel chunked calls — slicing
+  // the input to the first 100 URLs made page selection depend on
+  // Firecrawl's unstable map order (13 vs 2 priced services across runs),
+  // and the depth-sort workaround crowded the input with campaign stubs.
+  it("splits >100-URL inputs into multiple LLM calls and merges all scores", async () => {
+    const calls: string[][] = [];
+    const fakeProvider = {
+      generateJson: vi.fn().mockImplementation(async (args: { user: string }) => {
+        const urls = args.user
+          .split("\n")
+          .filter((l) => /^\d+\. /.test(l))
+          .map((l) => l.replace(/^\d+\. /, ""));
+        calls.push(urls);
+        return {
+          text: JSON.stringify({
+            ranked: urls.map((u) => ({
+              url: u,
+              score: u.includes("cennik") ? 0.95 : 0.5,
+              reason: "",
+            })),
+          }),
+        };
+      }),
+    };
+    const llm = new LLMClient(fakeProvider);
+    const urls = [
+      ...Array.from({ length: 150 }, (_, i) => `https://x.pl/page-${String(i).padStart(3, "0")}`),
+      "https://x.pl/zzz-cennik", // would be cut by any first-100 slice
+    ];
+    const out = await rerankUrls({ rootUrl: "https://x.pl", urls, llm });
+
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    expect(calls.every((c) => c.length <= 100)).toBe(true);
+    expect(out).toHaveLength(151);
+    expect(out[0]!.url).toBe("https://x.pl/zzz-cennik");
+    expect(out[0]!.score).toBe(0.95);
+  });
+});

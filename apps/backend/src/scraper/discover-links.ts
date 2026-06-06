@@ -15,7 +15,11 @@ import { canonicalizeUrl } from "./url-filter.js";
  * double-scraping the same logical page.
  */
 
-const MARKDOWN_LINK_RE = /\[(?:[^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
+// Optional markdown title after the URL — Firecrawl renders nav links as
+// [Cennik](https://…/cennik "Cennik usług stomatologicznych"). Demanding
+// ')' right after the URL made every title-bearing link invisible to the
+// discovery pass (annadentalclinic.com's only route to its pricing page).
+const MARKDOWN_LINK_RE = /\[(?:[^\]]*)\]\((https?:\/\/[^\s)]+)(?:\s+(?:"[^"]*"|'[^']*'))?\)/g;
 
 function apexHost(host: string): string {
   const lower = host.toLowerCase();

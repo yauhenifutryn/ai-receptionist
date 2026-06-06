@@ -228,4 +228,46 @@ describe("staffBlock RAG hardening (REGRESSION dentus.szczecin.pl REAL CALL 2026
     expect(md).toContain("Radiologia");
     expect(md).not.toContain("Radiologia (");
   });
+
+  it("appends LLM-generated specializationSynonyms not already covered by the map", () => {
+    // Auto patient phrasing for NEW agents: the consolidation LLM emits
+    // synonyms for unmapped terms; the renderer appends only the ones the
+    // deterministic map didn't already put on the line.
+    const md = scraperOutputToMarkdown({
+      ...SAMPLE,
+      staff: [
+        {
+          name: "lek. Q",
+          role: "lekarz stomatolog",
+          specialization: "Endodoncja, Gnatologia",
+          specializationSynonyms: [
+            "leczenie kanałowe", // duplicate — map already adds it
+            "leczenie stawów skroniowo-żuchwowych", // novel — must appear
+            "ból żuchwy",
+          ],
+          languages: [],
+        },
+      ],
+    });
+    expect(md).toContain("pacjenci pytają też: leczenie stawów skroniowo-żuchwowych, ból żuchwy");
+    // the duplicate must not be repeated in the appended tail — the only
+    // occurrence is the map's own parenthetical expansion
+    expect(md.match(/leczenie kanałowe/g)?.length).toBe(1);
+  });
+
+  it("emits no 'pacjenci pytają' tail when synonyms are absent or all duplicates", () => {
+    const md = scraperOutputToMarkdown({
+      ...SAMPLE,
+      staff: [
+        {
+          name: "lek. R",
+          role: "lekarz stomatolog",
+          specialization: "Endodoncja",
+          specializationSynonyms: ["leczenie kanałowe"],
+          languages: [],
+        },
+      ],
+    });
+    expect(md).not.toContain("pacjenci pytają");
+  });
 });

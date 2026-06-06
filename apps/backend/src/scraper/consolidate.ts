@@ -63,9 +63,14 @@ const SCRAPER_OUTPUT_JSON_SCHEMA = {
           name: { type: "STRING" },
           role: { type: "STRING" },
           specialization: { type: "STRING" },
+          // Patient phrasings for the specialization — required so the
+          // model never lazy-skips the field (same constrained-decoding
+          // lesson as price display/qualifier and the 7-day hours shape).
+          // Empty array is valid for non-clinical staff.
+          specializationSynonyms: { type: "ARRAY", items: { type: "STRING" } },
           languages: { type: "ARRAY", items: { type: "STRING" } },
         },
-        required: ["name"],
+        required: ["name", "specializationSynonyms"],
       },
     },
     services: {
@@ -145,6 +150,8 @@ const SYSTEM_PROMPT = [
   "",
   "Required top-level fields: sourceUrl (string URL), scrapedAt (ISO 8601), tenant.name (string).",
   "Optional arrays: staff[], services[], faq[]. Use [] when nothing is present.",
+  "",
+  'STAFF specializationSynonyms (required on every staff member): for each clinical specialization, list 1-3 short Polish phrasings a PATIENT would use when asking for that doctor on the phone — the procedure words, not the clinical taxonomy. Examples: Endodoncja → ["leczenie kanałowe"]; Protetyka → ["korony", "mosty", "protezy"]; Gnatologia → ["leczenie stawów skroniowo-żuchwowych", "ból żuchwy"]. Use [] for non-clinical staff (hygienists, assistants, reception, admin). Never invent specializations the source does not state — synonyms only rephrase the stated specialization.',
   "",
   // dci.waw.pl regression: the site serves Russian on unprefixed paths and
   // Polish under _pl suffixes. The KB is read aloud by a Polish-speaking

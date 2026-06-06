@@ -232,6 +232,41 @@ describe("scraper.consolidate (W2.1)", () => {
     expect(captured).toMatch(/Lakowanie/);
   });
 
+  it("Gemini-side staff schema declares specializationSynonyms and the prompt explains it (auto patient phrasing for NEW agents)", async () => {
+    // The deterministic taxonomy map in to-markdown.ts covers the dental
+    // core; the consolidation LLM generates patient phrasings for anything
+    // unmapped, so every new agent's roster is retrieval-ready without
+    // hand-extending the map.
+    let captured = "";
+    let capturedSchema: unknown;
+    const llm = new LLMClient(
+      provider(async (args: GenerateJsonArgs) => {
+        captured = args.system ?? "";
+        capturedSchema = args.jsonSchema;
+        return { text: JSON.stringify(VALID_OUTPUT) };
+      }),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+
+    await consolidate({
+      rootUrl: "https://example-vet.pl",
+      pages: [{ url: "https://example-vet.pl", markdown: "# x" }],
+      llm,
+    });
+
+    const staffItem = (
+      capturedSchema as {
+        properties: {
+          staff: { items: { properties: Record<string, unknown>; required?: string[] } };
+        };
+      }
+    ).properties.staff.items;
+    expect(staffItem.properties).toHaveProperty("specializationSynonyms");
+    expect(staffItem.required).toContain("specializationSynonyms");
+    expect(captured).toMatch(/specializationSynonyms/);
+    expect(captured.toLowerCase()).toMatch(/pacjent|patient/);
+  });
+
   it("stamps scrapedAt deterministically — model-emitted dates are hallucinated (REGRESSION: '2024-07-29' on a 2026 run)", async () => {
     const llm = new LLMClient(
       provider(async () => ({

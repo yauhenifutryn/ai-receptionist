@@ -149,6 +149,14 @@ function staffBlock(out: ScraperOutput): string {
     // otherwise the same synonyms would land twice on one line.
     if (s.role) pieces.push(s.specialization ? s.role : enrichWithPatientSynonyms(s.role));
     if (s.specialization) pieces.push(enrichWithPatientSynonyms(s.specialization));
+    // LLM-generated patient phrasings (specializationSynonyms) cover what
+    // the deterministic map doesn't; append only the ones the line doesn't
+    // already carry, so map-covered terms never repeat.
+    const lineSoFar = pieces.join(" — ").toLowerCase();
+    const novel = (s.specializationSynonyms ?? []).filter(
+      (syn) => syn.trim().length > 0 && !lineSoFar.includes(syn.trim().toLowerCase()),
+    );
+    if (novel.length > 0) pieces.push(`pacjenci pytają też: ${novel.join(", ")}`);
     if (s.languages.length > 0) {
       pieces.push(`języki: ${s.languages.join(", ")}`);
     }

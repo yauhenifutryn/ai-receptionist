@@ -1,5 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { ScraperTenantInfoSchema } from "../src/scraper.schema.js";
+import { ScraperStaffSchema, ScraperTenantInfoSchema } from "../src/scraper.schema.js";
+
+describe("ScraperStaffSchema", () => {
+  it("carries LLM-generated patient synonyms for the specialization, defaulting to []", () => {
+    // dentus.szczecin.pl real-call lesson (2026-06-06): roster lines need
+    // patient phrasing to win RAG retrieval. The deterministic map in
+    // to-markdown.ts covers the dental core taxonomy; this field lets the
+    // consolidation LLM cover everything else (rare specializations, other
+    // verticals) automatically for every NEW agent.
+    const withSyns = ScraperStaffSchema.safeParse({
+      name: "lek. stom. Anna Stefańczyk",
+      specialization: "Endodoncja",
+      specializationSynonyms: ["leczenie kanałowe", "kanałowe leczenie zębów"],
+    });
+    expect(withSyns.success).toBe(true);
+
+    const without = ScraperStaffSchema.parse({ name: "dr X" });
+    expect(without.specializationSynonyms).toEqual([]);
+  });
+});
 
 describe("ScraperTenantInfoSchema", () => {
   it("accepts a single plain email", () => {

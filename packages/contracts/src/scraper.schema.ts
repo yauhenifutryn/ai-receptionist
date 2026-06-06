@@ -54,6 +54,15 @@ export const ScraperStaffSchema = z
     name: z.string().min(1),
     role: z.string().optional(),
     specialization: z.string().optional(),
+    /**
+     * LLM-generated Polish patient phrasings for the specialization
+     * ("Endodoncja" → "leczenie kanałowe"). Rendered into every roster
+     * line so the chunk wins RAG retrieval against generic ontology text
+     * (dentus.szczecin.pl real-call lesson, 2026-06-06). Complements the
+     * deterministic taxonomy map in to-markdown.ts, which covers the
+     * dental core; this covers everything unmapped.
+     */
+    specializationSynonyms: z.array(z.string()).default([]),
     languages: z.array(z.string()).default([]),
   })
   .strict();

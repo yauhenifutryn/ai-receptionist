@@ -212,6 +212,26 @@ describe("scraper.consolidate (W2.1)", () => {
     expect(captured.toLowerCase()).toMatch(/informacyjn|przykładowe/);
   });
 
+  it("system prompt forbids price transfer between similarly-named services (REGRESSION dentus.szczecin.pl: Lakierowanie 150 zł copied onto Lakowanie)", async () => {
+    let captured = "";
+    const llm = new LLMClient(
+      provider(async (args: GenerateJsonArgs) => {
+        captured = args.system ?? "";
+        return { text: JSON.stringify(VALID_OUTPUT) };
+      }),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+
+    await consolidate({
+      rootUrl: "https://example-vet.pl",
+      pages: [{ url: "https://example-vet.pl", markdown: "# x" }],
+      llm,
+    });
+
+    expect(captured).toMatch(/Never transfer/);
+    expect(captured).toMatch(/Lakowanie/);
+  });
+
   it("stamps scrapedAt deterministically — model-emitted dates are hallucinated (REGRESSION: '2024-07-29' on a 2026 run)", async () => {
     const llm = new LLMClient(
       provider(async () => ({

@@ -169,6 +169,7 @@ const SYSTEM_PROMPT = [
   '  - "Wypełnienie kompozytowe500 – 600 zł" → name "Wypełnienie kompozytowe", price { display:"500 – 600 zł", min:500, max:600, qualifier:"range" }',
   "These ARE real published price rows. Split the trailing price expression from the name and capture it normally.",
   'PRICE DISCLAIMERS do not erase prices: phrases like "podane przykładowe ceny mają formę informacyjną" or "ceny mogą się różnić" mean the numbers are reference prices — STILL capture them as listed. Only mark unknown when no number is published at all.',
+  'A price belongs ONLY to the service row it is printed with. Never transfer it to a similarly-named but different service (observed: "Fluoryzacja / Lakierowanie — 150 zł" wrongly copied onto "Lakowanie zębów", a different procedure with no published price).',
   "STRICT RULES:",
   '  - qualifier="range" REQUIRES BOTH min AND max populated (e.g., "500-900 PLN" → min:500 AND max:900). Never set qualifier="range" with only one of them — use "from" instead if only the lower bound is known.',
   '  - qualifier="exact" REQUIRES min=max (both the same number).',

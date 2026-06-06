@@ -1,6 +1,7 @@
 import { ScraperOutputSchema, type ScraperOutput } from "@ai-receptionist/contracts";
 import type { LLMClient } from "../lib/llm.js";
 import type { FirecrawlPage } from "./firecrawl.js";
+import { mergePartials } from "./merge-partials.js";
 
 /**
  * Gemini-side JSON Schema (OpenAPI 3.0 subset) for ScraperOutput. Used as
@@ -228,6 +229,8 @@ export interface ConsolidateArgs {
    */
   model?: import("../lib/llm.js").LLMModel;
   fallbackChain?: import("../lib/llm.js").LLMModel[];
+  /** Test override for the dropout-retry batch size (chars per batch). */
+  batchCharBudget?: number;
 }
 
 /**
@@ -258,7 +261,92 @@ function buildUserPrompt(rootUrl: string, pages: FirecrawlPage[]): string {
   return [`Root URL: ${rootUrl}`, `Pages: ${pages.length}`, "", ...blocks].join("\n\n");
 }
 
+/**
+ * Minimum count of price-like patterns in the INPUT pages for the
+ * price-dropout detector to consider the site "priced". Below this, an
+ * unpriced output is treated as a natural gap (dentus-style site without
+ * a cennik), not an extraction failure.
+ */
+export const PRICE_SIGNAL_RETRY_THRESHOLD = 3;
+
+/**
+ * Char budget per batch when the dropout retry re-runs consolidation in
+ * batched mode. ~60k chars ≈ 15k tokens — the scale at which extraction
+ * was directly verified (a 2-page MAS probe extracted 75/75 prices while
+ * the 36-page single shot extracted 0).
+ */
+export const CONSOLIDATION_BATCH_CHAR_BUDGET = 60_000;
+
+/** Price-like patterns ("100 zł", "1 500 PLN") across all input pages. */
+function countPriceSignals(pages: FirecrawlPage[]): number {
+  let n = 0;
+  for (const p of pages) {
+    n += (p.markdown.match(/\d[\d\s ]*(?:zł|pln)/gi) ?? []).length;
+  }
+  return n;
+}
+
+function countPricedServices(out: ScraperOutput): number {
+  return out.services.filter((s) => s.price && s.price.qualifier !== "unknown").length;
+}
+
+/** Greedy order-preserving chunking; a page never splits across batches. */
+function chunkPagesByChars(pages: FirecrawlPage[], budget: number): FirecrawlPage[][] {
+  const batches: FirecrawlPage[][] = [];
+  let current: FirecrawlPage[] = [];
+  let size = 0;
+  for (const p of pages) {
+    if (current.length > 0 && size + p.markdown.length > budget) {
+      batches.push(current);
+      current = [];
+      size = 0;
+    }
+    current.push(p);
+    size += p.markdown.length;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
+/**
+ * Single-shot consolidation with PRICE-DROPOUT self-healing.
+ *
+ * REGRESSION (mas-stomatologia.pl, 2026-06-06): a 36-page input whose
+ * cennik was scraped clean ("- Konsultacja 100 zł" rows) consolidated into
+ * 43 services with EVERY price object omitted — gemini-2.5-pro, first
+ * attempt, no fallback. Not scale-dependent (MAS @352k chars failed while
+ * Anna @529k succeeded same-day): a stochastic lazy-fill pathology on
+ * mixed-language inputs. Detector: when the input carries clear price
+ * signals but the output prices nothing, re-run in batched mode (small
+ * inputs extract reliably — verified 75/75 on a 2-page probe) and merge
+ * with mergePartials.
+ */
 export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput> {
+  const first = await consolidateSingle(args);
+  const signals = countPriceSignals(args.pages);
+  if (
+    args.pages.length > 1 &&
+    signals >= PRICE_SIGNAL_RETRY_THRESHOLD &&
+    countPricedServices(first) === 0
+  ) {
+    console.warn(
+      `[consolidate] price dropout: ${signals} price signals in input, 0 priced services out — retrying in batched mode`,
+    );
+    const budget = args.batchCharBudget ?? CONSOLIDATION_BATCH_CHAR_BUDGET;
+    const partials: ScraperOutput[] = [];
+    for (const batch of chunkPagesByChars(args.pages, budget)) {
+      partials.push(await consolidateSingle({ ...args, pages: batch }));
+    }
+    const merged = mergePartials(partials);
+    console.warn(
+      `[consolidate] batched retry: ${partials.length} batches → ${countPricedServices(merged)} priced services`,
+    );
+    return merged;
+  }
+  return first;
+}
+
+async function consolidateSingle(args: ConsolidateArgs): Promise<ScraperOutput> {
   const now = args.now ?? (() => new Date());
   const result = await args.llm.generateStructured({
     // Primary `gemini-2.5-pro`: only Gemini model that can ACTUALLY

@@ -286,6 +286,115 @@ describe("scraper.consolidate (W2.1)", () => {
     expect(out.scrapedAt).toBe("2026-06-06T10:00:00.000Z");
   });
 
+  it("price-dropout triggers batched retry + merge (REGRESSION mas-stomatologia.pl: 36-page input, cennik scraped clean, 0/43 prices extracted by 2.5-pro single-shot)", async () => {
+    // The input visibly carried dozens of "- Konsultacja 100 zł" rows and
+    // the output named the cennik's services — with every price object
+    // omitted. Not scale-dependent (MAS @352k chars failed; Anna @529k
+    // succeeded) and not the fallback model (no LLMClient warnings → pro,
+    // attempt 1). Detector: price signals in the INPUT vs priced services
+    // in the OUTPUT; on dropout, re-run in batched mode (2-page probe
+    // extracted 75/75) and mergePartials.
+    const cennikPage = {
+      url: "https://x.pl/cennik",
+      markdown: "## Cennik\n- Konsultacja 100 zł\n- Znieczulenie 50 zł\n- Próchnica 350 zł",
+    };
+    const teamPage = {
+      url: "https://x.pl/zespol",
+      markdown: "## Zespół\ndr Maria Nowak\n- Wybielanie 600 zł\n- Korona 1200 zł",
+    };
+
+    const pricelessFull = {
+      ...VALID_OUTPUT,
+      services: [
+        { name: "Konsultacja", synonyms: [], nfzCovered: "unknown" },
+        { name: "Wybielanie", synonyms: [], nfzCovered: "unknown" },
+      ],
+    };
+    const pricedPartial = (name: string, price: number) => ({
+      ...VALID_OUTPUT,
+      services: [
+        {
+          name,
+          synonyms: [],
+          nfzCovered: "unknown",
+          price: {
+            currency: "PLN",
+            display: `${price} zł`,
+            min: price,
+            max: price,
+            qualifier: "exact",
+          },
+        },
+      ],
+    });
+
+    let calls = 0;
+    const llm = new LLMClient(
+      provider(async () => {
+        calls++;
+        if (calls === 1) return { text: JSON.stringify(pricelessFull) };
+        if (calls === 2) return { text: JSON.stringify(pricedPartial("Konsultacja", 100)) };
+        return { text: JSON.stringify(pricedPartial("Wybielanie", 600)) };
+      }),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+
+    const out = await consolidate({
+      rootUrl: "https://x.pl",
+      pages: [cennikPage, teamPage],
+      llm,
+      batchCharBudget: 10, // force one page per batch
+    });
+
+    expect(calls).toBe(3); // 1 single-shot + 2 batches
+    const priced = out.services.filter((s) => s.price && s.price.qualifier !== "unknown");
+    expect(priced.map((s) => s.name).sort()).toEqual(["Konsultacja", "Wybielanie"]);
+  });
+
+  it("no batched retry when the single shot already extracts prices", async () => {
+    let calls = 0;
+    const llm = new LLMClient(
+      provider(async () => {
+        calls++;
+        return { text: JSON.stringify(VALID_OUTPUT) }; // has 1 priced service
+      }),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+    await consolidate({
+      rootUrl: "https://x.pl",
+      pages: [
+        { url: "https://x.pl/cennik", markdown: "- A 100 zł\n- B 200 zł\n- C 300 zł" },
+        { url: "https://x.pl/b", markdown: "y" },
+      ],
+      llm,
+    });
+    expect(calls).toBe(1);
+  });
+
+  it("no batched retry when the site publishes no prices (dentus-style natural gap)", async () => {
+    const priceless = {
+      ...VALID_OUTPUT,
+      services: [{ name: "Konsultacja", synonyms: [], nfzCovered: "unknown" }],
+    };
+    let calls = 0;
+    const llm = new LLMClient(
+      provider(async () => {
+        calls++;
+        return { text: JSON.stringify(priceless) };
+      }),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+    await consolidate({
+      rootUrl: "https://x.pl",
+      pages: [
+        { url: "https://x.pl/uslugi", markdown: "Oferujemy leczenie." },
+        { url: "https://x.pl/zespol", markdown: "dr Nowak" },
+      ],
+      llm,
+    });
+    expect(calls).toBe(1);
+  });
+
   it("retries via LLMClient when first response is malformed", async () => {
     let n = 0;
     const llm = new LLMClient(

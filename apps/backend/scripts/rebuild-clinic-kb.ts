@@ -116,6 +116,27 @@ if (markdown.length < 1500) {
   process.exit(1);
 }
 
+// Price-regression gate (mas-stomatologia.pl lesson, 2026-06-06): a
+// consolidation price-dropout produced a 0-priced KB that was swapped onto
+// a live agent whose old KB may have carried prices. Never regress a live
+// agent's pricing: compare against the currently attached doc and abort.
+if (oldTenantDocs.length > 0) {
+  const oldContent = await (
+    await fetch(
+      `https://api.elevenlabs.io/v1/convai/knowledge-base/${oldTenantDocs[0]!.id}/content`,
+      { headers: { "xi-api-key": elKey } },
+    )
+  ).text();
+  const oldPriced = (oldContent.match(/Cena: (?!nieznana)/g) ?? []).length;
+  console.log(`price gate: old KB priced=${oldPriced}, new KB priced=${priced}`);
+  if (oldPriced > 0 && priced === 0) {
+    console.error(
+      "ABORT: price regression (old KB priced, new KB 0) — keeping the existing document",
+    );
+    process.exit(1);
+  }
+}
+
 const slug = tenant.name
   .toLowerCase()
   .replace(/[^a-z0-9]+/g, "-")

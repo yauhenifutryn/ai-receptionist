@@ -204,21 +204,32 @@ function section(title: string, lines: string[]): string {
 /** Render the always-true clinic facts block for the Environment section. */
 function clinicFactsLines(facts: ClinicFacts | undefined): string[] {
   if (!facts || (!facts.address && !facts.phone && !facts.hoursLines?.length)) return [];
+  const hasUnpublishedDays = facts.hoursLines?.some((l) => l.includes("brak danych")) ?? false;
   const lines = [
-    "CORE CLINIC FACTS — always true for this clinic, answer from here INSTANTLY. Never say you don't know these and never quote different values from anywhere else:",
+    "CORE CLINIC FACTS — always true for this clinic, answer from here INSTANTLY. Never say you don't know these and never quote different values from anywhere else." +
+      (hasUnpublishedDays
+        ? ' EXCEPTION: days marked "brak danych" are NOT known facts — for those the ZASADA rule below is absolute.'
+        : ""),
   ];
   if (facts.address) lines.push(`- Adres: ${facts.address}`);
   if (facts.phone) lines.push(`- Telefon recepcji: ${facts.phone}`);
   if (facts.hoursLines?.length) {
     lines.push("- Godziny otwarcia:");
-    for (const l of facts.hoursLines) lines.push(`  - ${l}`);
-    // Convention note — only when an unpublished day is present.
-    // REGRESSION (annadentalclinic.com sim): without this, the agent read
-    // 'Sobota: brak danych' as "closed" and asserted "w soboty całkowicie
-    // zamknięta" — fabricating a closure the clinic never published.
-    if (facts.hoursLines.some((l) => l.includes("brak danych"))) {
+    for (const l of facts.hoursLines) {
+      lines.push(l.includes("brak danych") ? `  - ${l} — obowiązuje ZASADA poniżej` : `  - ${l}`);
+    }
+    // REGRESSION (annadentalclinic.com REAL call 2026-06-06, conv_5201ktew…):
+    // the previous English footnote survived a sim but FAILED the real call —
+    // the agent asserted "W soboty nasza klinika nie pracuje" for an
+    // unpublished day. Root causes: (a) the CORE FACTS header ordered "Never
+    // say you don't know these", contradicting the footnote; (b) the rule was
+    // an English afterthought, not a line-local Polish directive with the
+    // banned phrasings spelled out. Fixed: header carve-out (above) +
+    // per-line marker + Polish ZASADA with banned verbatims and the exact
+    // required response.
+    if (hasUnpublishedDays) {
       lines.push(
-        '  - Uwaga: "brak danych" means the clinic does not publish hours for that day — NEVER claim it is open or closed then; say you don\'t have that information and offer the reception phone. "zamknięte" means genuinely closed.',
+        '  - ZASADA "brak danych" (bezwzględna): klinika NIE publikuje godzin otwarcia dla tego dnia. NIGDY nie mów, że klinika jest wtedy "zamknięta", "nieczynna", że "nie pracuje" ani że jest otwarta — to byłaby zmyślona informacja. Powiedz: "Nie mam informacji o godzinach otwarcia w ten dzień, najlepiej potwierdzić telefonicznie w recepcji" i podaj numer telefonu recepcji. Dzień opisany "zamknięte" jest naprawdę zamknięty — o nim wolno tak powiedzieć.',
       );
     }
   }

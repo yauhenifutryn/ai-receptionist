@@ -66,26 +66,43 @@ describe("buildSystemPrompt booking modes", () => {
     expect(without).not.toContain("CORE CLINIC FACTS");
   });
 
-  it("clinicFacts: 'brak danych' days come with the honesty convention (REGRESSION annadentalclinic.com sim: agent asserted 'w soboty całkowicie zamknięta' for an unpublished day)", () => {
-    // The site publishes Mon-Fri hours only; the KB marks saturday/sunday
-    // as "brak danych". Without an explicit convention the agent read
-    // that as "closed" and CLAIMED full Saturday closure — fabrication of
-    // a fact the clinic never published.
+  it("clinicFacts: 'brak danych' days carry a line-local Polish hard rule (REGRESSION annadentalclinic.com REAL CALL 2026-06-06: 'W soboty nasza klinika nie pracuje')", () => {
+    // The previous English footnote survived a sim but FAILED the real call
+    // (conv_5201ktew…): gemini-3.1-flash-lite resolved the contradiction
+    // between the CORE FACTS header ("Never say you don't know these") and
+    // the footnote by asserting closure. The rule must be (a) Polish,
+    // (b) line-local on each affected day, (c) spell out the banned
+    // phrasings verbatim — including the live failure "nie pracuje" —
+    // (d) give the exact required response, and (e) carve the exception
+    // out of the header instruction itself.
     const facts = {
+      phone: "+48583000194",
       hoursLines: ["Poniedziałek: 08:00-20:00", "Sobota: brak danych", "Niedziela: zamknięte"],
     };
-    const withFacts = buildSystemPrompt({ tenantDisplayName: "Testowa", clinicFacts: facts });
-    expect(withFacts).toMatch(
-      /brak danych.*(nie ma|nie podaje|nie publikuje)|"brak danych" means/i,
-    );
-    expect(withFacts).toMatch(/zamknięte/);
+    const p = buildSystemPrompt({ tenantDisplayName: "Testowa", clinicFacts: facts });
 
-    // No convention noise when every day has real hours.
+    // (e) header carve-out so "never say you don't know" can't override
+    expect(p).toMatch(/EXCEPTION: days marked "brak danych"/);
+    // (b) line-local marker on the affected day only
+    expect(p).toContain("Sobota: brak danych — obowiązuje ZASADA");
+    expect(p).toContain("Niedziela: zamknięte");
+    expect(p).not.toContain("Niedziela: zamknięte — obowiązuje");
+    // (a, c) Polish hard rule with banned phrasings, incl. the live failure
+    expect(p).toMatch(/ZASADA "brak danych"/);
+    expect(p).toMatch(/NIGDY/);
+    expect(p).toContain('"nie pracuje"');
+    expect(p).toMatch(/zamknięta|nieczynna/);
+    // (d) canned response + reception phone offer
+    expect(p).toContain("Nie mam informacji o godzinach otwarcia");
+    expect(p).toMatch(/numer (telefonu )?recepcji/);
+
+    // No rule noise when every day has real hours.
     const clean = buildSystemPrompt({
       tenantDisplayName: "Testowa",
       clinicFacts: { hoursLines: ["Poniedziałek: 08:00-20:00"] },
     });
-    expect(clean).not.toMatch(/"brak danych" means/i);
+    expect(clean).not.toContain("ZASADA");
+    expect(clean).not.toMatch(/EXCEPTION: days marked/);
   });
 
   it("clinicFactsFromKnowledgeMarkdown parses the generated knowledge.md shape", async () => {

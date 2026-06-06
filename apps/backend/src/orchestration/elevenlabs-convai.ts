@@ -152,6 +152,28 @@ export const DEFAULT_TTS_MODEL_ID = "eleven_flash_v2_5";
 export const RAG_EMBEDDING_MODEL = "multilingual_e5_large_instruct";
 export const RAG_MAX_CHUNKS = 20;
 
+// 2026-06-06 retrieval-variance fix. Identical doctor questions retrieved
+// the roster chunk in one call (query rewritten WITH the clinic name) and
+// missed it in the next (bare query): with ~80% of the chunk pool being
+// shared ontology, marginal ranks flip on query wording. Two levers, both
+// schema-sanctioned (max_retrieved_rag_chunks_count is hard-capped at 20,
+// so headroom is NOT available):
+//   - num_candidates raises ANN recall (EL docs: "higher number means
+//     better results"; recommended minimum 100).
+//   - query_rewrite_prompt_override pins the clinic name into every
+//     retrieval query and keeps the caller's service words verbatim, so
+//     clinic-doc chunks out-rank generic ontology consistently.
+export const RAG_NUM_CANDIDATES = 300;
+export function buildQueryRewritePrompt(tenantDisplayName: string): string {
+  return (
+    `Rewrite the caller's last message as ONE self-contained Polish search query ` +
+    `for the knowledge base of the dental clinic '${tenantDisplayName}'. ` +
+    `ALWAYS include the clinic name '${tenantDisplayName}' in the query. ` +
+    `Keep the caller's exact service words verbatim (e.g. 'leczenie kanałowe' stays ` +
+    `'leczenie kanałowe'); do not replace them with clinical taxonomy. Output only the query.`
+  );
+}
+
 // Kept as an exported interface so older imports (backfill script, tests)
 // don't break. We no longer ship any tags by default — the empty array is
 // passed through to EL so the agent uses the voice's natural register.
@@ -483,6 +505,8 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
                 enabled: true,
                 embedding_model: RAG_EMBEDDING_MODEL,
                 max_retrieved_rag_chunks_count: RAG_MAX_CHUNKS,
+                num_candidates: RAG_NUM_CANDIDATES,
+                query_rewrite_prompt_override: buildQueryRewritePrompt(input.tenantDisplayName),
               },
             },
             language,

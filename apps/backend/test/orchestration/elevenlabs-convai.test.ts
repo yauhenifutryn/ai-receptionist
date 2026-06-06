@@ -157,6 +157,15 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     expect(rag.enabled).toBe(true);
     expect(rag.embedding_model).toBe("multilingual_e5_large_instruct");
     expect(rag.max_retrieved_rag_chunks_count).toBe(20);
+    // 2026-06-06 retrieval-variance fix: identical doctor questions
+    // retrieved the roster chunk in one call and missed it in the next —
+    // the difference was the rewritten query carrying the clinic name (the
+    // 80%-ontology chunk pool wins marginal ranks otherwise). num_candidates
+    // raises ANN recall (EL default is lower; schema recommends >= 100);
+    // the rewrite override pins the clinic name into every retrieval query.
+    expect(rag.num_candidates).toBe(300);
+    expect(rag.query_rewrite_prompt_override).toContain("Klinika Łapka");
+    expect(rag.query_rewrite_prompt_override).toMatch(/verbatim/);
     const turn = conv.turn as Record<string, unknown>;
     expect(turn.turn_timeout).toBe(3);
     expect(turn.turn_eagerness).toBe("eager");

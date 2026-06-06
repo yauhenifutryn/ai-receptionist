@@ -3,6 +3,8 @@ import type { GenerateJsonArgs, LLMProvider } from "./llm.js";
 
 export interface CreateGeminiProviderOptions {
   apiKey?: string;
+  /** SDK hard timeout in ms. Default 300s; benches may raise it. */
+  timeoutMs?: number;
 }
 
 export function createGeminiProvider(opts: CreateGeminiProviderOptions = {}): LLMProvider {
@@ -15,7 +17,7 @@ export function createGeminiProvider(opts: CreateGeminiProviderOptions = {}): LL
   // in 60-90s; this only kicks in when Google or the network are wedged.
   const client = new GoogleGenAI({
     apiKey,
-    httpOptions: { timeout: 300_000 },
+    httpOptions: { timeout: opts.timeoutMs ?? 300_000 },
   });
 
   return {

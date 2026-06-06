@@ -1,6 +1,7 @@
 import type { ScraperOutput } from "@ai-receptionist/contracts";
 import type { LLMClient } from "../lib/llm.js";
 import { consolidate } from "./consolidate.js";
+import { extractInternalLinks } from "./discover-links.js";
 import type { FirecrawlClient, FirecrawlPage } from "./firecrawl.js";
 import { rerankUrls, pickByScore } from "./llm-reranker.js";
 import {
@@ -127,32 +128,10 @@ export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Prom
   // map-order slice(0, 25) filled all slots with blog posts on
   // dentus.szczecin.pl (kontakt sat at #29, zespol at #27). On rerank
   // failure the safe default is map order: scrape more, not less.
-  let candidates: string[];
-  try {
-    const reranked = await rerankUrls({
-      rootUrl: args.url,
-      urls: deduped.slice(0, RERANK_INPUT_CAP),
-      llm: args.llm,
-    });
-    candidates = pickByScore(reranked, {
-      threshold: RERANK_THRESHOLD,
-      floor: SCRAPE_FLOOR,
-      ceiling: maxPages,
-    });
-    // The root page is non-negotiable: clinics hide hours/phone in its
-    // footer (wadental.pl), and a low rerank score must not drop it.
-    const rootCanonical = canonicalizeUrl(args.url);
-    if (!candidates.some((c) => canonicalizeUrl(c) === rootCanonical)) {
-      candidates = [args.url, ...candidates].slice(0, Math.max(maxPages, 1));
-    }
-  } catch {
-    candidates = deduped.slice(0, maxPages);
-  }
+  const candidates = await selectCandidates(args, deduped, maxPages, SCRAPE_FLOOR);
 
-  const pages = await runWithConcurrency(
-    candidates,
-    args.concurrency ?? DEFAULT_CRAWL_CONCURRENCY,
-    async (u) => {
+  const scrapePass = (urls: string[]) =>
+    runWithConcurrency(urls, args.concurrency ?? DEFAULT_CRAWL_CONCURRENCY, async (u) => {
       // Per-page tolerance: a single 408 on a slow page must degrade to
       // "page skipped", never abort the whole provisioning run (the
       // 2026-06-06 batch lost 2 of 3 clinics to exactly this).
@@ -164,14 +143,68 @@ export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Prom
         args.onPage?.({ url: u, chars: 0, error: (e as Error).message });
         return { url: u, markdown: "" };
       }
-    },
-  );
+    });
+
+  const firstPass = await scrapePass(candidates);
+  const valid = firstPass.filter((p): p is FirecrawlPage => p.markdown.length >= MIN_PAGE_CHARS);
+
+  // Discovery pass — Firecrawl maps are sitemap-driven and miss nav-only
+  // pages (annadentalclinic.com publishes /cennik in the header nav but
+  // not in the sitemap; the map-only run produced a 3-priced KB). Pull
+  // internal links out of the scraped markdown, keep the new ones, rerank,
+  // scrape within the remaining page budget. Mirrors the wizard's pass.
+  if (valid.length > 0 && valid.length < maxPages) {
+    const seen = new Set(candidates.map((c) => canonicalizeUrl(c) ?? c));
+    const discovered = extractInternalLinks(valid, args.url)
+      .map((u) => upgradeToRootScheme(args.url, [u])[0]!)
+      .filter((u) => !seen.has(canonicalizeUrl(u) ?? u));
+    const discKept = dedupeByCanonicalUrl(filterCandidates(discovered, primaryLang).kept);
+    if (discKept.length > 0) {
+      const discCandidates = await selectCandidates(args, discKept, maxPages - valid.length, 0);
+      if (discCandidates.length > 0) {
+        const more = await scrapePass(discCandidates);
+        valid.push(...more.filter((p) => p.markdown.length >= MIN_PAGE_CHARS));
+      }
+    }
+  }
 
   return consolidate({
     rootUrl: args.url,
-    pages: pages.filter((p): p is FirecrawlPage => p.markdown.length >= MIN_PAGE_CHARS),
+    pages: valid,
     llm: args.llm,
   });
+}
+
+/**
+ * Rerank-and-pick with map-order fallback. `floor > 0` also force-includes
+ * the root page — clinics hide hours/phone in its footer (wadental.pl), and
+ * a low rerank score must not drop it.
+ */
+async function selectCandidates(
+  args: ScrapeAndConsolidateArgs,
+  urls: string[],
+  ceiling: number,
+  floor: number,
+): Promise<string[]> {
+  if (urls.length === 0 || ceiling <= 0) return [];
+  let picked: string[];
+  try {
+    const reranked = await rerankUrls({
+      rootUrl: args.url,
+      urls: urls.slice(0, RERANK_INPUT_CAP),
+      llm: args.llm,
+    });
+    picked = pickByScore(reranked, { threshold: RERANK_THRESHOLD, floor, ceiling });
+  } catch {
+    return urls.slice(0, ceiling);
+  }
+  if (floor > 0) {
+    const rootCanonical = canonicalizeUrl(args.url);
+    if (!picked.some((c) => canonicalizeUrl(c) === rootCanonical)) {
+      picked = [args.url, ...picked].slice(0, Math.max(ceiling, 1));
+    }
+  }
+  return picked;
 }
 
 async function runWithConcurrency<T, R>(

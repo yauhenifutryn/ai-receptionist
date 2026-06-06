@@ -87,7 +87,14 @@ export const ScraperTenantInfoSchema = z
     name: z.string().min(1),
     address: z.string().optional(),
     phone: z.string().optional(),
-    email: z.string().email().optional(),
+    /**
+     * Descriptive KB text, not a send-to address — multi-location clinics
+     * publish one email per gabinet and the consolidation captures both
+     * ("a@x.pl, b@x.pl"). `.email()` here killed a provisioning run
+     * (dentus.szczecin.pl, 2026-06-06); format validation is wrong for
+     * scraped display data.
+     */
+    email: z.string().optional(),
     hours: ScraperHoursSchema.optional(),
     description: z.string().optional(),
   })

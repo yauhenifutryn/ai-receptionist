@@ -155,6 +155,14 @@ const SYSTEM_PROMPT = [
   "",
   "PRICE-LIST COMPLETENESS (critical): when a page is a price list (cennik) — many rows of 'name … NNN PLN' — you MUST emit a separate priced service for EVERY single row. Do NOT summarize, sample, group, or stop early on a price list. A page with 100 priced rows must yield ~100 priced services. Dropping price-list rows is a hard error: those prices are the single most valuable output.",
   "",
+  // dci.waw.pl regression: footer said "Пн-Пт 9:00-20:00, Сб 9:00-16:00,
+  // Вс — выходной"; the model emitted monday/tuesday/wednesday and stopped.
+  // The agent then 'knew' the clinic was closed Thu-Sun.
+  "HOURS EXTRACTION RULES (critical):",
+  '  - Day ranges ("Pon-Pt 9:00-20:00", "Пн-Пт", "Mo-Fr", "pn – pt") expand to EVERY day in the range: monday, tuesday, wednesday, thursday AND friday each get the value. Never stop mid-range.',
+  '  - Always emit saturday and sunday explicitly when the source mentions them ("Sob 9-16" → saturday: "09:00-16:00"; "Вс — выходной" / "niedziela zamknięte" → sunday: "zamknięte").',
+  "  - If locations differ in hours, fill the day fields with the main location's hours and put per-location detail into hours.notes, labelled by location name.",
+  "",
   "For each service emit { name, synonyms[], nfzCovered, price?, durationMinutes? }.",
   "For each staff member emit { name, role?, specialization?, languages[] }.",
   "For each FAQ emit { question, answer }.",
@@ -273,7 +281,9 @@ export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput>
     thinkingBudget: CONSOLIDATE_THINKING_BUDGET,
     ...(args.signal !== undefined ? { abortSignal: args.signal } : {}),
   });
-  const out = result.data;
+  // scrapedAt is stamped deterministically — the model hallucinates dates
+  // (emitted "2024-07-29" on a 2026-06-06 run; it cannot know today's date).
+  const out = { ...result.data, scrapedAt: now().toISOString() };
   const hasUnknown = out.services.some(
     (s) =>
       !s.price ||
@@ -283,9 +293,5 @@ export async function consolidate(args: ConsolidateArgs): Promise<ScraperOutput>
   if (hasUnknown && !out.hasUnknownPrices) {
     return { ...out, hasUnknownPrices: true };
   }
-  // Suppress unused `now` warning while leaving the hook available for callers
-  // that want to override `scrapedAt` via the model. The model emits scrapedAt
-  // per the prompt; `now` is reserved for future deterministic stamping.
-  void now;
   return out;
 }

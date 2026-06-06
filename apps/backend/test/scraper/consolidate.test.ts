@@ -100,6 +100,52 @@ describe("scraper.consolidate (W2.1)", () => {
     expect(captured.toLowerCase()).toMatch(/translate/);
   });
 
+  it("system prompt demands full day-range expansion for hours (REGRESSION dci.waw.pl: 'Пн-Пт 9-20' → only mon/tue/wed emitted)", async () => {
+    // The site footer published Mon-Fri + Sat hours + Sunday-closed; the
+    // consolidation emitted monday/tuesday/wednesday and stopped. The
+    // agent then 'knew' the clinic is closed Thu-Sun — worse than not
+    // knowing. The prompt must force expansion of EVERY day in a range
+    // plus explicit saturday/sunday.
+    let captured = "";
+    const llm = new LLMClient(
+      provider(async (args: GenerateJsonArgs) => {
+        captured = args.system ?? "";
+        return { text: JSON.stringify(VALID_OUTPUT) };
+      }),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+
+    await consolidate({
+      rootUrl: "https://example-vet.pl",
+      pages: [{ url: "https://example-vet.pl", markdown: "# x" }],
+      llm,
+    });
+
+    expect(captured).toMatch(/HOURS EXTRACTION/);
+    expect(captured).toMatch(/EVERY day/);
+    expect(captured.toLowerCase()).toMatch(/saturday/);
+    expect(captured.toLowerCase()).toMatch(/sunday/);
+  });
+
+  it("stamps scrapedAt deterministically — model-emitted dates are hallucinated (REGRESSION: '2024-07-29' on a 2026 run)", async () => {
+    const llm = new LLMClient(
+      provider(async () => ({
+        text: JSON.stringify({ ...VALID_OUTPUT, scrapedAt: "2024-07-29T12:00:00.000Z" }),
+      })),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+
+    const fixedNow = new Date("2026-06-06T10:00:00.000Z");
+    const out = await consolidate({
+      rootUrl: "https://example-vet.pl",
+      pages: [{ url: "https://example-vet.pl", markdown: "# x" }],
+      llm,
+      now: () => fixedNow,
+    });
+
+    expect(out.scrapedAt).toBe("2026-06-06T10:00:00.000Z");
+  });
+
   it("retries via LLMClient when first response is malformed", async () => {
     let n = 0;
     const llm = new LLMClient(

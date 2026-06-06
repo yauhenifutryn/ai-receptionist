@@ -326,6 +326,57 @@ describe("scrapeAndConsolidate (W2.1 orchestrator)", () => {
     expect(scraped).toContain("https://x.pl");
   });
 
+  it("runs a discovery pass: scrapes nav-linked pages the map missed (REGRESSION annadentalclinic.com: /cennik absent from sitemap → 3-priced KB)", async () => {
+    const scraped: string[] = [];
+    let userPrompt = "";
+    const rootMd = `${pageBody("https://x.pl")}\n[Cennik](https://x.pl/cennik)\n[Kontakt](https://x.pl/kontakt)`;
+    const firecrawl: FirecrawlClient = {
+      async map() {
+        return []; // map is blind to nav-only pages
+      },
+      async scrape(url: string) {
+        scraped.push(url);
+        if (url === "https://x.pl") return { url, markdown: rootMd };
+        return { url, markdown: pageBody(url) };
+      },
+    };
+
+    await scrapeAndConsolidate({
+      url: "https://x.pl",
+      firecrawl,
+      llm: makeLlm({ captureUser: (u) => (userPrompt = u) }),
+      fetcher: noRedirectFetcher,
+    });
+
+    expect(scraped).toContain("https://x.pl/cennik");
+    expect(scraped).toContain("https://x.pl/kontakt");
+    expect(userPrompt).toContain("https://x.pl/cennik");
+  });
+
+  it("discovery pass does not re-scrape pages already scraped in the first pass", async () => {
+    const scraped: string[] = [];
+    const rootMd = `${pageBody("https://x.pl")}\n[O nas](https://x.pl/o-nas)`;
+    const firecrawl: FirecrawlClient = {
+      async map() {
+        return ["https://x.pl/o-nas"];
+      },
+      async scrape(url: string) {
+        scraped.push(url);
+        if (url === "https://x.pl") return { url, markdown: rootMd };
+        return { url, markdown: pageBody(url) };
+      },
+    };
+
+    await scrapeAndConsolidate({
+      url: "https://x.pl",
+      firecrawl,
+      llm: makeLlm(),
+      fetcher: noRedirectFetcher,
+    });
+
+    expect(scraped.filter((u) => u.includes("/o-nas"))).toHaveLength(1);
+  });
+
   it("falls back to map order when the rerank itself fails (scrape more, not less)", async () => {
     const scraped: string[] = [];
     const firecrawl: FirecrawlClient = {

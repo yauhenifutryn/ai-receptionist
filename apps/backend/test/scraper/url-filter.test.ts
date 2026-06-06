@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   canonicalizeUrl,
+  collapseUrlFamilies,
   shouldScrape,
   DEFAULT_RELEVANCE_QUERY,
   detectLanguagePrefixes,
@@ -225,6 +226,47 @@ describe("upgradeToRootScheme (REGRESSION dci.waw.pl: http links → Firecrawl 2
   it("returns unparseable URLs unchanged", () => {
     const out = upgradeToRootScheme("https://dci.waw.pl", ["not a url"]);
     expect(out).toEqual(["not a url"]);
+  });
+});
+
+describe("collapseUrlFamilies (REGRESSION dentus.szczecin.pl: template-stub families crowd out content)", () => {
+  // dentus-kids-1..17, d_f-1/-5/-502, dentysci_stomatolodzy/_/_2 — same
+  // template rendered N times. They tied with real service pages in the
+  // rerank and won on alphabetical tie-break, producing a 0-priced KB.
+  it("collapses families of 3+ URLs differing only by a trailing numeric/underscore suffix", () => {
+    const out = collapseUrlFamilies([
+      "https://x.pl/dentus-kids-1",
+      "https://x.pl/dentus-kids-2",
+      "https://x.pl/dentus-kids-10",
+      "https://x.pl/dentus-kids-11",
+      "https://x.pl/zakres-uslug/higienizacja",
+    ]);
+    expect(out.filter((u) => u.includes("dentus-kids"))).toHaveLength(1);
+    expect(out).toContain("https://x.pl/zakres-uslug/higienizacja");
+  });
+
+  it("collapses underscore-suffix families", () => {
+    const out = collapseUrlFamilies([
+      "https://x.pl/dentysci_stomatolodzy",
+      "https://x.pl/dentysci_stomatolodzy_",
+      "https://x.pl/dentysci_stomatolodzy_2",
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toBe("https://x.pl/dentysci_stomatolodzy");
+  });
+
+  it("keeps families with fewer than 3 members (could be real pages)", () => {
+    const out = collapseUrlFamilies(["https://x.pl/ortodoncja", "https://x.pl/ortodoncja-2"]);
+    expect(out).toHaveLength(2);
+  });
+
+  it("keeps distinct service pages untouched", () => {
+    const urls = [
+      "https://x.pl/zakres-uslug/implanty",
+      "https://x.pl/zakres-uslug/protezy",
+      "https://x.pl/zakres-uslug/sedacja",
+    ];
+    expect(collapseUrlFamilies(urls)).toEqual(urls);
   });
 });
 

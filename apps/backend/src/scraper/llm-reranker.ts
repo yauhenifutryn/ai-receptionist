@@ -85,10 +85,12 @@ const SYSTEM_PROMPT =
   "Score each URL 0.0 to 1.0 from the URL path text alone (you cannot see page content). " +
   "Scoring rubric: " +
   "0.9-1.0 = obvious must-have (e.g. /cennik, /uslugi, /service-category/implanty, /kontakt, /godziny, /faq, /doctors/X, /zespol, /o-nas). " +
+  "Service-section namespaces and their sub-pages (/uslugi/*, /zakres-uslug/*, /oferta/*, /services/*, /leczenie/*) belong here too — they typically carry the per-service prices. " +
   "0.6-0.8 = likely useful detail page (e.g. /implant-leczenie, /najlepsze-opcje-X, /pilna-pomoc, sub-pages of services). " +
   "0.4-0.6 = uncertain — could contain pricing or service info, lean toward scraping (e.g. /promocje, /pakiety, /before-after, generic article slugs). " +
   "0.2-0.4 = probably not useful but possible to contain stray contact / hours info (e.g. /blog/clinic-news, /press-release). " +
   "0.0-0.2 = clearly noise (e.g. /authors/jan-kowalski, /tag/promo, /404). " +
+  "Members of numbered / suffixed URL families (foo-1, foo-2 … foo-15, bar_, bar_2, baz-f) are template stubs or media-attachment pages, NOT distinct content — score them 0.0-0.2 even when the base slug sounds medical. " +
   "\n\n" +
   "Return ONE entry per input URL, preserving the URL string exactly. " +
   "Keep each 'reason' to a brief phrase under 80 characters. " +

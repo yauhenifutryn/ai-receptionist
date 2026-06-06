@@ -181,3 +181,21 @@ describe("rerankUrls (chunking — REGRESSION dentus.szczecin.pl 620 kept URLs)"
     expect(out[0]!.score).toBe(0.95);
   });
 });
+
+describe("rerank rubric (REGRESSION dentus.szczecin.pl: stub families tied with service pages)", () => {
+  it("system prompt downranks suffixed URL families and elevates service-section namespaces", async () => {
+    let captured = "";
+    const fakeProvider = {
+      generateJson: vi.fn().mockImplementation(async (args: { system?: string }) => {
+        captured = args.system ?? "";
+        return {
+          text: JSON.stringify({ ranked: [{ url: "https://x.pl/a", score: 0.5, reason: "" }] }),
+        };
+      }),
+    };
+    const llm = new LLMClient(fakeProvider);
+    await rerankUrls({ rootUrl: "https://x.pl", urls: ["https://x.pl/a"], llm });
+    expect(captured).toMatch(/zakres-uslug/);
+    expect(captured.toLowerCase()).toMatch(/numbered|suffix/);
+  });
+});

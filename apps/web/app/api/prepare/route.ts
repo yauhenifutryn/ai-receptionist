@@ -8,6 +8,7 @@ import {
   createFirecrawlClient,
   scraperOutputToMarkdown,
   detectPrimaryLanguage,
+  collapseUrlFamilies,
   filterCandidates,
   rerankUrls,
   pickByScore,
@@ -237,7 +238,7 @@ export async function POST(req: NextRequest) {
           const ranked = [url, ...links.filter((l) => l !== url)];
           urlsMapped = ranked.length;
           const filter = filterCandidates(ranked, primaryLang);
-          const afterFilter = filter.kept;
+          const afterFilter = collapseUrlFamilies(filter.kept);
           droppedCount = filter.droppedJunk.length + filter.droppedTranslations.length;
           await session?.event("filter:done", {
             rankedCount: ranked.length,

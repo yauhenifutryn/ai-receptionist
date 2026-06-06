@@ -187,6 +187,31 @@ describe("scraper.consolidate (W2.1)", () => {
     expect(captured).toMatch(/zamknięte/);
   });
 
+  it("system prompt covers glued price rows and price disclaimers (REGRESSION annadentalclinic.com /cennik: 44 price mentions → 0 extracted)", async () => {
+    // Firecrawl flattens two-column price tables into glued runs
+    // ("Przegląd uzębienia150 zł", "Licówka porcelanowaod 2 500 zł") and
+    // the page adds "podane przykładowe ceny mają formę informacyjną".
+    // The never-invent-primed model extracted ZERO of 44 visible prices.
+    let captured = "";
+    const llm = new LLMClient(
+      provider(async (args: GenerateJsonArgs) => {
+        captured = args.system ?? "";
+        return { text: JSON.stringify(VALID_OUTPUT) };
+      }),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+
+    await consolidate({
+      rootUrl: "https://example-vet.pl",
+      pages: [{ url: "https://example-vet.pl", markdown: "# x" }],
+      llm,
+    });
+
+    expect(captured).toMatch(/GLUED/);
+    expect(captured).toMatch(/uzębienia150/);
+    expect(captured.toLowerCase()).toMatch(/informacyjn|przykładowe/);
+  });
+
   it("stamps scrapedAt deterministically — model-emitted dates are hallucinated (REGRESSION: '2024-07-29' on a 2026 run)", async () => {
     const llm = new LLMClient(
       provider(async () => ({

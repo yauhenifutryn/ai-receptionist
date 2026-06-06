@@ -251,6 +251,57 @@ export function dedupeByCanonicalUrl(urls: string[]): string[] {
   return out;
 }
 
+/**
+ * Collapse URL FAMILIES — 3+ URLs identical except for a trailing
+ * numeric / underscore suffix on the last path segment (foo-1, foo-2,
+ * … foo-17; bar, bar_, bar_2). These are template stubs rendered N
+ * times (WordPress page-builder artifacts), not distinct content.
+ *
+ * REGRESSION (dentus.szczecin.pl): dentus-kids-1..17 + d_f-1/-5/-502 +
+ * dentysci_stomatolodzy/_/_2 tied with real service pages in the LLM
+ * rerank and won on alphabetical tie-break — the provisioned KB ended
+ * up with 0 priced services because /zakres-uslug/* lost every slot.
+ *
+ * Mechanical rule only: a family needs >=3 members before collapsing
+ * (2 could be legitimately distinct pages); the shortest URL (then
+ * lexicographically first) survives as the family representative.
+ */
+export function collapseUrlFamilies(urls: string[]): string[] {
+  const familyKey = (u: string): string | null => {
+    let parsed: URL;
+    try {
+      parsed = new URL(u);
+    } catch {
+      return null;
+    }
+    const segs = parsed.pathname.split("/").filter(Boolean);
+    if (segs.length === 0) return null;
+    const last = segs[segs.length - 1]!;
+    const base = last.replace(/[-_]+\d*$/i, "");
+    if (base.length === 0 || base === last) {
+      // No suffix to strip — still participates as the family base.
+      return `${parsed.hostname}/${[...segs.slice(0, -1), base || last].join("/")}`;
+    }
+    return `${parsed.hostname}/${[...segs.slice(0, -1), base].join("/")}`;
+  };
+
+  const families = new Map<string, string[]>();
+  for (const u of urls) {
+    const key = familyKey(u);
+    if (key === null) continue;
+    if (!families.has(key)) families.set(key, []);
+    families.get(key)!.push(u);
+  }
+
+  const drop = new Set<string>();
+  for (const members of families.values()) {
+    if (members.length < 3) continue;
+    const keep = [...members].sort((a, b) => a.length - b.length || (a < b ? -1 : 1))[0]!;
+    for (const m of members) if (m !== keep) drop.add(m);
+  }
+  return urls.filter((u) => !drop.has(u));
+}
+
 export interface FilterCandidatesResult {
   kept: string[];
   droppedJunk: string[];

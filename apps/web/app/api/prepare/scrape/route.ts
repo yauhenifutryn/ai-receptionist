@@ -5,6 +5,7 @@ import {
   createFirecrawlClient,
   detectPrimaryLanguage,
   extractInternalLinks,
+  collapseUrlFamilies,
   filterCandidates,
   MIN_PAGE_CHARS,
   pickByScore,
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
   });
   const ranked = [url, ...links.filter((l) => l !== url)];
   const filter = filterCandidates(ranked, primaryLang);
-  const afterFilter = filter.kept;
+  const afterFilter = collapseUrlFamilies(filter.kept);
 
   const toRerank = afterFilter.slice(0, RERANK_INPUT_CAP);
   const reranked = await rerankUrls({ rootUrl: url, urls: toRerank, llm });

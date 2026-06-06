@@ -6,6 +6,7 @@ import type { FirecrawlClient, FirecrawlPage } from "./firecrawl.js";
 import { rerankUrls, pickByScore } from "./llm-reranker.js";
 import {
   canonicalizeUrl,
+  collapseUrlFamilies,
   dedupeByCanonicalUrl,
   detectPrimaryLanguage,
   filterCandidates,
@@ -21,11 +22,14 @@ export {
 export { scraperOutputToMarkdown } from "./to-markdown.js";
 export {
   canonicalizeUrl,
+  collapseUrlFamilies,
+  dedupeByCanonicalUrl,
   shouldScrape,
   dedupeByLanguage,
   detectLanguagePrefixes,
   detectPrimaryLanguage,
   filterCandidates,
+  upgradeToRootScheme,
   DEFAULT_RELEVANCE_QUERY,
   type FilterCandidatesResult,
 } from "./url-filter.js";
@@ -46,7 +50,9 @@ export { extractInternalLinks } from "./discover-links.js";
 export { mergePartials } from "./merge-partials.js";
 export type { FirecrawlClient, FirecrawlPage, MapOptions } from "./firecrawl.js";
 
-const DEFAULT_MAX_PAGES = 25;
+// 35 (wizard parity, was 25): on stub-heavy sites the extra margin is the
+// difference between the hygiene/pricing pages making the cut or not.
+const DEFAULT_MAX_PAGES = 35;
 /**
  * 2026-06-06 batch incident: this was 3 while the Firecrawl plan's
  * maxConcurrency is 2 (verified via /v2/concurrency-check). The third
@@ -121,7 +127,9 @@ export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Prom
   // depth-1 campaign stubs (dentus-kids-1..17) and produced a 0-priced
   // KB. Every kept URL is scored by the chunked rerank; the LLM is the
   // only content judge.
-  const deduped = dedupeByCanonicalUrl(filter.kept).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const deduped = collapseUrlFamilies(dedupeByCanonicalUrl(filter.kept)).sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
   const maxPages = args.maxPages ?? DEFAULT_MAX_PAGES;
 
   // LLM rerank — same selection the onboarding wizard uses. Without it,
@@ -166,7 +174,9 @@ export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Prom
     const discovered = extractInternalLinks(valid, args.url)
       .map((u) => upgradeToRootScheme(args.url, [u])[0]!)
       .filter((u) => !seen.has(canonicalizeUrl(u) ?? u));
-    const discKept = dedupeByCanonicalUrl(filterCandidates(discovered, primaryLang).kept);
+    const discKept = collapseUrlFamilies(
+      dedupeByCanonicalUrl(filterCandidates(discovered, primaryLang).kept),
+    );
     if (discKept.length > 0 && discoveryBudget > 0) {
       const discCandidates = await selectCandidates(args, discKept, discoveryBudget, 0);
       if (discCandidates.length > 0) {

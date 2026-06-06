@@ -212,6 +212,15 @@ function clinicFactsLines(facts: ClinicFacts | undefined): string[] {
   if (facts.hoursLines?.length) {
     lines.push("- Godziny otwarcia:");
     for (const l of facts.hoursLines) lines.push(`  - ${l}`);
+    // Convention note — only when an unpublished day is present.
+    // REGRESSION (annadentalclinic.com sim): without this, the agent read
+    // 'Sobota: brak danych' as "closed" and asserted "w soboty całkowicie
+    // zamknięta" — fabricating a closure the clinic never published.
+    if (facts.hoursLines.some((l) => l.includes("brak danych"))) {
+      lines.push(
+        '  - Uwaga: "brak danych" means the clinic does not publish hours for that day — NEVER claim it is open or closed then; say you don\'t have that information and offer the reception phone. "zamknięte" means genuinely closed.',
+      );
+    }
   }
   return lines;
 }

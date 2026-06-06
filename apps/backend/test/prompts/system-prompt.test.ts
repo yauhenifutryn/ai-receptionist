@@ -66,6 +66,28 @@ describe("buildSystemPrompt booking modes", () => {
     expect(without).not.toContain("CORE CLINIC FACTS");
   });
 
+  it("clinicFacts: 'brak danych' days come with the honesty convention (REGRESSION annadentalclinic.com sim: agent asserted 'w soboty całkowicie zamknięta' for an unpublished day)", () => {
+    // The site publishes Mon-Fri hours only; the KB marks saturday/sunday
+    // as "brak danych". Without an explicit convention the agent read
+    // that as "closed" and CLAIMED full Saturday closure — fabrication of
+    // a fact the clinic never published.
+    const facts = {
+      hoursLines: ["Poniedziałek: 08:00-20:00", "Sobota: brak danych", "Niedziela: zamknięte"],
+    };
+    const withFacts = buildSystemPrompt({ tenantDisplayName: "Testowa", clinicFacts: facts });
+    expect(withFacts).toMatch(
+      /brak danych.*(nie ma|nie podaje|nie publikuje)|"brak danych" means/i,
+    );
+    expect(withFacts).toMatch(/zamknięte/);
+
+    // No convention noise when every day has real hours.
+    const clean = buildSystemPrompt({
+      tenantDisplayName: "Testowa",
+      clinicFacts: { hoursLines: ["Poniedziałek: 08:00-20:00"] },
+    });
+    expect(clean).not.toMatch(/"brak danych" means/i);
+  });
+
   it("clinicFactsFromKnowledgeMarkdown parses the generated knowledge.md shape", async () => {
     const { clinicFactsFromKnowledgeMarkdown } = await import("../../src/prompts/system-prompt.js");
     const md = [

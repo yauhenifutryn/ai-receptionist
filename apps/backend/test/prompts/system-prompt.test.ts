@@ -128,6 +128,17 @@ describe("buildSystemPrompt booking modes", () => {
     });
   });
 
+  it("forbids invented doctor-service attribution (REGRESSION b2stomatologia.pl WS call: 'wszyscy nasi lekarze' do root canals, stated nowhere)", () => {
+    // A bare roster (names without specializations) plus a priced service
+    // chunk made the agent attribute the service to ALL doctors. The KB-side
+    // guard alone is retrieval-dependent (the chunker split it away from
+    // the names); this rule is in the prompt on every turn.
+    const prompt = buildSystemPrompt({ tenantDisplayName: "Testowa Klinika" });
+    expect(prompt).toMatch(/DOCTOR-SERVICE ATTRIBUTION/);
+    expect(prompt).toContain("wszyscy nasi lekarze");
+    expect(prompt).toMatch(/never claim|NEVER claim/i);
+  });
+
   it("bookingEnabled: true keeps the full booking flow", () => {
     const prompt = buildSystemPrompt({
       tenantDisplayName: "Testowa Klinika",

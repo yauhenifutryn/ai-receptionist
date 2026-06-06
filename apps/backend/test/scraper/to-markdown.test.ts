@@ -269,6 +269,27 @@ describe("staffBlock RAG hardening (REGRESSION dentus.szczecin.pl REAL CALL 2026
     expect(md).toMatch(/recepcj/i);
   });
 
+  it("bare doctor LINES carry the no-attribution marker (REGRESSION round 2: the chunker split the cue line away from the names and the overclaim survived)", () => {
+    // Verified on the live B2 doc: chunk 1 ended with the cue line, chunk 2
+    // began with the bare names — the guard never traveled with the roster.
+    // Only per-LINE text survives arbitrary chunk boundaries.
+    const md = scraperOutputToMarkdown({
+      ...SAMPLE,
+      staff: [
+        { name: "lek. dent. Adam B", role: "lekarz dentysta", languages: [] },
+        {
+          name: "lek. dent. Ewa C",
+          role: "lekarz dentysta",
+          specialization: "Endodoncja",
+          languages: [],
+        },
+      ],
+    });
+    expect(md).toMatch(/- lek\. dent\. Adam B — lekarz dentysta — specjalizacja niepodana/);
+    // enriched lines stay clean
+    expect(md).not.toMatch(/Ewa C.*specjalizacja niepodana/);
+  });
+
   it("emits no 'pacjenci pytają' tail when synonyms are absent or all duplicates", () => {
     const md = scraperOutputToMarkdown({
       ...SAMPLE,

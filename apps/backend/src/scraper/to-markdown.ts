@@ -154,6 +154,23 @@ function staffBlock(out: ScraperOutput): string {
     // otherwise the same synonyms would land twice on one line.
     if (s.role) pieces.push(s.specialization ? s.role : enrichWithPatientSynonyms(s.role));
     if (s.specialization) pieces.push(enrichWithPatientSynonyms(s.specialization));
+    // Bare doctor lines (no specialization anywhere) get a per-LINE
+    // no-attribution marker. REGRESSION round 2 (b2stomatologia.pl): the
+    // cue-line guard was chunked AWAY from the names and the agent claimed
+    // all seven dentists do root canals. Only per-line text survives
+    // arbitrary chunk boundaries.
+    const isDoctor = /lekarz|dentyst|stomatolog|\bdr\b|lek\./i.test(`${s.name} ${s.role ?? ""}`);
+    const roleCarriesSignal = s.role ? enrichWithPatientSynonyms(s.role) !== s.role : false;
+    if (
+      isDoctor &&
+      !s.specialization &&
+      !roleCarriesSignal &&
+      (s.specializationSynonyms ?? []).length === 0
+    ) {
+      pieces.push(
+        "specjalizacja niepodana — nie przypisuj temu lekarzowi konkretnych zabiegów, skieruj do recepcji",
+      );
+    }
     // LLM-generated patient phrasings (specializationSynonyms) cover what
     // the deterministic map doesn't; append only the ones the line doesn't
     // already carry, so map-covered terms never repeat.

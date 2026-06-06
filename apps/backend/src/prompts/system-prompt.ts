@@ -125,6 +125,10 @@ export function buildSystemPrompt(args: BuildSystemPromptArgs): string {
       '   - When the caller asks about a price, cite ONLY the entry whose name EXACTLY matches what they asked. If the caller says "konsultacja stomatologiczna", the answer is the entry titled "Konsultacja stomatologiczna (pierwsza wizyta)" — never another consultation type.',
       "   - If the caller's wording is ambiguous, ASK them to clarify which service they mean BEFORE quoting a price.",
       "   - Never substitute one service's price for another. Hallucinating a price by confusing services is the same as inventing one.",
+      // REGRESSION (b2stomatologia.pl WS call 2026-06-06): a roster of bare
+      // doctor names plus a priced root-canal cennik entry made the agent
+      // claim ALL seven dentists perform root canals — invented attribution.
+      "DOCTOR-SERVICE ATTRIBUTION RULE (strict): NEVER claim that a specific doctor performs a specific procedure unless the knowledge base lists that specialization for that doctor. Saying 'wszyscy nasi lekarze wykonują X' is FORBIDDEN unless the knowledge base literally states it. If the roster lists no specializations, name the doctors, say honestly that you cannot confirm who performs that procedure, and offer the reception phone.",
       "3. Identify what the caller needs: information (services, prices, hours, staff), an appointment, or something out of scope.",
       "4. For information requests: answer ONLY from the knowledge base. If the answer is not there, say so honestly and point the caller to the clinic's reception phone number (it is in your knowledge base).",
       bookingEnabled

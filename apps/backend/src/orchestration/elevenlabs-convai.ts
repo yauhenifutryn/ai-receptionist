@@ -469,7 +469,14 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
               // instead of relying purely on prompt-level mirroring. Added
               // 2026-06-05 after a live call drifted into Russian unprompted.
               built_in_tools: {
-                language_detection: { name: "language_detection", description: "" },
+                // 2026-06-06 (Codex finding): an empty description weakens
+                // when/why small models invoke the tool. Specific trigger
+                // conditions improve switch reliability.
+                language_detection: {
+                  name: "language_detection",
+                  description:
+                    "Call this tool IMMEDIATELY whenever the caller speaks or requests a different language than the current conversation language (Polish, Russian, or English) — including questions like 'czy mówisz po angielsku?' / 'а по-русски говоришь?'. It switches speech recognition and voice output to the caller's language. Call it BEFORE composing your reply in the new language.",
+                },
               },
               // RAG ON (2026-06-05 latency audit) — see RAG_EMBEDDING_MODEL
               // comment. rag.enabled=false silently prompt-stuffs every

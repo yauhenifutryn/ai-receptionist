@@ -129,7 +129,10 @@ for (const clinic of clinics) {
     const kbDir = path.resolve(process.cwd(), "../../data/clinics", slug);
     mkdirSync(kbDir, { recursive: true });
     writeFileSync(path.join(kbDir, "knowledge.md"), markdown);
-    console.log(`  KB saved: data/clinics/${slug}/knowledge.md`);
+    // The consolidated JSON enables renderer-only re-renders of knowledge.md
+    // without a re-scrape (to-markdown.ts fixes land for free).
+    writeFileSync(path.join(kbDir, "scraper-output.json"), JSON.stringify(output, null, 2));
+    console.log(`  KB saved: data/clinics/${slug}/knowledge.md (+ scraper-output.json)`);
 
     if (markdown.length < 1500 || (priced === 0 && !clinic.allowUnpriced)) {
       console.log("  ABORT: KB too thin (needs operator review) — not provisioning");

@@ -48,6 +48,12 @@ export interface UpdateAgentKnowledgeInput {
   agentId: string;
   /** Replaces the agent's full KB document list. Idempotent. */
   knowledgeBaseDocumentIds: string[];
+  /**
+   * Names the tenant doc "<tenantDisplayName> - knowledge" (matching the
+   * provision path). Without it the doc is named by its raw ID, which gives
+   * the LLM-visible doc list zero signal that this is the clinic's own data.
+   */
+  tenantDisplayName?: string;
 }
 
 export interface UploadKnowledgeDocumentInput {

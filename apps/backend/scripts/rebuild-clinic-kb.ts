@@ -111,7 +111,10 @@ const slug = tenant.name
 const kbDir = path.resolve(process.cwd(), "../../data/clinics", slug);
 mkdirSync(kbDir, { recursive: true });
 writeFileSync(path.join(kbDir, "knowledge.md"), markdown);
-console.log(`KB saved: data/clinics/${slug}/knowledge.md`);
+// Persist the consolidated JSON too: renderer-only fixes can then re-render
+// knowledge.md without burning Firecrawl credits on a re-scrape.
+writeFileSync(path.join(kbDir, "scraper-output.json"), JSON.stringify(output, null, 2));
+console.log(`KB saved: data/clinics/${slug}/knowledge.md (+ scraper-output.json)`);
 
 // 2. upload new doc (waits for RAG index) + swap onto the agent
 const kb = await provider.uploadKnowledgeDocument({
@@ -123,6 +126,7 @@ console.log(`new KB doc: ${kb.documentId}`);
 await provider.updateAgentKnowledge({
   agentId: agent.provider_agent_id,
   knowledgeBaseDocumentIds: [kb.documentId],
+  tenantDisplayName: tenant.name,
 });
 console.log("agent KB swapped (ontology docs re-attached)");
 

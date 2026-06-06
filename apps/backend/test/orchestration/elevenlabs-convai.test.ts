@@ -307,6 +307,36 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     });
   });
 
+  it("updateAgentKnowledge names the tenant doc after the clinic, not its raw ID (REGRESSION wave-2 rebuild: live agents showed KB docs named 'irC8caEg…')", async () => {
+    // The provision path names the tenant doc "<clinic> - knowledge"; the
+    // rebuild path named it by its documentId, so the LLM-visible doc list
+    // gave zero signal that this is the clinic's own data.
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    const provider = new ElevenLabsConvAIProvider({ apiKey: "xi-test", fetcher });
+    await provider.updateAgentKnowledge({
+      agentId: "agent-77",
+      knowledgeBaseDocumentIds: ["doc-9"],
+      tenantDisplayName: "Dentus Szczecin",
+    });
+    const body = parseBody(fetcher.mock.calls[0] as [unknown, RequestInit | undefined]);
+    expect(body).toMatchObject({
+      conversation_config: {
+        agent: {
+          prompt: {
+            knowledge_base: [
+              {
+                type: "text",
+                id: "doc-9",
+                name: "Dentus Szczecin - knowledge",
+                usage_mode: "auto",
+              },
+            ],
+          },
+        },
+      },
+    });
+  });
+
   it("updateAgentTools PATCHes prompt.tool_ids (not inline tools) onto an existing agent", async () => {
     // Catalog: tool_ca exists, tool_cb missing → one POST creates it. Then
     // PATCH on agent with tool_ids = [ca, new_cb].

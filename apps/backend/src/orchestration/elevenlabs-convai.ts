@@ -615,7 +615,9 @@ export class ElevenLabsConvAIProvider implements VoiceAgentProvider {
     const tenantEntries = input.knowledgeBaseDocumentIds.map((documentId) => ({
       type: "text" as const,
       id: documentId,
-      name: documentId,
+      // Match the provision path's naming; the raw-ID fallback kept the old
+      // behavior for callers that don't know the clinic name.
+      name: input.tenantDisplayName ? `${input.tenantDisplayName} - knowledge` : documentId,
       usage_mode: "auto" as const,
     }));
     const ontologyEntries = ontologyIds.map((documentId, i) => ({

@@ -115,3 +115,117 @@ describe("scraperOutputToMarkdown (W2.1 KB formatter)", () => {
     expect(md).toContain("języki: polski, angielski");
   });
 });
+
+describe("staffBlock RAG hardening (REGRESSION dentus.szczecin.pl REAL CALL 2026-06-06)", () => {
+  // Real call: "Który lekarz zajmuje się leczeniem kanałowym?" went
+  // unanswered although the KB listed three endodontists. Evidence from the
+  // EL chunks API: (a) the chunker stranded the roster in a chunk WITHOUT
+  // its section header, (b) roster lines carried clinical taxonomy only
+  // ("Endodoncja") — zero patient phrasing ("leczenie kanałowe") — so the
+  // chunk embedded far from the patient's query and lost all 20 retrieval
+  // slots to generic ontology chunks. Per-LINE synonym expansion is the
+  // split-robust fix; header-level synonyms alone die at the first chunk
+  // boundary.
+  const dental: ScraperOutput = {
+    ...SAMPLE,
+    staff: [
+      {
+        name: "lek. stom. Anna Stefańczyk",
+        role: "lekarz stomatolog",
+        specialization: "Endodoncja, Protetyka",
+        languages: [],
+      },
+      {
+        name: "lek. stom. Agnieszka Herdzik",
+        role: "lekarz stomatolog",
+        specialization: "Pedodoncja, Leczenie zachowawcze (bonding)",
+        languages: [],
+      },
+      {
+        name: "dr n. med. Cezary Turostowski",
+        role: "lekarz implantolog",
+        specialization: "Implantologia, Stomatologia estetyczna",
+        languages: [],
+      },
+      {
+        name: "lek. stom. Katarzyna Jankowska",
+        role: "lekarz stomatolog",
+        specialization: "Ortodoncja",
+        languages: [],
+      },
+      {
+        name: "lek. stom. Kamila Banasik",
+        role: "lekarz stomatolog",
+        specialization: "Chirurgia",
+        languages: [],
+      },
+      {
+        name: "Magdalena Milancew",
+        role: "Dyplomowana higienistka stomatologiczna",
+        languages: [],
+      },
+    ],
+  };
+
+  it("front-loads patient-query synonyms on the section header", () => {
+    const md = scraperOutputToMarkdown(dental);
+    expect(md).toContain("## Lekarze i personel (znane także jako: który lekarz");
+  });
+
+  it("expands clinical taxonomy with patient phrasing PER LINE (split-robust)", () => {
+    const md = scraperOutputToMarkdown(dental);
+    expect(md).toContain("Endodoncja (leczenie kanałowe");
+    expect(md).toContain("Protetyka (korony, mosty, protezy)");
+    expect(md).toContain("Pedodoncja (leczenie dzieci");
+    expect(md).toContain("Leczenie zachowawcze (bonding) (plomby, wypełnienia");
+    expect(md).toContain("Implantologia (implanty");
+    expect(md).toContain("Stomatologia estetyczna (wybielanie, licówki, bonding)");
+    expect(md).toContain("Ortodoncja (aparaty ortodontyczne");
+    expect(md).toContain("Chirurgia (usuwanie zębów, ekstrakcje)");
+  });
+
+  it("enriches the role only when no specialization carries the signal", () => {
+    const md = scraperOutputToMarkdown({
+      ...SAMPLE,
+      staff: [
+        { name: "dr X", role: "lekarz implantolog", languages: [] },
+        {
+          name: "dr Y",
+          role: "lekarz implantolog",
+          specialization: "Implantologia",
+          languages: [],
+        },
+      ],
+    });
+    // role-only doctor: enrichment lands on the role
+    expect(md).toContain("lekarz implantolog (implanty");
+    // with specialization present, the role stays bare (no double append)
+    expect(md.match(/implanty, wszczepianie implantów/g)?.length).toBe(2);
+  });
+
+  it("does not duplicate when patient phrasing is already present", () => {
+    const md = scraperOutputToMarkdown({
+      ...SAMPLE,
+      staff: [
+        {
+          name: "lek. Z",
+          role: "lekarz stomatolog",
+          specialization: "Endodoncja (leczenie kanałowe)",
+          languages: [],
+        },
+      ],
+    });
+    expect(md.match(/leczenie kanałowe/g)?.length).toBe(1);
+  });
+
+  it("leaves unmapped specializations untouched", () => {
+    const md = scraperOutputToMarkdown({
+      ...SAMPLE,
+      staff: [
+        { name: "lek. W", role: "lekarz stomatolog", specialization: "Radiologia", languages: [] },
+      ],
+    });
+    expect(md).toContain("Radiologia");
+    expect(md).not.toContain("Radiologia (");
+  });
+});

@@ -90,12 +90,65 @@ function hoursBlock(out: ScraperOutput): string | null {
   return lines.join("\n");
 }
 
+/**
+ * Clinical-taxonomy → patient-phrasing synonym map for staff specializations.
+ *
+ * 2026-06-06 RAG lesson (dentus.szczecin.pl REAL call, conv_7801ktew…):
+ * "Który lekarz zajmuje się leczeniem kanałowym?" went unanswered although
+ * the KB listed three endodontists. The EL chunker had stranded the roster
+ * in a chunk WITHOUT its section header, and the lines carried clinical
+ * taxonomy only ("Endodoncja") — zero patient phrasing — so the chunk
+ * embedded far from the query and lost all 20 retrieval slots to generic
+ * ontology chunks. Synonyms must live INSIDE EVERY LINE to survive arbitrary
+ * chunk boundaries; header-level synonyms die at the first split.
+ */
+const SPECIALIZATION_PATIENT_SYNONYMS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/endodoncj/i, "leczenie kanałowe, kanałowe leczenie zębów"],
+  [/protetyk/i, "korony, mosty, protezy"],
+  [/pedodoncj|stomatologia dziecięca/i, "leczenie dzieci, dentysta dla dzieci"],
+  [/ortodoncj/i, "aparaty ortodontyczne, prostowanie zębów"],
+  [/implantolog/i, "implanty, wszczepianie implantów"],
+  [/chirurg/i, "usuwanie zębów, ekstrakcje"],
+  [/zachowawcz/i, "plomby, wypełnienia, leczenie próchnicy"],
+  [/stomatologia estetyczna/i, "wybielanie, licówki, bonding"],
+  [/periodontolog/i, "leczenie dziąseł, paradontoza"],
+];
+
+/**
+ * Append patient phrasing after each recognized clinical term so any chunk
+ * slice of the roster matches how patients actually ask. Idempotent: skips
+ * a segment whose patient phrasing is already present.
+ */
+function enrichWithPatientSynonyms(text: string): string {
+  return text
+    .split(",")
+    .map((seg) => {
+      const t = seg.trim();
+      for (const [re, synonyms] of SPECIALIZATION_PATIENT_SYNONYMS) {
+        if (re.test(t)) {
+          const lead = synonyms.split(",")[0]!.trim();
+          if (t.toLowerCase().includes(lead.toLowerCase())) return t;
+          return `${t} (${synonyms})`;
+        }
+      }
+      return t;
+    })
+    .join(", ");
+}
+
 function staffBlock(out: ScraperOutput): string {
-  const lines: string[] = ["## Lekarze i personel", ""];
+  const lines: string[] = [
+    "## Lekarze i personel (znane także jako: który lekarz, kto leczy, jaki specjalista, lekarze i ich specjalizacje; RU: какой врач, кто лечит; EN: which doctor, dentists, specialists)",
+    "",
+    "Pełna lista lekarzy i ich specjalizacji. Odpowiadaj z niej na pytania: który lekarz wykonuje dany zabieg, kto leczy dzieci, do kogo się umówić.",
+    "",
+  ];
   for (const s of out.staff) {
     const pieces: string[] = [`- ${s.name}`];
-    if (s.role) pieces.push(s.role);
-    if (s.specialization) pieces.push(s.specialization);
+    // Enrich the role only when no specialization carries the signal —
+    // otherwise the same synonyms would land twice on one line.
+    if (s.role) pieces.push(s.specialization ? s.role : enrichWithPatientSynonyms(s.role));
+    if (s.specialization) pieces.push(enrichWithPatientSynonyms(s.specialization));
     if (s.languages.length > 0) {
       pieces.push(`języki: ${s.languages.join(", ")}`);
     }

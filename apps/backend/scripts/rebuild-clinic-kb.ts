@@ -12,11 +12,17 @@
  *
  * Usage:
  *   set -a; . ./.env.local; set +a
- *   pnpm -F @ai-receptionist/backend exec tsx scripts/rebuild-clinic-kb.ts <tenant-name>
+ *   pnpm -F @ai-receptionist/backend exec tsx scripts/rebuild-clinic-kb.ts <tenant-name> [--from-json]
+ *
+ * --from-json: renderer-only rebuild. Re-renders knowledge.md from the
+ * persisted data/clinics/<slug>/scraper-output.json (written by every
+ * scrape since 2026-06-06) and swaps the doc, burning ZERO Firecrawl
+ * credits. Use after to-markdown.ts changes.
  */
 import { createClient } from "@supabase/supabase-js";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { ScraperOutputSchema } from "@ai-receptionist/contracts";
 import {
   createFirecrawlClient,
   scrapeAndConsolidate,
@@ -94,18 +100,41 @@ const attachedDocs = agentCfg.conversation_config?.agent?.prompt?.knowledge_base
 const oldTenantDocs = attachedDocs.filter((d) => !d.name.startsWith("ontology"));
 console.log(`currently attached tenant docs: ${oldTenantDocs.map((d) => d.id).join(", ") || "—"}`);
 
-// 1. fresh scrape + consolidate (current pipeline, all fixes active)
-const output = await scrapeAndConsolidate({
-  url: tenant.source_url,
-  firecrawl,
-  llm,
-  onPage: (p) =>
-    console.log(
-      p.error
-        ? `  page ${p.url} FAILED: ${p.error.slice(0, 120)}`
-        : `  page ${p.url} -> ${p.chars} chars`,
-    ),
-});
+const slugOf = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+const fromJson = process.argv.includes("--from-json");
+
+// 1. fresh scrape + consolidate (current pipeline, all fixes active) — or,
+// with --from-json, re-render from the persisted consolidation output.
+const output = fromJson
+  ? ScraperOutputSchema.parse(
+      JSON.parse(
+        readFileSync(
+          path.resolve(
+            process.cwd(),
+            "../../data/clinics",
+            slugOf(tenant.name),
+            "scraper-output.json",
+          ),
+          "utf8",
+        ),
+      ),
+    )
+  : await scrapeAndConsolidate({
+      url: tenant.source_url,
+      firecrawl,
+      llm,
+      onPage: (p) =>
+        console.log(
+          p.error
+            ? `  page ${p.url} FAILED: ${p.error.slice(0, 120)}`
+            : `  page ${p.url} -> ${p.chars} chars`,
+        ),
+    });
+if (fromJson) console.log("renderer-only rebuild from scraper-output.json (no scrape)");
 const markdown = scraperOutputToMarkdown(output);
 const priced = (markdown.match(/Cena: (?!nieznana)/g) ?? []).length;
 console.log(

@@ -255,6 +255,20 @@ describe("staffBlock RAG hardening (REGRESSION dentus.szczecin.pl REAL CALL 2026
     expect(md.match(/leczenie kanałowe/g)?.length).toBe(1);
   });
 
+  it("cue line forbids guessing doctor-service attribution (REGRESSION b2stomatologia.pl WS call: agent claimed ALL 7 dentists do root canals; the site lists no specializations)", () => {
+    // B2's roster is 7 bare "lekarz dentysta" lines; the clinic's cennik
+    // prices leczenie kanałowe. The agent fused the two into "leczeniem
+    // kanałowym zajmują się wszyscy nasi lekarze" — real names, real
+    // service, INVENTED attribution. The guard must live in the cue line
+    // so it is retrieved together with the roster chunk.
+    const md = scraperOutputToMarkdown({
+      ...SAMPLE,
+      staff: [{ name: "lek. dent. Adam B", role: "lekarz dentysta", languages: [] }],
+    });
+    expect(md).toMatch(/NIE przypisuj|NIE zgaduj/);
+    expect(md).toMatch(/recepcj/i);
+  });
+
   it("emits no 'pacjenci pytają' tail when synonyms are absent or all duplicates", () => {
     const md = scraperOutputToMarkdown({
       ...SAMPLE,

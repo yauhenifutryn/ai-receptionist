@@ -140,7 +140,12 @@ function staffBlock(out: ScraperOutput): string {
   const lines: string[] = [
     "## Lekarze i personel (znane także jako: który lekarz, kto leczy, jaki specjalista, lekarze i ich specjalizacje; RU: какой врач, кто лечит; EN: which doctor, dentists, specialists)",
     "",
-    "Pełna lista lekarzy i ich specjalizacji. Odpowiadaj z niej na pytania: który lekarz wykonuje dany zabieg, kto leczy dzieci, do kogo się umówić.",
+    // The attribution guard lives HERE (not only in the system prompt) so it
+    // is retrieved together with the roster chunk. REGRESSION
+    // (b2stomatologia.pl WS call 2026-06-06): a roster of bare "lekarz
+    // dentysta" lines plus a priced leczenie kanałowe cennik made the agent
+    // claim ALL seven dentists do root canals — invented attribution.
+    "Pełna lista lekarzy i ich specjalizacji. Odpowiadaj z niej na pytania: który lekarz wykonuje dany zabieg, kto leczy dzieci, do kogo się umówić. Jeżeli przy lekarzu nie podano specjalizacji, NIE zgaduj i NIE przypisuj mu konkretnych zabiegów — wymień lekarzy i zaproponuj potwierdzenie w recepcji, kto wykonuje dany zabieg.",
     "",
   ];
   for (const s of out.staff) {

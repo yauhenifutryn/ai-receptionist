@@ -48,21 +48,33 @@ const llm = new LLMClient(createGeminiProvider({ apiKey: env("GEMINI_API_KEY") }
 const provider = new ElevenLabsConvAIProvider({ apiKey: env("ELEVENLABS_API_KEY") });
 const elKey = env("ELEVENLABS_API_KEY");
 
-const { data: tenant, error: tErr } = await supabase
+// Duplicate tenant rows exist for some clinics (early provisioning
+// attempts, e.g. Dynasty Stomatology ×3) — resolve via the agents join:
+// the tenant row that owns a live elevenlabs agent is the real one.
+const { data: tenantRows, error: tErr } = await supabase
   .from("tenants")
   .select("id, name, source_url")
-  .ilike("name", `%${tenantName}%`)
-  .maybeSingle();
-if (tErr || !tenant) throw new Error(`tenant '${tenantName}' not found: ${tErr?.message}`);
-if (!tenant.source_url) throw new Error(`tenant '${tenant.name}' has no source_url`);
+  .ilike("name", `%${tenantName}%`);
+if (tErr || !tenantRows?.length)
+  throw new Error(`tenant '${tenantName}' not found: ${tErr?.message}`);
 
-const { data: agent, error: aErr } = await supabase
-  .from("agents")
-  .select("id, provider_agent_id")
-  .eq("tenant_id", tenant.id)
-  .eq("provider", "elevenlabs")
-  .maybeSingle();
-if (aErr || !agent) throw new Error(`agent for tenant '${tenant.name}' not found`);
+let tenant: { id: string; name: string; source_url: string | null } | null = null;
+let agent: { id: string; provider_agent_id: string } | null = null;
+for (const row of tenantRows) {
+  const { data: a } = await supabase
+    .from("agents")
+    .select("id, provider_agent_id")
+    .eq("tenant_id", row.id)
+    .eq("provider", "elevenlabs")
+    .maybeSingle();
+  if (a) {
+    if (agent) throw new Error(`multiple agents match tenant '${tenantName}' — be more specific`);
+    tenant = row;
+    agent = a;
+  }
+}
+if (!tenant || !agent) throw new Error(`no elevenlabs agent found for tenant '${tenantName}'`);
+if (!tenant.source_url) throw new Error(`tenant '${tenant.name}' has no source_url`);
 
 console.log(`tenant: ${tenant.name} (${tenant.id})`);
 console.log(`agent:  ${agent.provider_agent_id}`);

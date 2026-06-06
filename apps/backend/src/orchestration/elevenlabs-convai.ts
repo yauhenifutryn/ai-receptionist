@@ -109,24 +109,22 @@ export function buildGuardrails(bookingEnabled: boolean): Record<string, unknown
  * - Privacy hardened at provisioning per RODO: audio recording OFF,
  *   call data retention 0 days. Workspace-level "use for training" toggle
  *   must be flipped OFF in the EL UI (cannot be done via API).
- * - Agent in-call LLM defaults to qwen36-35b-a3b (~223ms latency,
- *   ~$0.0023/min — ultra-low-latency tier on ElevenLabs). Fallback if Polish
- *   quality disappoints: claude-haiku-4-5
- *   (~676ms, ~$0.0075/min, Anthropic Polish quality known-good).
+ * - Agent in-call LLM defaults to DEFAULT_AGENT_LLM below (decision history
+ *   in the comment there + docs/engineering/llm-bakeoff-2026-06-05.md).
  */
 
 export const DEFAULT_VOICE_ID = "mr1ubFaLs5xVrh1EqWtc";
-// 2026-06-05 SEMANTIC re-bench (6 models × 20 sims, every transcript human-read
-// — docs/engineering/llm-bakeoff-2026-06-05.md). This REVERSED the earlier
-// regex-scored verdict: flash-lite (previous pick) never named the requested
-// doctor, quoted the children's hygiene price to adults, and phrased answers
-// mechanically (matched live-call complaints). gemini-2.5-flash was the ONLY
-// model with zero fact errors and clean honest deflections; qwen397 fabricated
-// a price bound once (disqualifying), haiku promised callbacks it can't make
-// + costs 10x, gpt-5.4-mini mixes PL/RU inside sentences (unspeakable by TTS).
-// Console: flash ~776ms / $0.0230/min. Re-run the bench before changing;
+// 2026-06-06 bakeoff Rounds 5-6 (docs/engineering/llm-bakeoff-2026-06-05.md)
+// + founder real-call gate. 3.1-flash-lite ties gemini-2.5-flash (prior
+// default) on every quality axis — facts 24/24, PL→RU 4/4, context-carry 3/3,
+// price-wobble probe 6/6 — with a TIGHTER latency tail (p90 1.12s vs 1.26s,
+// zero >3s stalls) and passed a real SIP call (TTFB 0.97-1.09s, clean
+// PL→EN→RU switches, name carried across languages). Runners-up, all
+// disqualified: 2.5-flash-lite 0.42s median but volatile tail (17.7% turns
+// >3s on the Round-6 re-check); qwen397 16.2% stalls; qwen35b language salad;
+// gpt-4.1-mini 18/24 facts; haiku 10x cost. Re-run the bench before changing;
 // EL test suite (EL_DEFAULT_TEST_IDS) is the gate.
-export const DEFAULT_AGENT_LLM = "gemini-2.5-flash";
+export const DEFAULT_AGENT_LLM = "gemini-3.1-flash-lite";
 export const DEFAULT_AGENT_TEMPERATURE = 0.3;
 export const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 

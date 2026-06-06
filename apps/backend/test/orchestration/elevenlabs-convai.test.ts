@@ -106,6 +106,10 @@ describe("ElevenLabsConvAIProvider (W2.2)", () => {
     const agent = conv.agent as Record<string, Record<string, unknown>>;
     const prompt = agent.prompt as Record<string, unknown>;
     expect(prompt.llm).toBe(DEFAULT_AGENT_LLM);
+    // 2026-06-06 bakeoff Rounds 5-6 + founder real-call gate (see
+    // docs/engineering/llm-bakeoff-2026-06-05.md). Locked literal: a default
+    // change must consciously update this line after a re-bench.
+    expect(DEFAULT_AGENT_LLM).toBe("gemini-3.1-flash-lite");
     expect(prompt.temperature).toBe(0.3);
     expect(agent.language).toBe("pl");
 

@@ -47,11 +47,18 @@ const { data: agents, error } = await sb
 
 if (error) throw new Error(`Supabase listAgents: ${error.message}`);
 
-const rows = (agents ?? []) as Array<{
+let rows = (agents ?? []) as Array<{
   provider_agent_id: string;
   status: string;
   tenant: { display_name: string; source_url: string | null } | null;
 }>;
+
+// Optional positional filter: push only the named EL agent ids (e.g. after a
+// per-clinic KB rebuild) instead of rewriting the whole fleet.
+const onlyAgents = process.argv.slice(2).filter((a) => a.startsWith("agent_"));
+if (onlyAgents.length > 0) {
+  rows = rows.filter((r) => onlyAgents.includes(r.provider_agent_id));
+}
 
 console.error(`Pushing fresh system prompt to ${rows.length} agent(s)...\n`);
 

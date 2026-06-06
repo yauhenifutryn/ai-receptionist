@@ -127,6 +127,66 @@ describe("scraper.consolidate (W2.1)", () => {
     expect(captured.toLowerCase()).toMatch(/sunday/);
   });
 
+  it("Gemini-side schema REQUIRES all 7 days in hours (REGRESSION: prompt rules alone did not stop the mon/tue/wed lazy fill)", async () => {
+    // 3 sites, 3 runs, 2 models: with all-optional day fields the model
+    // expanded "pon-pt" to monday/tuesday/wednesday and stopped — even
+    // AFTER the HOURS EXTRACTION RULES prompt landed (dentus run,
+    // 2026-06-06 13:47Z). Same fix as the price display/qualifier
+    // pattern: constrained decoding, not prompt hope. Unknown days are
+    // emitted as "brak danych", closed days as "zamknięte".
+    let capturedSchema: unknown;
+    const llm = new LLMClient(
+      provider(async (args: GenerateJsonArgs) => {
+        capturedSchema = args.jsonSchema;
+        return { text: JSON.stringify(VALID_OUTPUT) };
+      }),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+
+    await consolidate({
+      rootUrl: "https://example-vet.pl",
+      pages: [{ url: "https://example-vet.pl", markdown: "# x" }],
+      llm,
+    });
+
+    const hours = (
+      capturedSchema as {
+        properties: { tenant: { properties: { hours: { required?: string[] } } } };
+      }
+    ).properties.tenant.properties.hours;
+    expect(hours.required).toEqual(
+      expect.arrayContaining([
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ]),
+    );
+  });
+
+  it("system prompt defines the brak-danych / zamknięte conventions for unknown and closed days", async () => {
+    let captured = "";
+    const llm = new LLMClient(
+      provider(async (args: GenerateJsonArgs) => {
+        captured = args.system ?? "";
+        return { text: JSON.stringify(VALID_OUTPUT) };
+      }),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+
+    await consolidate({
+      rootUrl: "https://example-vet.pl",
+      pages: [{ url: "https://example-vet.pl", markdown: "# x" }],
+      llm,
+    });
+
+    expect(captured).toMatch(/brak danych/);
+    expect(captured).toMatch(/zamknięte/);
+  });
+
   it("stamps scrapedAt deterministically — model-emitted dates are hallucinated (REGRESSION: '2024-07-29' on a 2026 run)", async () => {
     const llm = new LLMClient(
       provider(async () => ({

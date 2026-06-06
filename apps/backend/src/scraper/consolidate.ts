@@ -21,8 +21,25 @@ const SCRAPER_OUTPUT_JSON_SCHEMA = {
         phone: { type: "STRING" },
         email: { type: "STRING" },
         description: { type: "STRING" },
+        // All 7 days REQUIRED (constrained decoding), mirroring the price
+        // display/qualifier trick. With optional day fields the model
+        // expanded "pon-pt 9-19" to monday/tuesday/wednesday and STOPPED —
+        // observed on 3 different sites in a row, even after explicit
+        // prompt rules (2026-06-06). Days the source doesn't mention are
+        // emitted as "brak danych"; closed days as "zamknięte" (see
+        // HOURS EXTRACTION RULES in the system prompt).
         hours: {
           type: "OBJECT",
+          propertyOrdering: [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+            "notes",
+          ],
           properties: {
             monday: { type: "STRING" },
             tuesday: { type: "STRING" },
@@ -33,6 +50,7 @@ const SCRAPER_OUTPUT_JSON_SCHEMA = {
             sunday: { type: "STRING" },
             notes: { type: "STRING" },
           },
+          required: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
         },
       },
       required: ["name"],
@@ -159,8 +177,11 @@ const SYSTEM_PROMPT = [
   // Вс — выходной"; the model emitted monday/tuesday/wednesday and stopped.
   // The agent then 'knew' the clinic was closed Thu-Sun.
   "HOURS EXTRACTION RULES (critical):",
+  "  - When you emit tenant.hours, ALL SEVEN days are required by the schema.",
   '  - Day ranges ("Pon-Pt 9:00-20:00", "Пн-Пт", "Mo-Fr", "pn – pt") expand to EVERY day in the range: monday, tuesday, wednesday, thursday AND friday each get the value. Never stop mid-range.',
-  '  - Always emit saturday and sunday explicitly when the source mentions them ("Sob 9-16" → saturday: "09:00-16:00"; "Вс — выходной" / "niedziela zamknięte" → sunday: "zamknięte").',
+  '  - Days marked closed get "zamknięte" ("Вс — выходной" / "niedziela nieczynne" → sunday: "zamknięte").',
+  '  - Days the source says NOTHING about get "brak danych" (typically saturday/sunday on Mon-Fri-only sites). Never guess.',
+  '  - Day values are plain hour text like "09:00-19:00" — no quotes, no trailing punctuation, no copied JSON fragments.',
   "  - If locations differ in hours, fill the day fields with the main location's hours and put per-location detail into hours.notes, labelled by location name.",
   "",
   "For each service emit { name, synonyms[], nfzCovered, price?, durationMinutes? }.",

@@ -79,6 +79,11 @@ logs/
 # run for human + Claude review. Local only, contains real scraped clinic data.
 test-sessions/
 
+# Per-clinic scraped KBs saved by batch-provision-demo for operator review.
+# Same rationale as test-sessions: real scraped clinic data, local only;
+# the live copy lives in the ElevenLabs KB and is reproducible.
+data/clinics/
+
 # Local-only audit reports + admin one-off scripts
 REVIEW.md
 apps/backend/scripts/probe-*.mjs

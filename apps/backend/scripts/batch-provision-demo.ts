@@ -18,6 +18,8 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import { randomInt } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import {
   createFirecrawlClient,
   scrapeAndConsolidate,
@@ -44,7 +46,13 @@ const supabase = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
-const clinics: Array<{ name: string; url: string }> = JSON.parse(process.argv[2] ?? "[]");
+// `allowUnpriced: true` is the operator-review override for sites that
+// genuinely publish no prices (e.g. dentus.szczecin.pl) — the agent then
+// deflects price questions instead of quoting. Set it only after reading
+// the saved KB in data/clinics/<slug>/knowledge.md.
+const clinics: Array<{ name: string; url: string; allowUnpriced?: boolean }> = JSON.parse(
+  process.argv[2] ?? "[]",
+);
 if (clinics.length === 0) {
   console.error("usage: batch-provision-demo.ts '<json array of {name,url}>'");
   process.exit(2);
@@ -91,15 +99,39 @@ for (const clinic of clinics) {
       continue;
     }
 
-    // 1. scrape + consolidate
-    const output = await scrapeAndConsolidate({ url: clinic.url, firecrawl, llm });
+    // 1. scrape + consolidate (per-page log: the 2026-06-06 batch produced
+    // a 736-char KB with zero indication that every page came back as a
+    // 42-char Firecrawl proxy-error stub)
+    const output = await scrapeAndConsolidate({
+      url: clinic.url,
+      firecrawl,
+      llm,
+      onPage: (p) =>
+        console.log(
+          p.error
+            ? `  page ${p.url} FAILED: ${p.error.slice(0, 120)}`
+            : `  page ${p.url} -> ${p.chars} chars`,
+        ),
+    });
     const markdown = scraperOutputToMarkdown(output);
     const priced = (markdown.match(/Cena: (?!nieznana)/g) ?? []).length;
     const unknown = (markdown.match(/Cena: nieznana/g) ?? []).length;
     console.log(
       `  KB: ${markdown.length} chars | priced: ${priced} | unknown: ${unknown} | phone: ${output.tenant?.phone ?? "—"}`,
     );
-    if (markdown.length < 1500 || priced === 0) {
+
+    // Always persist the KB for operator review / re-provision without
+    // re-burning Firecrawl credits (CLAUDE.md knowledge-architecture path).
+    const slug = clinic.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    const kbDir = path.resolve(process.cwd(), "../../data/clinics", slug);
+    mkdirSync(kbDir, { recursive: true });
+    writeFileSync(path.join(kbDir, "knowledge.md"), markdown);
+    console.log(`  KB saved: data/clinics/${slug}/knowledge.md`);
+
+    if (markdown.length < 1500 || (priced === 0 && !clinic.allowUnpriced)) {
       console.log("  ABORT: KB too thin (needs operator review) — not provisioning");
       summary.push(`${clinic.name}: ABORTED (thin KB: ${markdown.length} chars, ${priced} priced)`);
       continue;

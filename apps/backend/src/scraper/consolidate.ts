@@ -128,6 +128,11 @@ const SYSTEM_PROMPT = [
   "Required top-level fields: sourceUrl (string URL), scrapedAt (ISO 8601), tenant.name (string).",
   "Optional arrays: staff[], services[], faq[]. Use [] when nothing is present.",
   "",
+  // dci.waw.pl regression: the site serves Russian on unprefixed paths and
+  // Polish under _pl suffixes. The KB is read aloud by a Polish-speaking
+  // voice agent — Russian descriptions leaking in are a hard failure.
+  "OUTPUT LANGUAGE: POLISH. All free-text output (service names, descriptions, FAQ answers, hours notes, unsorted) must be natural Polish. If source pages are in another language (e.g. Russian, English), translate the content to Polish. Keep proper names unchanged (people, brands, product names like 'ZOOM 4', street addresses). When the same page exists in both Polish and another language, prefer the Polish version's wording.",
+  "",
   CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES,
   "",
   "PRICE EXTRACTION RULES — read carefully, this is where you most often fail:",

@@ -6,6 +6,7 @@ import {
   detectPrimaryLanguage,
   extractInternalLinks,
   filterCandidates,
+  MIN_PAGE_CHARS,
   pickByScore,
   rerankUrls,
   type FirecrawlPage,
@@ -23,7 +24,10 @@ const SCRAPE_FLOOR = 8;
 const SCRAPE_CEILING_MAX = 50;
 const RERANK_INPUT_CAP = 100;
 const FIRECRAWL_MAP_LIMIT = 150;
-const DEFAULT_CONCURRENCY = 3;
+// 2026-06-06: the Firecrawl plan allows maxConcurrency=2 (verified via
+// /v2/concurrency-check). Running 3 queues the third request server-side
+// and the queue wait burns the 45s scrape timeout → 408 SCRAPE_TIMEOUT.
+const DEFAULT_CONCURRENCY = 2;
 /** Cached page is reused if scraped within this window; clinic sites change,
  *  so a week-old page is re-scraped on the next provisioning run. */
 const PAGE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -105,7 +109,10 @@ export async function POST(req: NextRequest) {
 
   const cache: PageCache = { supabase: operator.supabase, forceFresh, hits: 0 };
   const firstPass = await scrapeAll(firecrawl, candidates, DEFAULT_CONCURRENCY, cache);
-  const validFirstPass = firstPass.filter((p) => p.markdown.length > 0);
+  // MIN_PAGE_CHARS (not >0): Firecrawl can return HTTP 200 whose markdown
+  // is an infra error stub ("Invalid upstream proxy credentials", 42
+  // chars) — those must not count as scraped content.
+  const validFirstPass = firstPass.filter((p) => p.markdown.length >= MIN_PAGE_CHARS);
 
   // One discovery pass: pull internal links out of scraped markdown,
   // filter, rerank, scrape any new ones (subject to maxPages cap).
@@ -129,7 +136,7 @@ export async function POST(req: NextRequest) {
       });
       if (newCandidates.length > 0) {
         const more = await scrapeAll(firecrawl, newCandidates, DEFAULT_CONCURRENCY, cache);
-        discoveredPages = more.filter((p) => p.markdown.length > 0);
+        discoveredPages = more.filter((p) => p.markdown.length >= MIN_PAGE_CHARS);
       }
     }
   }
@@ -200,7 +207,9 @@ async function scrapeAll(
         .in("url", Array.from(new Set(canonicalByIndex)));
       const cutoff = Date.now() - PAGE_CACHE_TTL_MS;
       for (const row of (data ?? []) as CachedRow[]) {
-        if (new Date(row.scraped_at).getTime() >= cutoff && row.markdown.length > 0) {
+        // >= MIN_PAGE_CHARS also shields against rows cached before the
+        // error-stub guard existed (poisoned cache entries).
+        if (new Date(row.scraped_at).getTime() >= cutoff && row.markdown.length >= MIN_PAGE_CHARS) {
           cached.set(row.url, row.markdown);
         }
       }
@@ -226,7 +235,7 @@ async function scrapeAll(
       try {
         const page = await firecrawl.scrape(urls[i]!);
         out[i] = page;
-        if (page.markdown.length > 0) {
+        if (page.markdown.length >= MIN_PAGE_CHARS) {
           freshWrites.push({ url: canonical, markdown: page.markdown });
         }
       } catch (e) {

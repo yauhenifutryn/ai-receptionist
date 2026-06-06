@@ -18,7 +18,7 @@ export interface ScrapeOptions {
    * tight for heavy WordPress clinic pages once our ~4.3s of accordion-
    * reveal actions are added on top — they return 408 SCRAPE_TIMEOUT.
    * 45s lets the slow-but-alive pages finish. Bounded so total wall time
-   * stays under the 300s lambda ceiling at concurrency 3 (~5 waves).
+   * stays under the 300s lambda ceiling at concurrency 2.
    */
   timeoutMs?: number;
 }

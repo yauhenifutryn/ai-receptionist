@@ -76,6 +76,30 @@ describe("scraper.consolidate (W2.1)", () => {
     expect(CONSOLIDATION_PROMPT_NEVER_INVENT_PRICES).toMatch(/unknown/i);
   });
 
+  it("system prompt pins the output language to Polish (REGRESSION dci.waw.pl: Russian-primary source site)", async () => {
+    // dci.waw.pl serves Russian content on unprefixed paths and Polish
+    // under _pl suffixes. Without an explicit output-language rule the
+    // consolidation can emit Russian descriptions into a KB read aloud
+    // by a Polish-speaking agent.
+    let captured = "";
+    const llm = new LLMClient(
+      provider(async (args: GenerateJsonArgs) => {
+        captured = args.system ?? "";
+        return { text: JSON.stringify(VALID_OUTPUT) };
+      }),
+      { sleep: noSleep, defaultMaxRetries: 0 },
+    );
+
+    await consolidate({
+      rootUrl: "https://example-vet.pl",
+      pages: [{ url: "https://example-vet.pl", markdown: "# x" }],
+      llm,
+    });
+
+    expect(captured).toMatch(/OUTPUT LANGUAGE: POLISH/);
+    expect(captured.toLowerCase()).toMatch(/translate/);
+  });
+
   it("retries via LLMClient when first response is malformed", async () => {
     let n = 0;
     const llm = new LLMClient(

@@ -190,6 +190,67 @@ export async function detectPrimaryLanguage(
   return lower;
 }
 
+/**
+ * Upgrade http:// links to https:// when the operator-supplied root URL
+ * is https and the link points at the same site (host equality after
+ * stripping `www.`).
+ *
+ * REGRESSION (dci.waw.pl, 2026-06-06): Firecrawl's map returns http://
+ * links for this site; scraping them makes Firecrawl's upstream proxy
+ * fail and return HTTP 200 whose markdown is literally "Invalid
+ * upstream proxy credentials" (42 chars). 25 such pages consolidated
+ * into a 736-char KB. The https variant of the same page returns 20K
+ * chars. If the root speaks https, every same-site link can too.
+ *
+ * Never downgrades: an http root leaves links untouched. Other hosts
+ * and unparseable strings pass through unchanged.
+ */
+export function upgradeToRootScheme(rootUrl: string, urls: string[]): string[] {
+  let root: URL;
+  try {
+    root = new URL(rootUrl);
+  } catch {
+    return urls;
+  }
+  if (root.protocol !== "https:") return urls;
+  const stripWww = (h: string) => (h.startsWith("www.") ? h.slice(4) : h);
+  const rootHost = stripWww(root.hostname.toLowerCase());
+  return urls.map((u) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(u);
+    } catch {
+      return u;
+    }
+    if (parsed.protocol !== "http:") return u;
+    if (stripWww(parsed.hostname.toLowerCase()) !== rootHost) return u;
+    parsed.protocol = "https:";
+    return parsed.toString();
+  });
+}
+
+/**
+ * Drop URLs that canonicalize (scheme-insensitively) to an already-seen
+ * page, keeping the first occurrence. Firecrawl maps routinely return
+ * the same page as `www.` and naked-host variants (dentus.szczecin.pl:
+ * 626 mapped links, heavy www/naked duplication) — scraping both burns
+ * credits and page budget for zero new content. Unparseable URLs are
+ * kept (downstream shouldScrape decides).
+ */
+export function dedupeByCanonicalUrl(urls: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const u of urls) {
+    const canonical = canonicalizeUrl(u)?.replace(/^https?:/, "");
+    if (canonical) {
+      if (seen.has(canonical)) continue;
+      seen.add(canonical);
+    }
+    out.push(u);
+  }
+  return out;
+}
+
 export interface FilterCandidatesResult {
   kept: string[];
   droppedJunk: string[];
@@ -268,11 +329,29 @@ export function detectLanguagePrefixes(urls: string[]): Set<string> {
   const prefixes = Array.from(prefixToTails.keys());
   const isoPrefixes = prefixes.filter((p) => KNOWN_ISO_LANGS.has(p));
 
+  // Rule 3 evidence for a non-ISO prefix: 3+ URLs under it, or at least
+  // one tail that also exists unprefixed. Sparse slugs like a lone
+  // /ai/marketing never qualify.
+  const nonIsoQualifies = (tails: Set<string>): boolean => {
+    let overlap = 0;
+    for (const t of tails) if (unprefixedTails.has(t)) overlap++;
+    return overlap >= 1 || tails.size >= 3;
+  };
+
   // Rule 1: 2+ distinct 2-letter prefixes AND at least one is ISO ->
   // treat every ISO prefix in the set as a language. Non-ISO prefixes
-  // that just happened to co-occur (e.g. /ai/, /qa/) are NOT flagged.
+  // that just happened to co-occur (e.g. /ai/, /qa/) are NOT flagged on
+  // co-occurrence alone — but they ARE still checked against Rule 3.
+  // REGRESSION (annadentalclinic.com): the site localizes under /dk/
+  // (country code; Danish is ISO "da") next to /en/, /sv/. The old early
+  // return flagged only the ISO set, so the whole Danish namespace
+  // leaked into the scrape candidates.
   if (prefixes.length >= 2 && isoPrefixes.length >= 1) {
-    return new Set(isoPrefixes);
+    const detected = new Set(isoPrefixes);
+    for (const [prefix, tails] of prefixToTails) {
+      if (!detected.has(prefix) && nonIsoQualifies(tails)) detected.add(prefix);
+    }
+    return detected;
   }
 
   // Rule 2 + 3: singleton handling.
@@ -281,11 +360,9 @@ export function detectLanguagePrefixes(urls: string[]): Set<string> {
     if (KNOWN_ISO_LANGS.has(prefix)) {
       // Rule 2: ISO singleton is enough on its own.
       detected.add(prefix);
-    } else {
+    } else if (nonIsoQualifies(tails)) {
       // Rule 3: non-ISO singleton needs hard evidence.
-      let overlap = 0;
-      for (const t of tails) if (unprefixedTails.has(t)) overlap++;
-      if (overlap >= 1 || tails.size >= 3) detected.add(prefix);
+      detected.add(prefix);
     }
   }
   return detected;

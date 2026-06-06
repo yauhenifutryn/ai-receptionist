@@ -5,8 +5,10 @@ import {
   DEFAULT_RELEVANCE_QUERY,
   detectLanguagePrefixes,
   dedupeByLanguage,
+  dedupeByCanonicalUrl,
   detectPrimaryLanguage,
   filterCandidates,
+  upgradeToRootScheme,
 } from "../../src/scraper/url-filter.js";
 
 /**
@@ -148,6 +150,101 @@ describe("detectLanguagePrefixes (semantic, ISO-gated)", () => {
   it("F9: ISO singleton with transliterated tail is detected (no overlap needed)", () => {
     const urls = ["https://klinika.pl/doctors/oleh-vus", "https://klinika.pl/en/doctors/oleg-vus"];
     expect(detectLanguagePrefixes(urls).has("en")).toBe(true);
+  });
+
+  it("REGRESSION annadentalclinic.com: flags a non-ISO prefix with 3+ URLs even when ISO prefixes co-exist", () => {
+    // The site uses /dk/ (country code — Danish is ISO "da") alongside
+    // /en/, /sv/. Rule 1's early return flagged only the ISO set, so the
+    // whole Danish namespace leaked into scrape candidates (7 of the
+    // top-25 slots on the real site). Rule 3 (multiplicity/overlap) must
+    // still be evaluated for non-ISO prefixes when Rule 1 triggers.
+    const urls = [
+      "https://annadentalclinic.com/o-nas",
+      "https://annadentalclinic.com/en/about",
+      "https://annadentalclinic.com/en/team",
+      "https://annadentalclinic.com/sv/om-oss",
+      "https://annadentalclinic.com/dk/om-os",
+      "https://annadentalclinic.com/dk/tilbud",
+      "https://annadentalclinic.com/dk/prisliste",
+    ];
+    const detected = detectLanguagePrefixes(urls);
+    expect(detected.has("en")).toBe(true);
+    expect(detected.has("sv")).toBe(true);
+    expect(detected.has("dk")).toBe(true);
+  });
+
+  it("F8 guard holds: sparse non-ISO slug NOT flagged when ISO prefixes co-exist", () => {
+    // /ai/ has one URL, no overlap with unprefixed tails — must survive
+    // even though Rule 1 fires for /en/.
+    const urls = [
+      "https://klinika.pl/en/contact",
+      "https://klinika.pl/en/about",
+      "https://klinika.pl/ai/marketing",
+      "https://klinika.pl/uslugi",
+    ];
+    const detected = detectLanguagePrefixes(urls);
+    expect(detected.has("en")).toBe(true);
+    expect(detected.has("ai")).toBe(false);
+  });
+});
+
+describe("upgradeToRootScheme (REGRESSION dci.waw.pl: http links → Firecrawl 200 + proxy-error body)", () => {
+  // Firecrawl's map returns http:// links for dci.waw.pl; scraping them
+  // makes Firecrawl's upstream proxy fail and return a SUCCESSFUL scrape
+  // whose markdown is literally "Invalid upstream proxy credentials".
+  // 25 such pages consolidated into a 736-char KB. The https variant of
+  // the same page returns 20K chars.
+  it("rewrites same-host http links to https when the root is https", () => {
+    const out = upgradeToRootScheme("https://dci.waw.pl", [
+      "http://dci.waw.pl/price",
+      "http://dci.waw.pl/about",
+      "https://dci.waw.pl/pl",
+    ]);
+    expect(out).toEqual([
+      "https://dci.waw.pl/price",
+      "https://dci.waw.pl/about",
+      "https://dci.waw.pl/pl",
+    ]);
+  });
+
+  it("rewrites www-variant hosts of the same site", () => {
+    const out = upgradeToRootScheme("https://dci.waw.pl", ["http://www.dci.waw.pl/price"]);
+    expect(out).toEqual(["https://www.dci.waw.pl/price"]);
+  });
+
+  it("leaves links on other hosts untouched", () => {
+    const out = upgradeToRootScheme("https://dci.waw.pl", ["http://other-site.pl/page"]);
+    expect(out).toEqual(["http://other-site.pl/page"]);
+  });
+
+  it("is a no-op when the root itself is http", () => {
+    const out = upgradeToRootScheme("http://legacy.pl", ["http://legacy.pl/cennik"]);
+    expect(out).toEqual(["http://legacy.pl/cennik"]);
+  });
+
+  it("returns unparseable URLs unchanged", () => {
+    const out = upgradeToRootScheme("https://dci.waw.pl", ["not a url"]);
+    expect(out).toEqual(["not a url"]);
+  });
+});
+
+describe("dedupeByCanonicalUrl (collapse www/naked + trailing-slash variants)", () => {
+  it("keeps the first occurrence of each canonical URL", () => {
+    const out = dedupeByCanonicalUrl([
+      "https://dentus.szczecin.pl/kontakt",
+      "https://www.dentus.szczecin.pl/kontakt",
+      "https://www.dentus.szczecin.pl/kontakt/",
+      "https://www.dentus.szczecin.pl/zespol",
+    ]);
+    expect(out).toEqual([
+      "https://dentus.szczecin.pl/kontakt",
+      "https://www.dentus.szczecin.pl/zespol",
+    ]);
+  });
+
+  it("keeps distinct paths and unparseable URLs", () => {
+    const out = dedupeByCanonicalUrl(["https://x.pl/a", "https://x.pl/b", "junk"]);
+    expect(out).toEqual(["https://x.pl/a", "https://x.pl/b", "junk"]);
   });
 });
 

@@ -13,6 +13,7 @@ import {
   pickByScore,
   reportCoverage,
   extractInternalLinks,
+  MIN_PAGE_CHARS,
   PER_PAGE_CHAR_CAP,
 } from "@ai-receptionist/backend/scraper";
 import { LLMClient } from "@ai-receptionist/backend/lib/llm";
@@ -28,7 +29,7 @@ import { getOperatorOrJsonError } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Firecrawl scrape of up to 35 pages at concurrency 3 plus Gemini consolidate
+// Firecrawl scrape of up to 35 pages at concurrency 2 plus Gemini consolidate
 // regularly takes 60–180s for larger clinic sites. Vercel's current default
 // function ceiling is 300s; setting it explicitly avoids the "Stream ended
 // without a result" timeout on slow sites. If Hobby tier enforces a lower
@@ -36,7 +37,10 @@ export const dynamic = "force-dynamic";
 // consolidate as separate fast calls). See git log for the batched design.
 export const maxDuration = 300;
 
-const DEFAULT_CONCURRENCY = 3;
+// 2026-06-06: the Firecrawl plan allows maxConcurrency=2 (verified via
+// /v2/concurrency-check). Running 3 queues the third request server-side
+// and the queue wait burns the 45s scrape timeout → 408 SCRAPE_TIMEOUT.
+const DEFAULT_CONCURRENCY = 2;
 const FIRECRAWL_MAP_LIMIT = 150;
 const RERANK_INPUT_CAP = 100;
 const SCRAPE_FLOOR = 8;
@@ -343,7 +347,10 @@ export async function POST(req: NextRequest) {
             abort.signal,
           );
           if (aborted()) return;
-          validPages = pages.filter((p) => p.markdown.length > 0);
+          // MIN_PAGE_CHARS (not >0): Firecrawl can return HTTP 200 whose
+          // markdown is an infra error stub ("Invalid upstream proxy
+          // credentials") — never count those as content.
+          validPages = pages.filter((p) => p.markdown.length >= MIN_PAGE_CHARS);
           await session?.event("firecrawl:scrape", { pagesCount: validPages.length });
           // Manifest entries include the per-page filename so the resume path
           // can pair URL→markdown explicitly, instead of relying on filesystem
@@ -462,7 +469,7 @@ export async function POST(req: NextRequest) {
                     abort.signal,
                   );
                   if (aborted()) return;
-                  const moreValid = morePages.filter((p) => p.markdown.length > 0);
+                  const moreValid = morePages.filter((p) => p.markdown.length >= MIN_PAGE_CHARS);
                   await Promise.all(
                     moreValid.map((p, i) => {
                       const safe = p.url.replace(/[^a-zA-Z0-9-]+/g, "-").slice(0, 100);

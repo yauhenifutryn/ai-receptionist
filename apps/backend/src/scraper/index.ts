@@ -2,7 +2,14 @@ import type { ScraperOutput } from "@ai-receptionist/contracts";
 import type { LLMClient } from "../lib/llm.js";
 import { consolidate } from "./consolidate.js";
 import type { FirecrawlClient, FirecrawlPage } from "./firecrawl.js";
-import { detectPrimaryLanguage, filterCandidates } from "./url-filter.js";
+import { rerankUrls, pickByScore } from "./llm-reranker.js";
+import {
+  canonicalizeUrl,
+  dedupeByCanonicalUrl,
+  detectPrimaryLanguage,
+  filterCandidates,
+  upgradeToRootScheme,
+} from "./url-filter.js";
 
 export { createFirecrawlClient } from "./firecrawl.js";
 export {
@@ -39,7 +46,33 @@ export { mergePartials } from "./merge-partials.js";
 export type { FirecrawlClient, FirecrawlPage, MapOptions } from "./firecrawl.js";
 
 const DEFAULT_MAX_PAGES = 25;
-const DEFAULT_CRAWL_CONCURRENCY = 3;
+/**
+ * 2026-06-06 batch incident: this was 3 while the Firecrawl plan's
+ * maxConcurrency is 2 (verified via /v2/concurrency-check). The third
+ * in-flight scrape queues server-side and the queue wait counts against
+ * the 45s scrape timeout → 408 SCRAPE_TIMEOUT killed two of three
+ * provisioning runs. Keep this at or below the plan's limit.
+ */
+const DEFAULT_CRAWL_CONCURRENCY = 2;
+/**
+ * Pages shorter than this never reach the consolidation LLM. Real pages
+ * scraped with onlyMainContent:false always carry nav+footer chrome
+ * (hundreds of chars); sub-200-char "pages" are infra error stubs —
+ * observed: Firecrawl returning HTTP 200 whose markdown is literally
+ * "Invalid upstream proxy credentials" (42 chars, dci.waw.pl batch).
+ */
+export const MIN_PAGE_CHARS = 200;
+/**
+ * Cap on URLs sent to the LLM rerank in one call. Bounded by the rerank's
+ * maxOutputTokens (8192) — ~100 scored entries fit; 600+ would truncate
+ * mid-JSON and fail the whole rerank. Key pages sit well inside the first
+ * 100 kept URLs on every site measured (dentus.szczecin.pl, 620 kept:
+ * /kontakt #29, /zespol #27, /zakres-uslug #38-61).
+ */
+const RERANK_INPUT_CAP = 100;
+/** Mirror of the onboarding wizard's rerank defaults (prepare/scrape). */
+const RERANK_THRESHOLD = 0.4;
+const SCRAPE_FLOOR = 8;
 
 export interface ScrapeAndConsolidateArgs {
   url: string;
@@ -53,6 +86,13 @@ export interface ScrapeAndConsolidateArgs {
    * omit this and global fetch is used.
    */
   fetcher?: typeof fetch;
+  /**
+   * Per-page observability: called once per scrape attempt with the
+   * markdown length (0 + error message on failure). The 2026-06-06 batch
+   * produced a 736-char KB with zero indication of which pages came back
+   * empty — never again.
+   */
+  onPage?: (page: { url: string; chars: number; error?: string }) => void;
 }
 
 export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Promise<ScraperOutput> {
@@ -63,19 +103,73 @@ export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Prom
   const detectedPrimary = await detectPrimaryLanguage(args.url, args.fetcher);
   const primaryLang = detectedPrimary ?? "pl";
 
-  const links = await args.firecrawl.map(args.url);
-  const filter = filterCandidates([args.url, ...links.filter((l) => l !== args.url)], primaryLang);
-  const candidates = filter.kept.slice(0, args.maxPages ?? DEFAULT_MAX_PAGES);
+  let links = await args.firecrawl.map(args.url);
+  if (links.length === 0) {
+    // Transient empty maps happen (observed: same site 626 → 0 → 626
+    // links across minutes). One retry is 1 credit of insurance against
+    // provisioning a root-page-only KB.
+    links = await args.firecrawl.map(args.url);
+  }
+
+  // Firecrawl maps echo whatever scheme the site's sitemap declares;
+  // scraping http:// through Firecrawl's proxy fails (see
+  // upgradeToRootScheme). Upgrade before filtering so the canonical
+  // dedupe also collapses http/https pairs.
+  const upgraded = upgradeToRootScheme(args.url, links);
+  const filter = filterCandidates(
+    [args.url, ...upgraded.filter((l) => l !== args.url)],
+    primaryLang,
+  );
+  const deduped = dedupeByCanonicalUrl(filter.kept);
+  const maxPages = args.maxPages ?? DEFAULT_MAX_PAGES;
+
+  // LLM rerank — same selection the onboarding wizard uses. Without it,
+  // map-order slice(0, 25) filled all slots with blog posts on
+  // dentus.szczecin.pl (kontakt sat at #29, zespol at #27). On rerank
+  // failure the safe default is map order: scrape more, not less.
+  let candidates: string[];
+  try {
+    const reranked = await rerankUrls({
+      rootUrl: args.url,
+      urls: deduped.slice(0, RERANK_INPUT_CAP),
+      llm: args.llm,
+    });
+    candidates = pickByScore(reranked, {
+      threshold: RERANK_THRESHOLD,
+      floor: SCRAPE_FLOOR,
+      ceiling: maxPages,
+    });
+    // The root page is non-negotiable: clinics hide hours/phone in its
+    // footer (wadental.pl), and a low rerank score must not drop it.
+    const rootCanonical = canonicalizeUrl(args.url);
+    if (!candidates.some((c) => canonicalizeUrl(c) === rootCanonical)) {
+      candidates = [args.url, ...candidates].slice(0, Math.max(maxPages, 1));
+    }
+  } catch {
+    candidates = deduped.slice(0, maxPages);
+  }
 
   const pages = await runWithConcurrency(
     candidates,
     args.concurrency ?? DEFAULT_CRAWL_CONCURRENCY,
-    (u) => args.firecrawl.scrape(u),
+    async (u) => {
+      // Per-page tolerance: a single 408 on a slow page must degrade to
+      // "page skipped", never abort the whole provisioning run (the
+      // 2026-06-06 batch lost 2 of 3 clinics to exactly this).
+      try {
+        const page = await args.firecrawl.scrape(u);
+        args.onPage?.({ url: u, chars: page.markdown.length });
+        return page;
+      } catch (e) {
+        args.onPage?.({ url: u, chars: 0, error: (e as Error).message });
+        return { url: u, markdown: "" };
+      }
+    },
   );
 
   return consolidate({
     rootUrl: args.url,
-    pages: pages.filter((p): p is FirecrawlPage => p.markdown.length > 0),
+    pages: pages.filter((p): p is FirecrawlPage => p.markdown.length >= MIN_PAGE_CHARS),
     llm: args.llm,
   });
 }

@@ -139,6 +139,15 @@ export function createFirecrawlClient(opts: CreateFirecrawlClientOptions = {}): 
       }>("/v1/scrape", {
         url,
         formats: ["markdown"],
+        // 2026-06-06 WaDental incident: Firecrawl defaults onlyMainContent=true,
+        // silently stripping headers/navs/FOOTERS. wadental.pl publishes its
+        // opening hours only in the footer ("Pon – Nd: 09 00 – 21 00"), so the
+        // consolidation LLM never saw them and the agent had no hours at all.
+        // Pipeline philosophy: scrape EVERYTHING from the page; noise removal
+        // is the consolidation LLM's job (semantic extraction), not the
+        // scraper's. Proven by controlled probe: onlyMainContent=true → hours
+        // absent; false → present (+~5KB nav/footer noise, which Gemini drops).
+        onlyMainContent: false,
         timeout: scrapeOpts.timeoutMs ?? DEFAULT_SCRAPE_TIMEOUT_MS,
         actions: [
           { type: "wait", milliseconds: 2000 },

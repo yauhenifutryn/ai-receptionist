@@ -40,6 +40,11 @@ describe("FirecrawlClient (W2.1)", () => {
     expect(JSON.parse(init.body as string)).toMatchObject({
       url: "https://x/a",
       formats: ["markdown"],
+      // 2026-06-06 WaDental incident: Firecrawl defaults onlyMainContent=true,
+      // which strips footers — wadental.pl publishes opening hours ONLY in the
+      // footer, so Gemini consolidation never saw them. Philosophy: scrape
+      // EVERYTHING, let the consolidation LLM remove noise semantically.
+      onlyMainContent: false,
     });
   });
 

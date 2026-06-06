@@ -121,7 +121,23 @@ export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Prom
     [args.url, ...upgraded.filter((l) => l !== args.url)],
     primaryLang,
   );
-  const deduped = dedupeByCanonicalUrl(filter.kept);
+  // Deterministic candidate order: path depth asc, then lexicographic.
+  // Firecrawl's map order is unstable run-to-run (observed 626→0→626
+  // links on dentus.szczecin.pl within minutes); with 620 kept URLs the
+  // RERANK_INPUT_CAP slice randomly included or excluded the pricing
+  // pages — two consecutive runs produced 13 vs 2 priced services.
+  // Shallow paths are the content pages on clinic sites; deep paths are
+  // attachments/photo junk, so depth-first is also a relevance proxy.
+  const deduped = dedupeByCanonicalUrl(filter.kept).sort((a, b) => {
+    const depth = (u: string): number => {
+      try {
+        return new URL(u).pathname.split("/").filter(Boolean).length;
+      } catch {
+        return 99;
+      }
+    };
+    return depth(a) - depth(b) || a.localeCompare(b);
+  });
   const maxPages = args.maxPages ?? DEFAULT_MAX_PAGES;
 
   // LLM rerank — same selection the onboarding wizard uses. Without it,
@@ -152,15 +168,23 @@ export async function scrapeAndConsolidate(args: ScrapeAndConsolidateArgs): Prom
   // pages (annadentalclinic.com publishes /cennik in the header nav but
   // not in the sitemap; the map-only run produced a 3-priced KB). Pull
   // internal links out of the scraped markdown, keep the new ones, rerank,
-  // scrape within the remaining page budget. Mirrors the wizard's pass.
-  if (valid.length > 0 && valid.length < maxPages) {
+  // scrape. Discovery has its OWN bounded budget (≤ min(5, 20% of
+  // maxPages) extra scrapes) on top of any leftover first-pass budget:
+  // on sites whose sitemap already fills maxPages (annadentalclinic.com,
+  // 10 team-profile pages), a leftover-only budget silently skipped the
+  // one pass that can find the pricing page.
+  if (valid.length > 0) {
+    const discoveryBudget = Math.max(
+      maxPages - valid.length,
+      Math.min(5, Math.ceil(maxPages * 0.2)),
+    );
     const seen = new Set(candidates.map((c) => canonicalizeUrl(c) ?? c));
     const discovered = extractInternalLinks(valid, args.url)
       .map((u) => upgradeToRootScheme(args.url, [u])[0]!)
       .filter((u) => !seen.has(canonicalizeUrl(u) ?? u));
     const discKept = dedupeByCanonicalUrl(filterCandidates(discovered, primaryLang).kept);
-    if (discKept.length > 0) {
-      const discCandidates = await selectCandidates(args, discKept, maxPages - valid.length, 0);
+    if (discKept.length > 0 && discoveryBudget > 0) {
+      const discCandidates = await selectCandidates(args, discKept, discoveryBudget, 0);
       if (discCandidates.length > 0) {
         const more = await scrapePass(discCandidates);
         valid.push(...more.filter((p) => p.markdown.length >= MIN_PAGE_CHARS));

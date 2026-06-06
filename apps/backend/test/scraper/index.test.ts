@@ -353,6 +353,37 @@ describe("scrapeAndConsolidate (W2.1 orchestrator)", () => {
     expect(userPrompt).toContain("https://x.pl/cennik");
   });
 
+  it("discovery still runs when the map alone fills the maxPages budget (REGRESSION annadentalclinic.com rebuild: 25 mapped pages → /cennik skipped again)", async () => {
+    // The map returned enough sitemap pages (10 team profiles…) to exhaust
+    // maxPages, so `valid.length < maxPages` was false and the one pass
+    // that can find nav-only pages never ran. Discovery now has a small
+    // bounded budget of its own (≤ min(5, 20% of maxPages) extra scrapes).
+    const scraped: string[] = [];
+    const mapped = Array.from({ length: 12 }, (_, i) => `https://x.pl/uslugi/${i}`);
+    const rootMd = `${pageBody("https://x.pl")}\n[Cennik](https://x.pl/cennik)`;
+    const firecrawl: FirecrawlClient = {
+      async map() {
+        return mapped;
+      },
+      async scrape(url: string) {
+        scraped.push(url);
+        if (url === "https://x.pl") return { url, markdown: rootMd };
+        return { url, markdown: pageBody(url) };
+      },
+    };
+
+    await scrapeAndConsolidate({
+      url: "https://x.pl",
+      firecrawl,
+      llm: makeLlm(),
+      maxPages: 10,
+      fetcher: noRedirectFetcher,
+    });
+
+    expect(scraped.length).toBeGreaterThanOrEqual(10);
+    expect(scraped).toContain("https://x.pl/cennik");
+  });
+
   it("discovery pass does not re-scrape pages already scraped in the first pass", async () => {
     const scraped: string[] = [];
     const rootMd = `${pageBody("https://x.pl")}\n[O nas](https://x.pl/o-nas)`;
@@ -375,6 +406,44 @@ describe("scrapeAndConsolidate (W2.1 orchestrator)", () => {
     });
 
     expect(scraped.filter((u) => u.includes("/o-nas"))).toHaveLength(1);
+  });
+
+  it("rerank input is deterministic regardless of map order (REGRESSION dentus.szczecin.pl: 620 kept URLs, unstable map order → 13 vs 2 priced services across two runs)", async () => {
+    // The rerank cap slices the first 100 kept URLs; with map order
+    // unstable run-to-run (observed 626→0→626 links on the same site
+    // within minutes), the pricing pages randomly fell outside the cap.
+    // Selection must depend on the URL set, not on Firecrawl's mood:
+    // sorted by path depth (shallow pages are the content on clinic
+    // sites), then lexicographically.
+    const mkPages = async (mapOrder: string[]): Promise<string[]> => {
+      const scraped: string[] = [];
+      const firecrawl: FirecrawlClient = {
+        async map() {
+          return mapOrder;
+        },
+        async scrape(url: string) {
+          scraped.push(url);
+          return { url, markdown: pageBody(url) };
+        },
+      };
+      await scrapeAndConsolidate({
+        url: "https://x.pl",
+        firecrawl,
+        llm: makeLlm(),
+        maxPages: 5,
+        fetcher: noRedirectFetcher,
+      });
+      return scraped.sort();
+    };
+
+    const urls = Array.from(
+      { length: 30 },
+      (_, i) => `https://x.pl/page-${String(i).padStart(2, "0")}`,
+    );
+    const shuffled = [...urls].reverse();
+    const a = await mkPages(urls);
+    const b = await mkPages(shuffled);
+    expect(a).toEqual(b);
   });
 
   it("falls back to map order when the rerank itself fails (scrape more, not less)", async () => {

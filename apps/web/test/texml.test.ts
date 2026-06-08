@@ -1,6 +1,12 @@
 // apps/web/test/texml.test.ts
 import { describe, expect, it } from "vitest";
-import { gatherPinTexml, dialSipTexml, goodbyeTexml, MAX_PIN_ATTEMPTS } from "../lib/texml";
+import {
+  gatherPinTexml,
+  dialSipTexml,
+  goodbyeTexml,
+  limitReachedTexml,
+  MAX_PIN_ATTEMPTS,
+} from "../lib/texml";
 
 const BASE = "https://demo.example.com";
 
@@ -51,6 +57,19 @@ describe("goodbyeTexml", () => {
     const xml = goodbyeTexml(BASE);
     expect(xml).toContain(`<Play>${BASE}/ivr/goodbye.mp3</Play>`);
     expect(xml).toContain("<Hangup/>");
+  });
+});
+
+describe("limitReachedTexml", () => {
+  it("plays the demo-limit prompt and hangs up", () => {
+    const xml = limitReachedTexml(BASE);
+    expect(xml).toContain(`<?xml version="1.0" encoding="UTF-8"?>`);
+    expect(xml).toContain(`<Play>${BASE}/ivr/limit-reached.mp3</Play>`);
+    expect(xml).toContain("<Hangup/>");
+  });
+
+  it("rejects XML-unsafe baseUrl (defense in depth)", () => {
+    expect(() => limitReachedTexml("https://x&y")).toThrow();
   });
 });
 

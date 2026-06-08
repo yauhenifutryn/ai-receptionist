@@ -1,9 +1,16 @@
 import { type NextRequest } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase-server";
-import { gatherPinTexml, dialSipTexml, goodbyeTexml, MAX_PIN_ATTEMPTS } from "@/lib/texml";
+import {
+  gatherPinTexml,
+  dialSipTexml,
+  goodbyeTexml,
+  limitReachedTexml,
+  MAX_PIN_ATTEMPTS,
+} from "@/lib/texml";
 import { verifyTelnyxSignature } from "@/lib/verify-telnyx-signature";
 import { pickAgentByPin, type LineAssignment } from "@/lib/resolve-demo-pin";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getDemoBudgetStatus, createSupabaseDemoBudgetReader } from "@/lib/demo-budget";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,6 +95,26 @@ export async function POST(req: NextRequest) {
 
   const match = pickAgentByPin(assignments, digits);
   if (match) {
+    // Per-clinic demo minute budget: a correct PIN still refuses to <Dial>
+    // once this agent has used its 30 min, so one clinic cannot drain the
+    // shared EL credit pool. Fail-open: any error allows the call through.
+    let overBudget = false;
+    try {
+      const status = await getDemoBudgetStatus(
+        createSupabaseDemoBudgetReader(supabase),
+        match.providerAgentId,
+      );
+      overBudget = status.overBudget;
+      if (overBudget) {
+        console.warn(
+          `demo-line: minute budget exhausted → agent ${match.providerAgentId} ` +
+            `(${status.usedSeconds}/${status.budgetSeconds}s)`,
+        );
+      }
+    } catch (e) {
+      console.error("demo-line: budget check failed (allowing call)", (e as Error).message);
+    }
+    if (overBudget) return xml(limitReachedTexml(base));
     console.log(`demo-line: PIN hit → agent ${match.providerAgentId}`);
     return xml(dialSipTexml({ virtualE164: match.elVirtualE164!, pin: digits }));
   }

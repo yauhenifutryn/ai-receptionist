@@ -8,7 +8,6 @@ import ConversationStatsStrip from "./conversation-stats-strip";
 import ELAnalysisStatusCard from "./el-analysis-status-card";
 import DemoAccessPanel from "./demo-access-panel";
 import OwnerInvitePanel from "./owner-invite-panel";
-import PhoneNumberPanel from "./phone-number-panel";
 import PhoneLinePanel from "./phone-line-panel";
 import TestAgentClient from "./test-client";
 
@@ -73,10 +72,9 @@ export default async function TestAgentPage({ params }: PageProps) {
         initialPin={agentRow?.pin_code ?? null}
         origin={origin}
       />
-      <PhoneNumberPanel
-        providerAgentId={agentId}
-        existingPhoneNumber={agentRow?.phone_number ?? null}
-      />
+      {/* Twilio dedicated-number import hidden 2026-06-10 (legacy; telephony
+          is Telnyx now, demo uses the shared PIN line below). Component kept
+          for a future Telnyx rewire. */}
       <PhoneLinePanel providerAgentId={agentId} pinCode={agentRow?.pin_code ?? null} />
       <OwnerInvitePanel agentId={agentId} />
       <AgentManagementPanel providerAgentId={agentId} tenantDisplayName={tenantDisplayName} />

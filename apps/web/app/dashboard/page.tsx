@@ -217,24 +217,14 @@ export default async function DashboardPage() {
                       />
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">
-                      {a.phone_number ?? <span className="text-neutral-300">— unset</span>}
+                      <PhoneCell line={phoneLineMap.get(a.id)} fallback={a.phone_number} />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1.5">
-                        <AgentDemoActions
-                          providerAgentId={a.provider_agent_id}
-                          initialPin={a.pin_code}
-                          origin={origin}
-                        />
-                        {phoneLineMap.has(a.id) ? (
-                          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] text-emerald-800">
-                            &#9990; {phoneLineMap.get(a.id)!.e164}
-                            {phoneLineMap.get(a.id)!.mode === "pin" ? (
-                              <span className="text-amber-700"> &middot; PIN</span>
-                            ) : null}
-                          </span>
-                        ) : null}
-                      </div>
+                      <AgentDemoActions
+                        providerAgentId={a.provider_agent_id}
+                        initialPin={a.pin_code}
+                        origin={origin}
+                      />
                     </td>
                     <td className="px-4 py-3 text-xs uppercase tracking-wider text-neutral-500">
                       {a.default_language}
@@ -278,7 +268,7 @@ export default async function DashboardPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
                   <span className="font-mono">
-                    {a.phone_number ?? <span className="text-neutral-300">no phone</span>}
+                    <PhoneCell line={phoneLineMap.get(a.id)} fallback={a.phone_number} compact />
                   </span>
                   <span className="uppercase tracking-wider">{a.default_language}</span>
                   <span>{formatDate(a.created_at)}</span>
@@ -345,6 +335,38 @@ function HealthDot({ status }: { status: string }) {
       aria-label={m.label}
     />
   );
+}
+
+function PhoneCell({
+  line,
+  fallback,
+  compact,
+}: {
+  line?: { e164: string; mode: string };
+  fallback: string | null;
+  compact?: boolean;
+}) {
+  // A phone is "set" when the agent is on a shared demo line (phone_lines) OR
+  // has a dedicated number (agents.phone_number). The list previously read
+  // only agents.phone_number, so PIN-mode demo agents showed "unset" despite
+  // being reachable. Show the assigned number here; the PIN lives in the
+  // Demo access column.
+  if (line) {
+    return (
+      <span className="inline-flex items-center gap-1 text-neutral-800">
+        {line.e164}
+        <span
+          className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+            line.mode === "pin" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+          }`}
+        >
+          {line.mode === "pin" ? "PIN" : "direct"}
+        </span>
+      </span>
+    );
+  }
+  if (fallback) return <span className="text-neutral-800">{fallback}</span>;
+  return <span className="text-neutral-300">{compact ? "no phone" : "— unset"}</span>;
 }
 
 function formatDate(iso: string): string {

@@ -84,7 +84,7 @@ export default async function PrivacyReferencePage() {
           <strong>ElevenLabs</strong> &middot; voice synthesis + transcription. US region; EU SCCs.
         </Bullet>
         <Bullet>
-          <strong>Twilio EU</strong> &middot; SIP trunk for phone connectivity. EU media region.
+          <strong>Telnyx EU</strong> &middot; SIP trunk for phone connectivity. EU media region.
         </Bullet>
         <Bullet>
           <strong>Supabase</strong> &middot; database + auth. Ireland (eu-west-1).

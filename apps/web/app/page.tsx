@@ -1921,9 +1921,17 @@ function Footer() {
         <span className="text-base font-semibold tracking-tight text-neutral-900">
           {t.footer.copyright}
         </span>
-        <span className="font-mono text-[10px] text-neutral-500 sm:text-xs">
-          &copy; {new Date().getFullYear()}
-        </span>
+        <div className="flex items-center gap-4">
+          <a
+            href="/legal"
+            className="font-mono text-[10px] text-neutral-500 transition hover:text-neutral-800 sm:text-xs"
+          >
+            Legal &amp; privacy
+          </a>
+          <span className="font-mono text-[10px] text-neutral-500 sm:text-xs">
+            &copy; {new Date().getFullYear()}
+          </span>
+        </div>
       </div>
     </footer>
   );

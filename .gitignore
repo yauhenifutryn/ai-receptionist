@@ -93,3 +93,9 @@ apps/backend/.ontology-uploaded.json
 
 # Firecrawl scratch cache (research dumps, not source)
 .firecrawl/
+
+# EWOR proprietary reference templates (never commit)
+docs/legal/_ewor-reference/
+
+# Raw workflow research outputs (large JSON, keep local)
+docs/research/_raw/
